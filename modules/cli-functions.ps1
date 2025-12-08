@@ -15,11 +15,11 @@ function Invoke-Hydrate {
     }
 
     $modulesDir = Join-Path $DevBaseRoot "modules"
-    
+
     try {
         . (Join-Path $modulesDir "setup-core.ps1")
         Setup-Core -RootPath $DevBaseRoot -Force:$Force
-        
+
         . (Join-Path $modulesDir "setup-pkm.ps1")
         Setup-PKM -RootPath $DevBaseRoot -Force:$Force
 
@@ -45,7 +45,7 @@ function Invoke-Hydrate {
 function Invoke-LinkDotfiles {
     param([string]$DevBaseRoot)
     Write-Header "DevBase Link Dotfiles"
-    
+
     $sourceDir = Join-Path $DevBaseRoot "00-09_SYSTEM/01_dotfiles/links"
     $targetDir = $HOME
 
@@ -115,7 +115,7 @@ function Invoke-NewProject {
     }
 
     Write-Host "Criando projeto '$ProjectName' a partir do template '$templateName'..." -ForegroundColor $script:ColorInfo
-    
+
     try {
         Copy-Item -Path $sourcePath -Destination $destinationPath -Recurse -Force
         Write-Step "Projeto '$ProjectName' criado com sucesso em:" "OK"
@@ -130,9 +130,9 @@ function Invoke-Doctor {
     param([string]$DevBaseRoot)
     Write-Header "DevBase Doctor"
     Write-Host "Verificando integridade do DevBase em: $DevBaseRoot`n" -ForegroundColor $script:ColorInfo
-    
+
     $issues = 0
-    
+
     $requiredAreas = @(
         '00-09_SYSTEM',
         '10-19_KNOWLEDGE',
@@ -141,7 +141,7 @@ function Invoke-Doctor {
         '40-49_MEDIA_ASSETS',
         '90-99_ARCHIVE_COLD'
     )
-    
+
     foreach ($area in $requiredAreas) {
         $path = Join-Path $DevBaseRoot $area
         if (Test-Path $path) {
@@ -151,14 +151,14 @@ function Invoke-Doctor {
             $issues++
         }
     }
-    
+
     $requiredFiles = @(
         '.editorconfig',
         '.gitignore',
         '00.00_index.md',
         '.devbase_state.json'
     )
-    
+
     foreach ($file in $requiredFiles) {
         $path = Join-Path $DevBaseRoot $file
         if (Test-Path $path) {
@@ -168,10 +168,10 @@ function Invoke-Doctor {
             $issues++
         }
     }
-    
+
     $privatePath = Join-Path $DevBaseRoot '10-19_KNOWLEDGE/12_private_vault'
     $gitignorePath = Join-Path $DevBaseRoot '.gitignore'
-    
+
     if (Test-Path $privatePath) {
         if (Test-Path $gitignorePath) {
             $gitignoreContent = Get-Content $gitignorePath -Raw
@@ -211,9 +211,9 @@ function Invoke-Audit {
     param([string]$DevBaseRoot, [switch]$Fix)
     Write-Header "DevBase Audit"
     Write-Host "Auditando nomenclatura em: $DevBaseRoot`n" -ForegroundColor $script:ColorInfo
-    
+
     $violations = @()
-    
+
     # Allowed patterns
     $allowedPatterns = @(
         '^\d{2}(-\d{2})?_',
@@ -223,18 +223,18 @@ function Invoke-Audit {
         '^node_modules$',
         '^\.git$'
     )
-    
+
     Get-ChildItem -Path $DevBaseRoot -Recurse -Directory | ForEach-Object {
         $name = $_.Name
         $isAllowed = $false
-        
+
         foreach ($pattern in $allowedPatterns) {
             if ($name -match $pattern) {
                 $isAllowed = $true
                 break
             }
         }
-        
+
         if (-not $isAllowed) {
             $violations += [PSCustomObject]@{
                 Path = $_.FullName
@@ -243,12 +243,12 @@ function Invoke-Audit {
             }
         }
     }
-    
+
     if ($violations.Count -eq 0) {
         Write-Step "Nenhuma violação encontrada" "OK"
     } else {
         Write-Host "Encontradas $($violations.Count) violações:`n" -ForegroundColor $script:ColorWarning
-        
+
         $violations | ForEach-Object {
             Write-Host "  Current:     " -NoNewline -ForegroundColor $script:ColorError
             Write-Host $_.Name -ForegroundColor $script:ColorError
@@ -257,7 +257,7 @@ function Invoke-Audit {
             Write-Host "  Path:      $($_.Path)" -ForegroundColor Gray
             Write-Host ""
         }
-        
+
         if ($Fix) {
             Write-Host "Aplicando correções..." -ForegroundColor $script:ColorInfo
             $violations | ForEach-Object {
@@ -277,13 +277,13 @@ function Invoke-Audit {
 function Invoke-Backup {
     param([string]$DevBaseRoot)
     Write-Header "DevBase Backup 3-2-1"
-    
+
     $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
     $backupName = "devbase_backup_$timestamp"
     $backupPath = Join-Path $DevBaseRoot "30-39_OPERATIONS" "31_backups" "local" $backupName
-    
+
     Write-Host "Criando backup em: $backupPath`n" -ForegroundColor $script:ColorInfo
-    
+
     try {
         if ($IsWindows) {
             Write-Host "Usando 'robocopy' para backup otimizado no Windows..." -ForegroundColor $script:ColorInfo
@@ -301,7 +301,7 @@ function Invoke-Backup {
                 Write-Host "Por favor, instale 'rsync' ou use outra ferramenta de backup manual." -ForegroundColor $script:ColorInfo
                 return
             }
-            
+
             Write-Host "Usando 'rsync' para backup em ambiente non-Windows..." -ForegroundColor $script:ColorInfo
             $rsyncExcludes = @(
                 '--exclude=node_modules/',
@@ -311,7 +311,7 @@ function Invoke-Backup {
             )
             # The slash at the end of the source path is crucial for rsync
             $sourcePath = "$DevBaseRoot/"
-            
+
             # -a: archive mode (recursive, preserves links, permissions, etc.)
             # --delete: deletes files in the destination that no longer exist in the source
             rsync -a --delete $rsyncExcludes $sourcePath $backupPath
@@ -319,16 +319,16 @@ function Invoke-Backup {
 
         Write-Step "Backup local criado com sucesso" "OK"
         Write-Host "  Localização: $backupPath" -ForegroundColor Gray
-        
+
         # Calculate size (cross-platform method)
         $size = (Get-ChildItem -Path $backupPath -Recurse -File | Measure-Object -Property Length -Sum).Sum
         $sizeMB = [math]::Round($size / 1MB, 2)
         Write-Host "  Tamanho: $sizeMB MB" -ForegroundColor Gray
-        
+
     } catch {
         Write-Step "Falha no backup: $_" "ERROR"
     }
-    
+
     Write-Host "`nEstratégia 3-2-1:" -ForegroundColor $script:ColorInfo
     Write-Host "  [1] Local: $backupPath" -ForegroundColor Gray
     Write-Host "  [2] Segundo disco: Copie para um disco externo." -ForegroundColor $script:ColorWarning
@@ -339,9 +339,9 @@ function Invoke-Backup {
 function Invoke-Clean {
     param([string]$DevBaseRoot)
     Write-Header "DevBase Clean"
-    
+
     Write-Host "Limpando arquivos temporários...`n" -ForegroundColor $script:ColorInfo
-    
+
     $patterns = @(
         '*.log',
         '*.tmp',
@@ -349,9 +349,9 @@ function Invoke-Clean {
         'Thumbs.db',
         '.DS_Store'
     )
-    
+
     $cleaned = 0
-    
+
     foreach ($pattern in $patterns) {
         $files = Get-ChildItem -Path $DevBaseRoot -Filter $pattern -Recurse -File -ErrorAction SilentlyContinue
         foreach ($file in $files) {
@@ -359,16 +359,16 @@ function Invoke-Clean {
             $cleaned++
         }
     }
-    
+
     Write-Step "Removed $cleaned temporary files" "OK"
-    
+
     # Clean old backups (keep last 5)
     $backupDir = Join-Path $DevBaseRoot "30-39_OPERATIONS" "31_backups" "local"
     if (Test-Path $backupDir) {
         $oldBackups = Get-ChildItem -Path $backupDir -Directory |
             Sort-Object CreationTime -Descending |
             Select-Object -Skip 5
-        
+
         if ($oldBackups.Count -gt 0) {
             Write-Host "`nRemoving old backups..." -ForegroundColor $script:ColorInfo
             $oldBackups | ForEach-Object {
@@ -384,15 +384,15 @@ function Invoke-Clean {
 
 function Invoke-InitCI {
     param([string]$DevBaseRoot)
-    
+
     Write-Header "DevBase CI Bootstrap"
     $targetPath = Get-Location
-    
+
     Write-Host "Analyzing project at: $targetPath" -ForegroundColor Gray
-    
+
     # 1. Detect Stack
     $stack = Get-ProjectStack -Path $targetPath
-    
+
     if ($stack.Type -eq "generic") {
         Write-Step "Could not detect a specific stack (Node/Python/.NET)." "WARN"
         $proceed = Read-Host "Do you want to install a generic CI template? (y/n)"
@@ -400,11 +400,11 @@ function Invoke-InitCI {
     } else {
         Write-Step "Detected Stack: $($stack.Name) (Manager: $($stack.PackageManager))" "OK"
     }
-    
+
     # 2. Determine Source Template
     $templateName = $stack.ciTemplate
     $sourceTemplate = Join-Path $DevBaseRoot "00-09_SYSTEM/05_templates/ci/$templateName"
-    
+
     if (-not (Test-Path $sourceTemplate)) {
         # Fallback to module source if not hydrated yet
         $sourceTemplate = Join-Path $DevBaseRoot "modules/templates/ci/$templateName"
@@ -413,23 +413,23 @@ function Invoke-InitCI {
             return
         }
     }
-    
+
     # 3. Install to .github/workflows
     $githubDir = Join-Path $targetPath ".github/workflows"
     New-DirSafe $githubDir
-    
+
     $destFile = Join-Path $githubDir "ci.yml"
-    
+
     # Check overwrite
     if (Test-Path $destFile) {
         Write-Step "CI workflow already exists at .github/workflows/ci.yml" "WARN"
         $confirm = Read-Host "Overwrite? (y/n)"
         if ($confirm -ne 'y') { return }
     }
-    
+
     $content = Get-Content $sourceTemplate -Raw
     New-FileSafe -Path $destFile -Content $content -Force
-    
+
     Write-Host "`n[✔] CI/CD Pipeline configured for $($stack.Name)!" -ForegroundColor Green
     Write-Host "    Next step: git add .github/workflows/ci.yml && git commit -m 'ci: add workflow'" -ForegroundColor Gray
 }

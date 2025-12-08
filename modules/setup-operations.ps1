@@ -13,7 +13,7 @@ function Setup-Operations {
     The root path of the DevBase workspace.
 #>
     param([string]$RootPath)
-    
+
     $Area30 = Join-Path $RootPath "30-39_OPERATIONS"
     $templateSourceRoot = Join-Path $PSScriptRoot "templates/operations"
 
@@ -30,31 +30,31 @@ function Setup-Operations {
     New-DirSafe -Path $credentialsPath
     $cliPath = Join-Path $Area30 "35_devbase_cli"
     New-DirSafe -Path $cliPath
-    
+
     # === TEMPLATE PUBLISHING LOGIC ===
     # Copia templates genéricos de operações
     $templateFiles = Get-ChildItem -Path $templateSourceRoot -Filter "*.template" -Recurse
-    
+
     foreach ($templateFile in $templateFiles) {
         $content = Get-Content -Path $templateFile.FullName -Raw
-        
+
         $relativeSourcePath = $templateFile.FullName.Substring($templateSourceRoot.Length + 1)
         $destinationFileName = $templateFile.Name.Replace(".template", "")
-        
+
         $destinationDir = Join-Path $Area30 (Split-Path $relativeSourcePath -Parent)
         $destinationPath = Join-Path $destinationDir $destinationFileName
 
         if (-not (Test-Path $destinationDir)) {
             New-DirSafe -Path $destinationDir
         }
-        
+
         New-FileSafe -Path $destinationPath -Content $content -UpdateIfExists
     }
-    
+
     # === DEVBASE CLI MAIN SCRIPTS ===
     # Instala o devbase.ps1 e as novas ferramentas de telemetria da v3.1
     # Nota: Assume que os assets existem na pasta modules/assets/
-    
+
     $cliTools = @(
         "devbase.ps1",
         "telemetry.ps1",      # Novo na v3.1
@@ -72,7 +72,7 @@ function Setup-Operations {
             # Write-Step "Asset não encontrado: $assetPath" "WARN"
         }
     }
-	
+
 	$libsToCopy = @(
 			"common-functions.ps1",
 			"cli-functions.ps1",
@@ -83,7 +83,7 @@ function Setup-Operations {
 			# Procura na mesma pasta do script (modules)
 			$srcPath = Join-Path $PSScriptRoot $lib
 			$destPath = Join-Path $cliPath $lib
-			
+
 			if (Test-Path $srcPath) {
 				Copy-Item -Path $srcPath -Destination $destPath -Force
 				Write-Step "Biblioteca instalada: $lib" "OK"

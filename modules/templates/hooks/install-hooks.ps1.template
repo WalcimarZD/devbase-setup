@@ -28,16 +28,16 @@ Write-Host "Instalando Git hooks em '$targetDir'..." -ForegroundColor Cyan
 
 foreach ($hook in $hooks) {
     $powerShellScriptPath = Join-Path $hooksSourceDir "$hook.ps1"
-    
+
     # O hook em si, que será o executável dentro de .git/hooks
     $hookWrapperPath = Join-Path $targetDir $hook
-    
+
     # Cria um wrapper shell que invoca o script PowerShell de forma portável
     # Isso funciona no cmd, powershell e git-bash no Windows.
     $wrapperContent = "#!/bin/sh`n# DevBase Hook Wrapper`n`npwsh -NoProfile -File `"$powerShellScriptPath`" `$@`n"
-    
+
     Set-Content -Path $hookWrapperPath -Value $wrapperContent -Encoding UTF8 -Force
-    
+
     # Torna executável (essencial para ambientes *nix/macOS e Git Bash)
     if (-not $IsWindows) {
         try {
@@ -46,7 +46,7 @@ foreach ($hook in $hooks) {
             Write-Warning "Could not make hook executable. You may need to run 'chmod +x $($hookWrapperPath)' manually."
         }
     }
-    
+
     Write-Host "  [OK] Instalado hook: $hook" -ForegroundColor Green
 }
 

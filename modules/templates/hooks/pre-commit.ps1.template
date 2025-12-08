@@ -10,7 +10,7 @@ Write-Host "🔍 Running pre-commit checks..." -ForegroundColor Cyan
 # === DETECTAR CREDENCIAIS ===
 function Check-Credentials {
     Write-Host "  Checking for secrets..."
-    
+
     $patterns = @(
         'password\s*=\s*["\x27][^"\x27]+',
         'api[_-]?key\s*=\s*["\x27][^"\x27]+',
@@ -22,10 +22,10 @@ function Check-Credentials {
         'aws_access_key_id',
         'aws_secret_access_key'
     )
-    
+
     # Apenas arquivos no stage
     $stagedFiles = git diff --cached --name-only --diff-filter=ACM
-    
+
     foreach ($file in $stagedFiles) {
         if (Test-Path $file -PathType Leaf) {
             foreach ($pattern in $patterns) {
@@ -39,7 +39,7 @@ function Check-Credentials {
             }
         }
     }
-    
+
     Write-Host "  ✅ No credentials detected" -ForegroundColor Green
 }
 
@@ -55,7 +55,7 @@ function Check-LintAndFormat {
             Write-Warning "Could not parse package.json. Skipping lint/format."
             return
         }
-        
+
         $hasPrettier = $null -ne $packageJson.devDependencies.prettier -or $null -ne $packageJson.dependencies.prettier
         $hasEslint = $null -ne $packageJson.devDependencies.eslint -or $null -ne $packageJson.dependencies.eslint
 
@@ -65,7 +65,7 @@ function Check-LintAndFormat {
             $stagedFiles | ForEach-Object { git add $_ }
             Write-Host "  ✅ Prettier passed" -ForegroundColor Green
         }
-        
+
         if ($hasEslint) {
             $lintFiles = $stagedFiles | Where-Object { $_ -match '\.(js|ts|jsx|tsx)$' }
             if ($lintFiles) {

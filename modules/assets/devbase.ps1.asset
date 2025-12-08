@@ -17,24 +17,24 @@ param(
         'track', 'stats', 'weekly', 'brag' # Telemetry v3.2
     )]
     [string]$Command = 'help',
-    
+
     # Parâmetros para 'new' e 'hydrate'
     [Parameter(ParameterSetName='NewProject')]
     [string]$Name,
 
     [Parameter()]
     [switch]$Fix,
-    
+
     [Parameter(ParameterSetName='Hydrate')]
     [switch]$Force,
-    
+
     # Parâmetros para Telemetria (v3.2)
     [Parameter(ParameterSetName='Telemetry')]
     [string]$Message,
-    
+
     [Parameter(ParameterSetName='Telemetry')]
     [string]$Type = "work",
-    
+
     [Parameter(ParameterSetName='Telemetry')]
     [string]$Output, # Caminho para exportar (weekly/brag)
 
@@ -81,12 +81,12 @@ function Invoke-Hydrate {
     }
 
     $modulesDir = Join-Path $DevBaseRoot "modules"
-    
+
     try {
         Write-Step "Hidratando Core..." "INFO" # Pass string "INFO" instead of ColorInfo variable
         . (Join-Path $modulesDir "setup-core.ps1")
         Setup-Core -RootPath $DevBaseRoot -Force:$Force # Pass -Force to setup module
-        
+
         Write-Step "Hidratando PKM..." "INFO"
         . (Join-Path $modulesDir "setup-pkm.ps1")
         Setup-PKM -RootPath $DevBaseRoot -Force:$Force # Pass -Force to setup module
@@ -120,7 +120,7 @@ function Invoke-Hydrate {
 
 function Invoke-LinkDotfiles {
     Write-Header "DevBase Link Dotfiles"
-    
+
     $sourceDir = Join-Path $DevBaseRoot "00-09_SYSTEM" "01_dotfiles" "links"
     $targetDir = $HOME
 
@@ -199,12 +199,12 @@ function Invoke-NewProject {
     }
 
     Write-Host "Criando projeto '$ProjectName' a partir do template '$templateName'..." -ForegroundColor $script:ColorInfo
-    
+
     try {
         Copy-Item -Path $sourcePath -Destination $destinationPath -Recurse -Force
         Write-Step "Projeto '$ProjectName' criado com sucesso em:" "OK"
         Write-Host $destinationPath -ForegroundColor Gray
-        
+
         # TODO: Adicionar lógica para substituir placeholders dentro dos arquivos do novo projeto.
         # Ex: Get-ChildItem -Path $destinationPath -Recurse | Where-Object { -not $_.PSIsContainer } | ForEach-Object { (Get-Content $_.FullName -Raw) -replace '{{PROJECT_NAME}}', $ProjectName | Set-Content $_.FullName -Encoding UTF8 }
 
@@ -221,9 +221,9 @@ function Invoke-NewProject {
 function Invoke-Doctor {
     Write-Header "DevBase Doctor"
     Write-Host "Verificando integridade do DevBase em: $DevBaseRoot`n" -ForegroundColor $script:ColorInfo
-    
+
     $issues = 0
-    
+
     # 1. Verificar estrutura de áreas
     Write-Host "Verificando estrutura de áreas..." -ForegroundColor $script:ColorInfo
     $requiredAreas = @(
@@ -234,7 +234,7 @@ function Invoke-Doctor {
         '40-49_MEDIA_ASSETS',
         '90-99_ARCHIVE_COLD'
     )
-    
+
     foreach ($area in $requiredAreas) {
         $path = Join-Path $DevBaseRoot $area
         if (Test-Path $path) {
@@ -244,7 +244,7 @@ function Invoke-Doctor {
             $issues++
         }
     }
-    
+
     # 2. Verificar arquivos de governança
     Write-Host "`nVerificando arquivos de governança..." -ForegroundColor $script:ColorInfo
     $requiredFiles = @(
@@ -253,7 +253,7 @@ function Invoke-Doctor {
         '00.00_index.md',
         '.devbase_state.json'
     )
-    
+
     foreach ($file in $requiredFiles) {
         $path = Join-Path $DevBaseRoot $file
         if (Test-Path $path) {
@@ -263,12 +263,12 @@ function Invoke-Doctor {
             $issues++
         }
     }
-    
+
     # 3. Verificar Air-Gap do Private Vault
     Write-Host "`nVerificando Air-Gap do Private Vault..." -ForegroundColor $script:ColorInfo
     $privatePath = Join-Path $DevBaseRoot '10-19_KNOWLEDGE_PKM' '12_private_vault'
     $gitignorePath = Join-Path $DevBaseRoot '.gitignore'
-    
+
     if (Test-Path $privatePath) {
         if (Test-Path $gitignorePath) {
             $gitignoreContent = Get-Content $gitignorePath -Raw
@@ -303,11 +303,11 @@ function Invoke-Doctor {
     } else {
         Write-Step "Comando 'git' não encontrado. Verificação de hooks pulada." "INFO"
     }
-    
+
     # 5. Verificar nomenclatura kebab-case
     Write-Host "`nVerificando nomenclatura kebab-case..." -ForegroundColor $script:ColorInfo
     $violations = Get-ChildItem -Path $DevBaseRoot -Recurse -Directory |
-        Where-Object { 
+        Where-Object {
             $_.Name -notmatch '^[a-z0-9]+(-[a-z0-9]+)*$' -and
             $_.Name -notmatch '^\d{2}(-\d{2})?_' -and
             $_.Name -notmatch '^\.' -and
@@ -315,7 +315,7 @@ function Invoke-Doctor {
             $_.Name -notmatch '^node_modules$'
         } |
         Select-Object -First 10
-    
+
     if ($violations.Count -eq 0) {
         Write-Step "Nomenclatura OK" "OK"
     } else {
@@ -324,7 +324,7 @@ function Invoke-Doctor {
             Write-Host "    - $($_.FullName)" -ForegroundColor $script:ColorWarning
         }
     }
-    
+
     # 6. Verificar state file
     Write-Host "`nVerificando state file..." -ForegroundColor $script:ColorInfo
     $statePath = Join-Path $DevBaseRoot '.devbase_state.json'
@@ -338,7 +338,7 @@ function Invoke-Doctor {
             $issues++
         }
     }
-    
+
     # Resultado final
     Write-Host "`n" + "="*50 -ForegroundColor $script:ColorHeader
     if ($issues -eq 0) {
@@ -356,9 +356,9 @@ function Invoke-Doctor {
 function Invoke-Audit {
     Write-Header "DevBase Audit"
     Write-Host "Auditando nomenclatura em: $DevBaseRoot`n" -ForegroundColor $script:ColorInfo
-    
+
     $violations = @()
-    
+
     # Padrões permitidos
     $allowedPatterns = @(
         '^\d{2}(-\d{2})?_',     # Johnny.Decimal (00-09_NAME)
@@ -368,18 +368,18 @@ function Invoke-Audit {
         '^node_modules$',        # Exceptions
         '^\.git$'
     )
-    
+
     Get-ChildItem -Path $DevBaseRoot -Recurse -Directory | ForEach-Object {
         $name = $_.Name
         $isAllowed = $false
-        
+
         foreach ($pattern in $allowedPatterns) {
             if ($name -match $pattern) {
                 $isAllowed = $true
                 break
             }
         }
-        
+
         if (-not $isAllowed) {
             $violations += [PSCustomObject]@{
                 Path = $_.FullName
@@ -388,12 +388,12 @@ function Invoke-Audit {
             }
         }
     }
-    
+
     if ($violations.Count -eq 0) {
         Write-Step "Nenhuma violação encontrada" "OK"
     } else {
         Write-Host "Encontradas $($violations.Count) violações:`n" -ForegroundColor $script:ColorWarning
-        
+
         $violations | ForEach-Object {
             Write-Host "  Atual:     " -NoNewline -ForegroundColor $script:ColorError
             Write-Host $_.Name -ForegroundColor $script:ColorError
@@ -402,7 +402,7 @@ function Invoke-Audit {
             Write-Host "  Path:      $($_.Path)" -ForegroundColor Gray
             Write-Host ""
         }
-        
+
         if ($Fix) {
             Write-Host "Aplicando correções..." -ForegroundColor $script:ColorInfo
             $violations | ForEach-Object {
@@ -424,13 +424,13 @@ function Invoke-Audit {
 
 function Invoke-Backup {
     Write-Header "DevBase Backup 3-2-1"
-    
+
     $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
     $backupName = "devbase_backup_$timestamp"
     $backupPath = Join-Path $DevBaseRoot "30-39_OPERATIONS" "31_backups" "local" $backupName
-    
+
     Write-Host "Criando backup em: $backupPath`n" -ForegroundColor $script:ColorInfo
-    
+
     try {
         if ($IsWindows) {
             Write-Host "Usando 'robocopy' para backup otimizado no Windows..." -ForegroundColor $script:ColorInfo
@@ -448,7 +448,7 @@ function Invoke-Backup {
                 Write-Host "Por favor, instale 'rsync' ou use outra ferramenta de backup manual." -ForegroundColor $script:ColorInfo
                 return
             }
-            
+
             Write-Host "Usando 'rsync' para backup em ambiente non-Windows..." -ForegroundColor $script:ColorInfo
             $rsyncExcludes = @(
                 '--exclude=node_modules/',
@@ -458,7 +458,7 @@ function Invoke-Backup {
             )
             # A barra no final do caminho de origem é crucial para o rsync
             $sourcePath = "$DevBaseRoot/"
-            
+
             # -a: modo archive (recursivo, preserva links, permissões, etc.)
             # --delete: deleta arquivos no destino que não existem mais na origem
             rsync -a --delete $rsyncExcludes $sourcePath $backupPath
@@ -466,16 +466,16 @@ function Invoke-Backup {
 
         Write-Step "Backup local criado com sucesso" $script:ColorSuccess
         Write-Host "  Localização: $backupPath" -ForegroundColor Gray
-        
+
         # Calcular tamanho (método cross-platform)
         $size = (Get-ChildItem -Path $backupPath -Recurse -File | Measure-Object -Property Length -Sum).Sum
         $sizeMB = [math]::Round($size / 1MB, 2)
         Write-Host "  Tamanho: $sizeMB MB" -ForegroundColor Gray
-        
+
     } catch {
         Write-Step "Falha no backup: $_" $script:ColorError
     }
-    
+
     Write-Host "`nEstratégia 3-2-1:" -ForegroundColor $script:ColorInfo
     Write-Host "  [1] Local: $backupPath" -ForegroundColor Gray
     Write-Host "  [2] Segundo disco: Copie para um disco externo." -ForegroundColor $script:ColorWarning
@@ -488,9 +488,9 @@ function Invoke-Backup {
 
 function Invoke-Clean {
     Write-Header "DevBase Clean"
-    
+
     Write-Host "Limpando arquivos temporários...`n" -ForegroundColor $script:ColorInfo
-    
+
     $patterns = @(
         '*.log',
         '*.tmp',
@@ -498,9 +498,9 @@ function Invoke-Clean {
         'Thumbs.db',
         '.DS_Store'
     )
-    
+
     $cleaned = 0
-    
+
     foreach ($pattern in $patterns) {
         $files = Get-ChildItem -Path $DevBaseRoot -Filter $pattern -Recurse -File -ErrorAction SilentlyContinue
         foreach ($file in $files) {
@@ -508,16 +508,16 @@ function Invoke-Clean {
             $cleaned++
         }
     }
-    
+
     Write-Step "Removidos $cleaned arquivos temporários" $script:ColorSuccess
-    
+
     # Limpar backups antigos (manter últimos 5)
     $backupDir = Join-Path $DevBaseRoot "30-39_OPERATIONS" "31_backups" "local"
     if (Test-Path $backupDir) {
         $oldBackups = Get-ChildItem -Path $backupDir -Directory |
             Sort-Object CreationTime -Descending |
             Select-Object -Skip 5
-        
+
         if ($oldBackups.Count -gt 0) {
             Write-Host "`nRemovendo backups antigos..." -ForegroundColor $script:ColorInfo
             $oldBackups | ForEach-Object {
@@ -537,7 +537,7 @@ function Invoke-Track {
     if (-not $Message) {
         $Message = Read-Host "Digite a mensagem para o log (ex: 'Corrigi bug X')"
     }
-    
+
     $telemetryScript = Join-Path $PSScriptRoot "telemetry.ps1"
     if (Test-Path $telemetryScript) {
         & pwsh -File $telemetryScript record $Type $Message
@@ -560,7 +560,7 @@ function Invoke-Weekly {
     if (Test-Path $telemetryScript) {
         $argsList = @("weekly")
         if ($Output) { $argsList += "-OutputPath"; $argsList += $Output }
-        
+
         & pwsh -File $telemetryScript @argsList
     }
 }
@@ -571,7 +571,7 @@ function Invoke-Brag {
     if (Test-Path $telemetryScript) {
         $argsList = @("brag")
         if ($Output) { $argsList += "-OutputPath"; $argsList += $Output }
-        
+
         & pwsh -File $telemetryScript @argsList
     }
 }
@@ -630,7 +630,7 @@ switch ($Command) {
     'new'    { Invoke-NewProject -ProjectName $Name }
     'link-dotfiles' { Invoke-LinkDotfiles }
     'hydrate' { Invoke-Hydrate -Force:$Force }
-    
+
     # Novos comandos v3.2
     'track'  { Invoke-Track }
     'stats'  { Invoke-Stats }

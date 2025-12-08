@@ -1,9 +1,9 @@
 # [ADR-XXXX] Título da Decisão
 
 > **ADR** = Architecture Decision Record
-> 
-> ADRs documentam decisões importantes de arquitetura e design, explicando o **contexto**, 
-> **opções consideradas** e **justificativa** da escolha. Eles formam um histórico de 
+>
+> ADRs documentam decisões importantes de arquitetura e design, explicando o **contexto**,
+> **opções consideradas** e **justificativa** da escolha. Eles formam um histórico de
 > "por que fizemos assim" que é inestimável para novos membros da equipe e para o "eu do futuro".
 
 ## Metadados
@@ -36,8 +36,8 @@ Descreva o **contexto** e o **problema** que motivou esta decisão. Seja especí
 - Quais são as forças em jogo (restrições técnicas, negócio, tempo)?
 
 **Exemplo:**
-> Nosso sistema de autenticação atual usa sessões em memória, o que impede 
-> escalabilidade horizontal. Com a previsão de crescimento de 10x nos próximos 
+> Nosso sistema de autenticação atual usa sessões em memória, o que impede
+> escalabilidade horizontal. Com a previsão de crescimento de 10x nos próximos
 > 6 meses, precisamos de uma solução que suporte múltiplas instâncias.
 
 ## Drivers de Decisão
@@ -136,5 +136,5 @@ Como saberemos se a decisão foi correta?
 ---
 
 > **Template baseado em:** [MADR](https://adr.github.io/madr/) (Markdown Any Decision Records)
-> 
+>
 > **Dica:** ADRs não precisam ser perfeitos. Um ADR simples é melhor que nenhum ADR.

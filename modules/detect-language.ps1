@@ -24,11 +24,11 @@ function Get-ProjectStack {
     if (Test-Path (Join-Path $Path "package.json")) {
         $stack.Type = "node"
         $stack.Name = "Node.js"
-        
+
         if (Test-Path (Join-Path $Path "pnpm-lock.yaml")) { $stack.PackageManager = "pnpm" }
         elseif (Test-Path (Join-Path $Path "yarn.lock")) { $stack.PackageManager = "yarn" }
         else { $stack.PackageManager = "npm" }
-        
+
         $stack.ciTemplate = "ci-node.yml.template"
         return $stack
     }

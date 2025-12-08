@@ -234,7 +234,7 @@ Para adicionar um novo comando:
 
 <div align="center">
 
-**Documento Gerado**: {{DATE}}  
+**Documento Gerado**: {{DATE}}
 **Versão**: {{POLICY_VERSION}}
 
 [⬆️ Voltar ao topo](#️-arquitetura-do-devbase)

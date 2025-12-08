@@ -241,30 +241,30 @@ function Setup-[Nome] {
         O caminho raiz do workspace DevBase.
     #>
     param([string]$RootPath)
-    
+
     # 1. Definir caminhos
     $Area = Join-Path $RootPath "[XX-XX_AREA]"
     $templateSourceRoot = Join-Path $PSScriptRoot "templates/[area]"
-    
+
     # 2. Criar estrutura de diretórios
     New-DirSafe -Path $Area
     New-DirSafe -Path (Join-Path $Area "subfolder")
-    
+
     # 3. Processar templates
     $templateFiles = Get-ChildItem -Path $templateSourceRoot -Filter "*.template" -Recurse
-    
+
     foreach ($templateFile in $templateFiles) {
         $content = Get-Content -Path $templateFile.FullName -Raw
-        
+
         # Substituir placeholders
         $content = $content.Replace('{{PLACEHOLDER}}', $value)
-        
+
         # Calcular caminho de destino
         $relativeSourcePath = $templateFile.FullName.Substring($templateSourceRoot.Length + 1)
         $destinationFileName = $templateFile.Name.Replace(".template", "")
         $destinationDir = Join-Path $Area (Split-Path $relativeSourcePath -Parent)
         $destinationPath = Join-Path $destinationDir $destinationFileName
-        
+
         # Criar arquivo
         New-FileSafe -Path $destinationPath -Content $content -UpdateIfExists
     }
@@ -312,7 +312,7 @@ $modulesPath = Join-Path $PSScriptRoot "modules"
 
 $modules = @(
     "setup-core.ps1",
-    "setup-pkm.ps1", 
+    "setup-pkm.ps1",
     "setup-code.ps1",
     "setup-operations.ps1",
     "setup-templates.ps1",
@@ -384,21 +384,21 @@ $templateFiles = Get-ChildItem -Path $templateSourceRoot -Filter "*.template" -R
 foreach ($templateFile in $templateFiles) {
     # 1. Ler conteúdo do template
     $content = Get-Content -Path $templateFile.FullName -Raw
-    
+
     # 2. Substituir placeholders dinâmicos
     $content = $content.Replace('{{YEAR}}', (Get-Date -Format 'yyyy'))
     $content = $content.Replace('{{DATE}}', (Get-Date -Format 'yyyy-MM-dd'))
     $content = $content.Replace('{{WEEK_NUMBER}}', (Get-Date -UFormat '%V'))
-    
+
     # 3. Calcular caminho de destino
     #    Template: modules/templates/pkm/11_public_garden/til/template-til.md.template
     #    Destino:  Dev_Workspace/10-19_KNOWLEDGE/11_public_garden/til/template-til.md
-    
+
     $relativeSourcePath = $templateFile.FullName.Substring($templateSourceRoot.Length + 1)
     $destinationFileName = $templateFile.Name.Replace(".template", "")
     $destinationDir = Join-Path $Area10 (Split-Path $relativeSourcePath -Parent)
     $destinationPath = Join-Path $destinationDir $destinationFileName
-    
+
     # 4. Criar arquivo (idempotente)
     New-FileSafe -Path $destinationPath -Content $content -UpdateIfExists
 }
@@ -578,9 +578,9 @@ function Save-DevBaseState {
 function Invoke-Doctor {
     Write-Header "DevBase Doctor"
     Write-Host "Verificando integridade do DevBase em: $DevBaseRoot`n" -ForegroundColor $script:ColorInfo
-    
+
     $issues = 0
-    
+
     # 1. Verificar estrutura de áreas
     Write-Host "Verificando estrutura de áreas..." -ForegroundColor $script:ColorInfo
     $requiredAreas = @(
@@ -591,7 +591,7 @@ function Invoke-Doctor {
         '40-49_MEDIA_ASSETS',
         '90-99_ARCHIVE_COLD'
     )
-    
+
     foreach ($area in $requiredAreas) {
         $path = Join-Path $DevBaseRoot $area
         if (Test-Path $path) {
@@ -601,10 +601,10 @@ function Invoke-Doctor {
             $issues++
         }
     }
-    
+
     # 2. Verificar arquivos de governança
     # ...
-    
+
     # 3. Resultado final
     if ($issues -eq 0) {
         Write-Host "DevBase está SAUDÁVEL" -ForegroundColor $script:ColorSuccess
@@ -674,7 +674,7 @@ function Assert-SafePath {
         # Resolve caminhos para evitar ../
         $absTarget = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($TargetPath)
         $absRoot = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($AllowedRoot)
-        
+
         if (-not $absTarget.StartsWith($absRoot, [StringComparison]::InvariantCultureIgnoreCase)) {
             throw "SECURITY VIOLATION: Path Traversal detected! '$absTarget' is outside '$absRoot'."
         }
@@ -697,7 +697,7 @@ function Write-FileAtomic {
 
     $parentDir = Split-Path $Path -Parent
     if (-not (Test-Path $parentDir)) { New-DirSafe $parentDir }
-    
+
     # 1. Escrever em arquivo temporário
     $fileName = Split-Path $Path -Leaf
     $tempPath = Join-Path $parentDir ".$fileName.$([Guid]::NewGuid()).tmp"
@@ -705,19 +705,19 @@ function Write-FileAtomic {
     try {
         # 2. Escrever conteúdo
         Set-Content -Path $tempPath -Value $Content -Encoding $Encoding -Force
-        
+
         # 3. Sanitizar BOM
         Assert-NoBOM -Path $tempPath
-        
+
         # 4. Rename atômico (operação do filesystem)
         Move-Item -LiteralPath $tempPath -Destination $Path -Force
-        
+
         return $true
     }
     catch {
         # Limpar temp file em caso de erro
-        if (Test-Path $tempPath) { 
-            Remove-Item $tempPath -Force -ErrorAction SilentlyContinue 
+        if (Test-Path $tempPath) {
+            Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
         }
         throw $_
     }
@@ -740,13 +740,13 @@ function Write-FileAtomic {
 
 function Setup-MeuModulo {
     param([string]$RootPath)
-    
+
     $Area = Join-Path $RootPath "XX-XX_MINHA_AREA"
     $templateSourceRoot = Join-Path $PSScriptRoot "templates/meumodulo"
-    
+
     # Criar estrutura
     New-DirSafe -Path $Area
-    
+
     # Processar templates
     # ...
 }
@@ -780,12 +780,12 @@ Setup-MeuModulo -RootPath $RootPath
 
 function Invoke-MeuComando {
     Write-Header "Meu Comando"
-    
+
     # Sua lógica aqui
     Write-Step "Fazendo algo..." "INFO"
-    
+
     # ...
-    
+
     Write-Step "Concluído" "OK"
 }
 

@@ -18,4 +18,3 @@ Response timeline
   provide progress updates until the issue is resolved.
 
 For more information see: https://docs.github.com/en/code-security
-

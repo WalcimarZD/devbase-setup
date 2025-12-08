@@ -77,7 +77,7 @@ O template segue **Clean Architecture** (também conhecida como Onion Architectu
 ### Regra de Dependência
 **Dependências apontam PARA DENTRO:**
 - ✅ Infrastructure → Domain
-- ✅ Application → Domain  
+- ✅ Application → Domain
 - ✅ Presentation → Application
 - ❌ Domain → Infrastructure (NUNCA!)
 

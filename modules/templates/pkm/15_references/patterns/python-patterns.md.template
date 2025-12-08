@@ -63,7 +63,7 @@ def minha_funcao(a: int, b: int) -> int:
 
     Returns:
         A soma de a e b.
-    
+
     Raises:
         TypeError: Se os argumentos não forem inteiros.
     """
@@ -84,10 +84,10 @@ def test_soma_positivos():
     # Arrange (Organizar)
     a = 5
     b = 10
-    
+
     # Act (Agir)
     resultado = minha_funcao(a, b)
-    
+
     # Assert (Verificar)
     assert resultado == 15
 ```

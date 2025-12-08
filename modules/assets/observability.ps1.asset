@@ -44,7 +44,7 @@ function Generate-Weeknotes {
     $md = @"
 # Weeknotes: $weekStart to $weekEnd
 
-Author: $authorName  
+Author: $authorName
 Generated: $($now.ToString('yyyy-MM-dd HH:mm'))
 
 ---
@@ -103,7 +103,7 @@ function Generate-BragDoc {
     $md = @"
 # Brag Document - Q$quarter $year
 
-Author: $authorName  
+Author: $authorName
 Generated: $($now.ToString('yyyy-MM-dd HH:mm'))
 
 ---

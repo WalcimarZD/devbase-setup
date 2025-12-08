@@ -338,7 +338,7 @@ O arquivo `.devbase_state.json` na raiz do workspace rastreia:
 
 ### **P: Como adicionar meus dotfiles?**
 
-**R:** 
+**R:**
 1. Copie seus dotfiles para `00-09_SYSTEM/01_dotfiles/links/`
 2. Execute `devbase link-dotfiles`
 3. O DevBase criará symlinks em `$HOME`

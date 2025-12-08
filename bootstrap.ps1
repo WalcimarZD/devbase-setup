@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
     DevBase v3.1 - Bootstrap (Orquestrador Principal)
-    
+
 .DESCRIPTION
     Este é o script principal do DevBase - o "maestro" que coordena toda a
     configuração do seu Personal Engineering Operating System.
-    
+
     ╔═══════════════════════════════════════════════════════════════════╗
     ║  O QUE ESTE SCRIPT FAZ:                                          ║
     ╠═══════════════════════════════════════════════════════════════════╣
@@ -15,7 +15,7 @@
     ║  4. Salva o estado para futuras migrações                        ║
     ║  5. Valida a estrutura final                                     ║
     ╚═══════════════════════════════════════════════════════════════════╝
-    
+
     CONCEITO: IDEMPOTÊNCIA
     ──────────────────────
     Este script é IDEMPOTENTE - você pode executá-lo quantas vezes quiser
@@ -23,15 +23,15 @@
     • Diretórios existentes não são recriados
     • Arquivos existentes não são sobrescritos (exceto com -Force)
     • Estado é rastreado para evitar retrabalho
-    
+
     CONCEITO: DECLARATIVO vs IMPERATIVO
     ────────────────────────────────────
     O DevBase usa uma abordagem declarativa: você define o ESTADO DESEJADO
     através de templates, e o sistema cuida de chegar lá.
-    
+
     Imperativo: "Crie pasta X, depois Y, depois arquivo Z"
     Declarativo: "O sistema deve ter esta estrutura" → sistema calcula o que fazer
-    
+
     ORDEM DE EXECUÇÃO DOS MÓDULOS:
     ──────────────────────────────
     1. setup-core.ps1       → Estrutura base Johnny.Decimal
@@ -41,36 +41,36 @@
     5. setup-templates.ps1  → Padrões técnicos
     6. setup-hooks.ps1      → Git hooks
     7. setup-ai.ps1         → Módulo de IA local
-    
+
     A ordem importa! Módulos posteriores podem depender de estruturas
     criadas por módulos anteriores.
-    
+
 .PARAMETER RootPath
     O caminho raiz para o workspace DevBase (onde a estrutura será criada).
     Se não especificado, usa "$HOME\Dev_Workspace".
-    
+
     DICA: Use um SSD/NVMe para melhor performance!
-    
+
 .PARAMETER SkipStorageValidation
     Pula a verificação de tipo de storage (SSD/NVMe).
     Útil para VMs ou ambientes de teste onde o tipo de storage não pode
     ser determinado automaticamente.
-    
+
 .PARAMETER Force
     Força a atualização de TODOS os arquivos de template, sobrescrevendo
     arquivos existentes no destino.
-    
+
     ⚠️  CUIDADO: Isso sobrescreve customizações que você tenha feito nos
     arquivos gerados pelo DevBase.
-    
+
     Quando usar -Force:
     • Ao atualizar o DevBase para uma nova versão
     • Para restaurar templates ao estado original
     • Em ambiente de desenvolvimento do DevBase
-    
+
 .PARAMETER SkipHooks
     Impede a instalação de git hooks e a configuração de `core.hooksPath`.
-    
+
     Quando usar -SkipHooks:
     • Quando você tem hooks próprios que não quer substituir
     • Em ambientes CI/CD onde hooks não são necessários
@@ -95,12 +95,12 @@
 .NOTES
     Versão: 3.1.0
     Requer: PowerShell 5.1+ ou PowerShell Core 7+
-    
+
     ARQUIVOS IMPORTANTES:
     • .devbase_state.json  → Estado da instalação (versão, migrações)
     • 00.00_index.md       → Índice principal do workspace
     • .gitignore           → Proteção do vault privado
-    
+
     TROUBLESHOOTING:
     • Se der erro de permissão: Execute como Administrador
     • Se módulo não for encontrado: Verifique se a pasta modules/ está completa
@@ -190,7 +190,7 @@ $script:StateFile = Join-Path $RootPath ".devbase_state.json"
     - Qual versão está instalada
     - Quando foi instalada/atualizada
     - Quais migrações já foram aplicadas
-    
+
     Se o arquivo não existir, retorna um estado "vazio" (versão 0.0.0)
     indicando uma instalação nova.
 
@@ -246,7 +246,7 @@ function Save-DevBaseState {
     - Tier 0 (Hot): SSD/NVMe - Para workspace ativo (dados quentes)
     - Tier 1 (Warm): HDD - Para backups recentes
     - Tier 2 (Cold): Cloud/External - Para arquivos históricos
-    
+
     Esta função verifica se o diretório está em storage Tier 0,
     que é recomendado para melhor performance de I/O.
 
@@ -259,18 +259,18 @@ function Save-DevBaseState {
 .NOTES
     Esta verificação é Windows-específica e usa WMI/CIM para
     consultar informações do disco físico.
-    
+
     Em Linux/macOS, a verificação é pulada automaticamente.
 #>
 function Test-StorageTier {
     param([string]$Path)
-    
+
     # Permite pular a verificação via parâmetro
     if ($SkipStorageValidation) {
         Write-Step "Storage validation skipped" "WARN"
         return $true
     }
-    
+
     # Verificação só funciona no Windows (usa WMI)
     # $IsWindows é automático no PowerShell Core
     if (-not $IsWindows) {
@@ -280,7 +280,7 @@ function Test-StorageTier {
 
     # Extrai a letra do drive (ex: "D" de "D:\DevBase")
     $driveLetter = (Split-Path $Path -Qualifier).TrimEnd(':')
-    
+
     try {
         # Pipeline WMI para descobrir o tipo de mídia do disco físico
         # Get-PhysicalDisk → Get-Partition → Get-Disk → verificar MediaType
@@ -289,7 +289,7 @@ function Test-StorageTier {
             $diskNumber = ($partitions | Get-Disk).Number
             $_.DeviceId -eq $diskNumber
         } | Select-Object -First 1
-        
+
         if ($disk) {
             $mediaType = $disk.MediaType
             # SSD, NVMe ou Unspecified (VMs/WSL) são aceitáveis
@@ -329,8 +329,8 @@ Write-Host @"
 ║                                                           ║
 ║     ██████╗ ███████╗██╗   ██╗██████╗  █████╗ ███████╗███████╗
 ║     ██╔══██╗██╔════╝██║   ██║██╔══██╗██╔══██╗██╔════╝██╔════╝
-║     ██║  ██║█████╗  ██║   ██║██████╔╝███████║███████╗█████╗  
-║     ██║  ██║██╔══╝  ╚██╗ ██╔╝██╔══██╗██╔══██║╚════██║██╔══╝  
+║     ██║  ██║█████╗  ██║   ██║██████╔╝███████║███████╗█████╗
+║     ██║  ██║██╔══╝  ╚██╗ ██╔╝██╔══██╗██╔══██║╚════██║██╔══╝
 ║     ██████╔╝███████╗ ╚████╔╝ ██████╔╝██║  ██║███████║███████╗
 ║     ╚═════╝ ╚══════╝  ╚═══╝  ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝
 ║                                                           ║
@@ -374,7 +374,7 @@ if ($currentState.version -ne "0.0.0") {
 # CARREGAMENTO DE MÓDULOS
 # ============================================
 # O DevBase é modular: cada Setup-* está em seu próprio arquivo.
-# 
+#
 # Benefícios da arquitetura modular:
 # • Separação de responsabilidades (Single Responsibility)
 # • Facilita manutenção e testes
@@ -533,24 +533,24 @@ $expectedFolders = @(
     "00-09_SYSTEM/05_templates",       # Templates reutilizáveis
     "00-09_SYSTEM/06_git_hooks",       # Git hooks compartilhados
     "00-09_SYSTEM/07_documentation",   # Documentação do DevBase
-    
+
     # KNOWLEDGE (10-19): Gestão de conhecimento
     "10-19_KNOWLEDGE/11_public_garden",        # Jardim digital público
     "10-19_KNOWLEDGE/12_private_vault",        # Vault privado (Air-Gap)
     "10-19_KNOWLEDGE/15_references/patterns",  # Padrões técnicos
     "10-19_KNOWLEDGE/18_adr-decisions",        # Architecture Decision Records
-    
+
     # CODE (20-29): Desenvolvimento de software
     "20-29_CODE/21_monorepo_apps",             # Projetos monorepo
     "20-29_CODE/__template-clean-arch",        # Template Clean Architecture
-    
+
     # OPERATIONS (30-39): Automação e infraestrutura
     "30-39_OPERATIONS/31_backups",             # Scripts de backup
     "30-39_OPERATIONS/35_devbase_cli",         # CLI do DevBase
-    
+
     # MEDIA (40-49): Assets multimídia
     "40-49_MEDIA_ASSETS",
-    
+
     # ARCHIVE (90-99): Arquivos históricos
     "90-99_ARCHIVE_COLD"
 )

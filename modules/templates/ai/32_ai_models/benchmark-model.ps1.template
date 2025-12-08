@@ -16,7 +16,7 @@ $ErrorActionPreference = "Stop"
 function Measure-DiskIO {
     param([string]$Path)
     Write-Host " [bench] Measuring Disk I/O for model load..." -ForegroundColor Cyan
-    
+
     if (-not (Test-Path $Path)) {
         Write-Warning "Model file not found at $Path. Skipping disk bench."
         return $null
@@ -26,7 +26,7 @@ function Measure-DiskIO {
     # Ler primeiros 512MB para simular carregamento na RAM/VRAM
     $bytes = Get-Content -Path $Path -TotalCount 512MB -Encoding Byte -ErrorAction SilentlyContinue
     $sw.Stop()
-    
+
     $mbSec = (512 / $sw.Elapsed.TotalSeconds)
     Write-Host "   -> Speed: $([math]::Round($mbSec, 2)) MB/s" -ForegroundColor Gray
     return $mbSec
@@ -34,7 +34,7 @@ function Measure-DiskIO {
 
 function Measure-Inference {
     Write-Host " [bench] Measuring Inference Latency (TTFT)..." -ForegroundColor Cyan
-    
+
     $payload = @{
         model = $ModelName
         prompt = "Explain quantum computing in 1 sentence."
@@ -52,7 +52,7 @@ function Measure-Inference {
 
         Write-Host "   -> Latency: $([math]::Round($duration, 0)) ms" -ForegroundColor Green
         Write-Host "   -> Throughput: $([math]::Round($tps, 1)) tokens/sec" -ForegroundColor Green
-        
+
         return @{ LatencyMs = $duration; TPS = $tps }
     }
     catch {
@@ -69,7 +69,7 @@ $metrics = @{
 }
 
 # 1. IO Bench (Simulado busca do arquivo se soubermos onde está, senão ignora)
-# $metrics.DiskSpeed = Measure-DiskIO -Path "..." 
+# $metrics.DiskSpeed = Measure-DiskIO -Path "..."
 
 # 2. Inference Bench
 $infMetrics = Measure-Inference

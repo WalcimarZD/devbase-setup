@@ -59,12 +59,12 @@ deleted_by      NVARCHAR(100)   NULL
 CREATE TABLE [schema].[table_name] (
     -- PK
     id                  INT             IDENTITY(1,1) NOT NULL,
-    
+
     -- Campos de negócio
     name                NVARCHAR(100)   NOT NULL,
     description         NVARCHAR(500)   NULL,
     status              TINYINT         NOT NULL DEFAULT 1,
-    
+
     -- Auditoria
     created_at          DATETIME2       NOT NULL DEFAULT GETDATE(),
     updated_at          DATETIME2       NULL,
@@ -72,19 +72,19 @@ CREATE TABLE [schema].[table_name] (
     updated_by          NVARCHAR(100)   NULL,
     is_deleted          BIT             NOT NULL DEFAULT 0,
     deleted_at          DATETIME2       NULL,
-    
+
     -- Constraints
     CONSTRAINT pk_table_name PRIMARY KEY CLUSTERED (id),
     CONSTRAINT ck_table_name_status CHECK (status IN (0, 1, 2))
 );
 
 -- Índices
-CREATE NONCLUSTERED INDEX ix_table_name_status 
-    ON [schema].[table_name] (status) 
+CREATE NONCLUSTERED INDEX ix_table_name_status
+    ON [schema].[table_name] (status)
     WHERE is_deleted = 0;
 
 -- Comentários
-EXEC sp_addextendedproperty 
+EXEC sp_addextendedproperty
     @name = N'MS_Description',
     @value = N'Descrição da tabela',
     @level0type = N'SCHEMA', @level0name = 'schema',
@@ -108,9 +108,9 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
-    
+
     BEGIN TRY
-        SELECT 
+        SELECT
             id,
             name,
             description,
@@ -120,7 +120,7 @@ BEGIN
         FROM [schema].[table_name]
         WHERE id = @id
           AND is_deleted = 0;
-          
+
     END TRY
     BEGIN CATCH
         THROW;
@@ -141,10 +141,10 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
-    
+
     BEGIN TRY
         BEGIN TRANSACTION;
-        
+
         INSERT INTO [schema].[table_name] (
             name,
             description,
@@ -155,11 +155,11 @@ BEGIN
             @description,
             @user
         );
-        
+
         SET @new_id = SCOPE_IDENTITY();
-        
+
         COMMIT TRANSACTION;
-        
+
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0
@@ -180,7 +180,7 @@ GO
 
 CREATE OR ALTER VIEW [schema].[vw_table_name_active]
 AS
-SELECT 
+SELECT
     id,
     name,
     description,

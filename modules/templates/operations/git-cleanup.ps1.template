@@ -16,7 +16,7 @@ git fetch --prune
 
 # List merged branches
 Write-Host "`nLocal branches merged into $MainBranch`:"
-$mergedBranches = git branch --merged $MainBranch | 
+$mergedBranches = git branch --merged $MainBranch |
     Where-Object { $_ -notmatch "^\*" -and $_ -notmatch $MainBranch -and $_ -notmatch "develop" }
 
 if ($mergedBranches.Count -eq 0) {

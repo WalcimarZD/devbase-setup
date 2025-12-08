@@ -118,7 +118,8 @@ class FileSystem:
         # str() é necessário para comparação string-prefix
         if not str(resolved_target).startswith(str(self.root)):
             raise ValueError(
-                f"SECURITY VIOLATION: Path '{target_path}' is outside root '{self.root}'"
+                "SECURITY VIOLATION: Path "
+                f"'{target_path}' is outside root '{self.root}'"
             )
         return True
 

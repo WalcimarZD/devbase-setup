@@ -101,7 +101,7 @@ devbase help
 
 **CRÍTICO:** A pasta `12_private_vault/` é protegida por Air-Gap:
 - ❌ Nunca sincronize com Git
-- ❌ Nunca envie para cloud pública  
+- ❌ Nunca envie para cloud pública
 - ✅ Faça backup local criptografado
 
 Verifique regularmente: `devbase doctor` alerta se houver exposição.

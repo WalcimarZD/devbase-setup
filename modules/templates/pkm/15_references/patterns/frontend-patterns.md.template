@@ -85,10 +85,10 @@ function useUserProfile(userId: string) {
 ```typescript
 test('deve exibir o nome do usuário', async () => {
   render(<UserProfile userId="1" />);
-  
+
   // Encontre o elemento como o usuário o veria
   const heading = await screen.findByRole('heading', { name: /John Doe/i });
-  
+
   // Verifique se ele está no documento
   expect(heading).toBeInTheDocument();
 });
