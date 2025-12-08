@@ -10,6 +10,7 @@
     .\devbase.ps1 backup           # Executa backup 3-2-1
 #>
 
+[CmdletBinding(DefaultParameterSetName='General')]
 param(
     [Parameter(Position=0)]
     [ValidateSet(
@@ -228,8 +229,8 @@ function Invoke-Doctor {
     Write-Host "Verificando estrutura de áreas..." -ForegroundColor $script:ColorInfo
     $requiredAreas = @(
         '00-09_SYSTEM',
-        '10-19_KNOWLEDGE_PKM',
-        '20-29_CODE_WORK',
+        '10-19_KNOWLEDGE',
+        '20-29_CODE',
         '30-39_OPERATIONS',
         '40-49_MEDIA_ASSETS',
         '90-99_ARCHIVE_COLD'
@@ -266,7 +267,10 @@ function Invoke-Doctor {
 
     # 3. Verificar Air-Gap do Private Vault
     Write-Host "`nVerificando Air-Gap do Private Vault..." -ForegroundColor $script:ColorInfo
-    $privatePath = Join-Path $DevBaseRoot '10-19_KNOWLEDGE_PKM' '12_private_vault'
+    
+    # CORREÇÃO CRÍTICA: Ajuste para PowerShell 5.1
+    # Usamos apenas 2 argumentos no Join-Path combinando as subpastas
+    $privatePath = Join-Path $DevBaseRoot "10-19_KNOWLEDGE\12_private_vault"
     $gitignorePath = Join-Path $DevBaseRoot '.gitignore'
 
     if (Test-Path $privatePath) {
@@ -282,7 +286,7 @@ function Invoke-Doctor {
             Write-Step ".gitignore não encontrado" "WARN"
         }
     } else {
-        Write-Step "Private Vault não existe" "INFO"
+        Write-Step "Private Vault não existe (Opcional, mas recomendado)" "INFO"
     }
 
     # 4. Verificar Git Hooks do Repositório Raiz
@@ -290,12 +294,26 @@ function Invoke-Doctor {
     if (Get-Command git -ErrorAction SilentlyContinue) {
         $isGitRepo = git -C $DevBaseRoot rev-parse --is-inside-work-tree 2>$null
         if ($isGitRepo) {
-            $hooksPath = (git -C $DevBaseRoot config core.hooksPath 2>$null).Replace('\', '/')
-            $expectedPath = "00-09_SYSTEM/06_git_hooks"
-            if ($hooksPath -eq $expectedPath) {
-                Write-Step "Git Hooks configurados corretamente para o repositório raiz." "OK"
+            $configOutput = git -C $DevBaseRoot config core.hooksPath 2>$null
+            
+            # Verificação de segurança para valor nulo
+            if ($configOutput) {
+                $hooksPath = $configOutput.Replace('\', '/')
             } else {
-                Write-Step "Git Hooks não configurados para o repositório raiz. (Esperado: '$expectedPath', Atual: '$hooksPath')" "WARN"
+                $hooksPath = $null
+            }
+            
+            $expectedPath = "00-09_SYSTEM/06_git_hooks"
+            
+            if ($hooksPath -eq $expectedPath) {
+                Write-Step "Git Hooks configurados corretamente." "OK"
+            } else {
+                Write-Step "Git Hooks não configurados corretamente." "WARN"
+                Write-Host "   Esperado: '$expectedPath'" -ForegroundColor Gray
+                
+                $displayCurrent = if ($hooksPath) { $hooksPath } else { "Não definido" }
+                Write-Host "   Atual:    '$displayCurrent'" -ForegroundColor Gray
+                Write-Host "   Ação:     Execute 'devbase hydrate' ou configure manualmente." -ForegroundColor Gray
             }
         } else {
             Write-Step "O diretório raiz não é um repositório Git. Verificação de hooks pulada." "INFO"
@@ -312,16 +330,19 @@ function Invoke-Doctor {
             $_.Name -notmatch '^\d{2}(-\d{2})?_' -and
             $_.Name -notmatch '^\.' -and
             $_.Name -notmatch '^__' -and
-            $_.Name -notmatch '^node_modules$'
+            $_.Name -notmatch '^node_modules$' -and
+            $_.Name -notmatch '^bin$' -and
+            $_.Name -notmatch '^obj$' -and
+            $_.Name -notmatch '^\.git$'
         } |
         Select-Object -First 10
 
     if ($violations.Count -eq 0) {
         Write-Step "Nomenclatura OK" "OK"
     } else {
-        Write-Step "$($violations.Count)+ violações de nomenclatura" "WARN"
+        Write-Step "$($violations.Count)+ violações de nomenclatura detectadas" "WARN"
         $violations | ForEach-Object {
-            Write-Host "    - $($_.FullName)" -ForegroundColor $script:ColorWarning
+            Write-Host "    - $($_.Name)" -ForegroundColor $script:ColorWarning
         }
     }
 
@@ -337,15 +358,17 @@ function Invoke-Doctor {
             Write-Step "State file corrompido" "ERROR"
             $issues++
         }
+    } else {
+         Write-Step "State file não encontrado (.devbase_state.json)" "WARN"
     }
 
     # Resultado final
-    Write-Host "`n" + "="*50 -ForegroundColor $script:ColorHeader
+    Write-Host ("`n" + "="*50) -ForegroundColor $script:ColorHeader
     if ($issues -eq 0) {
         Write-Host "DevBase está SAUDÁVEL" -ForegroundColor $script:ColorSuccess
     } else {
         Write-Host "Encontrados $issues problemas" -ForegroundColor $script:ColorWarning
-        Write-Host "Execute 'devbase doctor -Fix' para tentar corrigir" -ForegroundColor $script:ColorWarning
+        Write-Host "Execute 'devbase doctor' novamente após as correções manuais." -ForegroundColor $script:ColorInfo
     }
 }
 
