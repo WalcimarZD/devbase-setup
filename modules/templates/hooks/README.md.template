@@ -1,0 +1,133 @@
+# Git Hooks (PowerShell)
+
+> Hooks para validação automática de commits e código, escritos em PowerShell para portabilidade cross-platform.
+
+## O que são Git Hooks?
+
+Git Hooks são scripts que o Git executa automaticamente em certos eventos (commit, push, merge, etc.). Eles permitem automatizar validações e garantir qualidade do código.
+
+**Por que usar hooks?**
+- ✅ Validação automática antes de commits
+- ✅ Padronização de mensagens de commit
+- ✅ Detecção de credenciais/secrets antes de vazar
+- ✅ Execução de testes antes de push
+
+## 🔧 Instalação
+
+O método mais robusto é usar o script de instalação:
+
+```powershell
+# Instala hooks no repositório atual
+./install-hooks.ps1
+
+# Ou via CLI do DevBase
+devbase install-hooks
+```
+
+Isso configura `core.hooksPath` para apontar para a pasta compartilhada de hooks, garantindo que todos os repos usem os mesmos padrões.
+
+## 📋 Hooks Disponíveis
+
+### pre-commit
+
+Executado **antes** de cada commit. Valida:
+
+- 🎨 **Formatação** - Verifica se código está formatado (prettier, eslint, black)
+- 🔑 **Secrets** - Detecta credenciais/tokens hardcoded
+- 📝 **Lint** - Erros de sintaxe e style
+
+```powershell
+# O hook roda automaticamente, mas você pode testar:
+.\.git\hooks\pre-commit
+```
+
+### commit-msg
+
+Valida a **mensagem de commit** seguindo [Conventional Commits](https://www.conventionalcommits.org/):
+
+**Formato:** `<type>(<scope>): <description>`
+
+```bash
+# ✅ Válidos
+feat(auth): add OAuth2 login
+fix(cart): resolve quantity validation bug
+docs: update API documentation
+
+# ❌ Inválidos
+"fixed bug"           # Sem tipo
+"FEAT: Add feature"   # Tipo em maiúsculo
+"feat add feature"    # Falta dois pontos
+```
+
+### pre-push
+
+Executado **antes** de push para remoto. Verifica:
+
+- 🧪 **Testes** - Executa suite de testes
+- 🛡️ **Branch protegida** - Previne push direto para main/master
+- 📊 **Coverage** - (opcional) Valida cobertura mínima
+
+## 🔧 Configuração
+
+Os hooks podem ser configurados via variáveis de ambiente ou arquivo `.devbase.json`:
+
+```json
+{
+  "hooks": {
+    "pre-commit": {
+      "enabled": true,
+      "formatters": ["prettier", "eslint"],
+      "detectSecrets": true
+    },
+    "commit-msg": {
+      "enabled": true,
+      "allowedTypes": ["feat", "fix", "docs", "style", "refactor", "test", "chore"]
+    },
+    "pre-push": {
+      "enabled": true,
+      "runTests": true,
+      "protectedBranches": ["main", "master", "develop"]
+    }
+  }
+}
+```
+
+## 🚫 Bypass (usar com cautela!)
+
+Em situações emergenciais, você pode pular hooks:
+
+```bash
+# Pular pre-commit e commit-msg
+git commit --no-verify -m "emergency fix"
+
+# Pular pre-push
+git push --no-verify
+```
+
+⚠️ **Aviso:** Use apenas em emergências. Bypasses frequentes indicam que os hooks precisam ser ajustados.
+
+## 🔍 Troubleshooting
+
+**Hooks não executam?**
+```powershell
+# Verificar se core.hooksPath está configurado
+git config core.hooksPath
+
+# Reinstalar hooks
+./install-hooks.ps1 -Force
+```
+
+**Erro de permissão (Linux/Mac)?**
+```bash
+chmod +x .git/hooks/*
+```
+
+**Hook está lento?**
+- Use cache para formatters (prettier --cache)
+- Execute lint apenas em arquivos staged (lint-staged)
+
+## 📚 Referências
+
+- [Conventional Commits](https://www.conventionalcommits.org/)
+- [Git Hooks Documentation](https://git-scm.com/docs/githooks)
+- [Husky](https://typicode.github.io/husky/) - Popular para projetos Node.js

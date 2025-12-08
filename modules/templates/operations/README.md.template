@@ -1,0 +1,141 @@
+# Operations (30-39)
+
+> Backups, automação, monitoramento e DevBase CLI
+
+## 🎯 Propósito
+
+A área Operations contém tudo relacionado à **operação** do seu ambiente de desenvolvimento:
+- Scripts de automação
+- Backups e disaster recovery
+- Módulo de IA local
+- Ferramentas de monitoramento
+- CLI do DevBase
+
+## 📁 Estrutura
+
+```
+30-39_OPERATIONS/
+├── 31_backups/              # Estratégia 3-2-1
+│   ├── local/               # Backups locais
+│   ├── cloud/               # Referências para cloud (não dados!)
+│   └── logs/                # Histórico de backups
+│
+├── 32_ai_models/            # Modelos de IA local
+│   ├── install_model.ps1    # Script para instalar modelos
+│   ├── update_model.ps1     # Script para atualizar
+│   └── benchmark-model.ps1  # Benchmark de performance
+│
+├── 33_ai_config/            # Configuração de IA
+│   ├── policy.md            # Política de privacidade
+│   └── audit-privacy.ps1    # Auditoria de dados enviados
+│
+├── 34_credentials/          # Vault de credenciais (criptografado)
+│   └── README.md            # Instruções de uso
+│
+└── 35_devbase_cli/          # CLI do DevBase
+    ├── devbase.ps1          # Script principal do CLI
+    └── functions/           # Funções auxiliares
+```
+
+## 💾 Estratégia de Backup 3-2-1
+
+A regra **3-2-1** é um padrão da indústria para proteção de dados:
+
+| Número | Significado | Implementação |
+|--------|-------------|---------------|
+| **3** | 3 cópias dos dados | Original + 2 backups |
+| **2** | 2 tipos de mídia | SSD local + HD externo (ou NAS) |
+| **1** | 1 cópia offsite | Cloud criptografada ou local remoto |
+
+```powershell
+# Executar backup completo
+devbase backup
+
+# Verificar status do backup
+devbase backup -Status
+
+# Restaurar (com confirmação)
+devbase restore -Date "2024-01-15"
+```
+
+## 🤖 Módulo de IA
+
+O módulo de IA do DevBase prioriza **privacidade** com modelos locais:
+
+### Modelos Suportados
+- **Ollama** - Llama, Mistral, CodeLlama
+- **LM Studio** - Interface gráfica
+- **LocalAI** - API compatível OpenAI
+
+### Instalação
+```powershell
+# Instalar modelo local
+.\32_ai_models\install_model.ps1 -Model "codellama:7b"
+
+# Benchmark
+.\32_ai_models\benchmark-model.ps1 -Model "codellama:7b"
+```
+
+### Política de Privacidade
+Leia `33_ai_config/policy.md` para entender:
+- Quais dados podem ser enviados para IA
+- Como auditar uso de IA
+- Configuração de proxies/firewalls
+
+## 🖥️ DevBase CLI
+
+Comandos disponíveis via `devbase`:
+
+| Comando | Descrição |
+|---------|-----------|
+| `devbase doctor` | Valida estrutura e integridade |
+| `devbase new` | Cria projeto a partir do template |
+| `devbase audit` | Verifica convenções de nomenclatura |
+| `devbase backup` | Executa backup 3-2-1 |
+| `devbase link-dotfiles` | Sincroniza dotfiles para $HOME |
+| `devbase update` | Aplica atualizações/migrações |
+| `devbase help` | Mostra todos os comandos |
+
+## 🔧 Scripts de Automação
+
+### Docker Cleanup
+```powershell
+# Remove imagens e containers não utilizados
+.\docker-cleanup.ps1
+
+# Modo agressivo (remove tudo parado)
+.\docker-cleanup.ps1 -Aggressive
+```
+
+### Git Cleanup
+```powershell
+# Remove branches merged e tags antigas
+.\git-cleanup.ps1
+
+# Preview (não deleta, apenas mostra)
+.\git-cleanup.ps1 -WhatIf
+```
+
+### Update All
+```powershell
+# Atualiza todos os repos no workspace
+.\update-all.ps1
+
+# Apenas fetch (sem pull)
+.\update-all.ps1 -FetchOnly
+```
+
+## 📊 Monitoramento
+
+Ferramentas para acompanhar a saúde do workspace:
+
+```powershell
+# Resumo de status dos repos
+devbase status
+
+# Verificar espaço em disco
+devbase storage
+
+# Listar projetos por última modificação
+devbase activity
+```

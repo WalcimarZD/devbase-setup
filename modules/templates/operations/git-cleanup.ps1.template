@@ -1,0 +1,36 @@
+<#
+.SYNOPSIS
+    Cleans up merged Git branches and obsolete remotes
+#>
+
+param(
+    [switch]$DryRun,
+    [string]$MainBranch = 'main'
+)
+
+Write-Host "=== Git Branch Cleanup ===" -ForegroundColor Cyan
+
+# Update remote references
+Write-Host "`nUpdating remote references..."
+git fetch --prune
+
+# List merged branches
+Write-Host "`nLocal branches merged into $MainBranch`:"
+$mergedBranches = git branch --merged $MainBranch | 
+    Where-Object { $_ -notmatch "^\*" -and $_ -notmatch $MainBranch -and $_ -notmatch "develop" }
+
+if ($mergedBranches.Count -eq 0) {
+    Write-Host "  No branches to clean" -ForegroundColor Green
+} else {
+    $mergedBranches | ForEach-Object {
+        $branch = $_.Trim()
+        if ($DryRun) {
+            Write-Host "  [DRY-RUN] Would remove: $branch" -ForegroundColor Yellow
+        } else {
+            git branch -d $branch
+            Write-Host "  Removed: $branch" -ForegroundColor Green
+        }
+    }
+}
+
+Write-Host "`nComplete!" -ForegroundColor Green

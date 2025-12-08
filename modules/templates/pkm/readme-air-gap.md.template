@@ -1,0 +1,85 @@
+# 🔒 Air-Gap Security
+
+> Sistema de separação de segurança do DevBase
+
+## O que é Air-Gap?
+
+**Air-Gap** é um conceito de segurança onde sistemas críticos são fisicamente isolados de redes externas. No DevBase, aplicamos este conceito para proteger seus dados mais sensíveis.
+
+**Analogia:** Pense como um cofre físico que nunca é conectado à internet - mesmo que todo o resto seja hackeado, o cofre permanece seguro.
+
+## Regras de Sincronização
+
+| Pasta | Pode sincronizar para Cloud? | Git? | Conteúdo |
+|-------|------------------------------|------|----------|
+| `11_public_garden/` | ✅ Sim | ✅ Sim | Blog, TILs, notas públicas |
+| `12_private_vault/` | ❌ **NUNCA** | ❌ **NUNCA** | Credenciais, diário, finanças |
+| `15_references/` | ✅ Sim | ✅ Sim | Padrões, checklists, documentação |
+| `18_adr-decisions/` | ✅ Sim | ✅ Sim | Decisões de arquitetura |
+
+## 🔐 Private Vault (12_private_vault/)
+
+O vault privado contém dados que **nunca** devem sair do seu computador:
+
+### Conteúdo Típico
+
+| Subpasta | Conteúdo | Nível de Sensibilidade |
+|----------|----------|------------------------|
+| `credentials/` | Senhas, tokens, chaves API | 🔴 CRÍTICO |
+| `journal/` | Diário pessoal, Engineering Daybook | 🟡 PRIVADO |
+| `finances/` | Dados financeiros, planilhas | 🔴 CRÍTICO |
+| `brag-docs/` | Registro de conquistas profissionais | 🟡 PRIVADO |
+| `legal/` | Documentos legais, contratos | 🔴 CRÍTICO |
+
+### Proteções Automáticas
+
+1. **`.gitignore`** - Exclui `12_private_vault/` do Git
+2. **Permissões** - `chmod 600` em arquivos sensíveis (Linux/Mac)
+3. **Validação** - `devbase doctor` alerta se vault estiver exposto
+
+## Backup Seguro do Vault
+
+⚠️ O vault **precisa** de backup, mas de forma segura:
+
+```bash
+# ✅ CORRETO: Backup local criptografado
+7z a -p"senha-forte" -mhe=on vault-backup.7z 12_private_vault/
+
+# ✅ CORRETO: HD externo offline
+cp -r 12_private_vault/ /media/hd-externo/backup/
+
+# ❌ ERRADO: Dropbox, Google Drive, OneDrive
+# ❌ ERRADO: Git push
+# ❌ ERRADO: Backup sem criptografia
+```
+
+## Verificação de Segurança
+
+Execute periodicamente para garantir que o Air-Gap está funcionando:
+
+```powershell
+# Verifica se vault está protegido
+devbase doctor
+
+# Verifica se vault aparece no .gitignore
+Get-Content .gitignore | Select-String "private_vault"
+
+# Verifica se vault NÃO está no Git
+git ls-files | Select-String "private_vault"  # Deve retornar vazio
+```
+
+## Por que Air-Gap?
+
+1. **Vazamentos acontecem** - Serviços cloud são hackeados
+2. **Git é permanente** - Commits deletados ainda existem no histórico
+3. **Sync acidental** - É fácil sincronizar a pasta errada
+4. **Defense in depth** - Múltiplas camadas de proteção
+
+## Exceções
+
+Não existe exceção para o Air-Gap. Se você precisa compartilhar algo do vault:
+
+1. Copie apenas o necessário para fora do vault
+2. Use um canal seguro (criptografado end-to-end)
+3. Delete a cópia após o compartilhamento
+4. **Nunca** mova o arquivo original para fora do vault

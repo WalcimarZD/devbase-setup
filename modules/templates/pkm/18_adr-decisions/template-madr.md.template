@@ -1,0 +1,140 @@
+# [ADR-XXXX] Título da Decisão
+
+> **ADR** = Architecture Decision Record
+> 
+> ADRs documentam decisões importantes de arquitetura e design, explicando o **contexto**, 
+> **opções consideradas** e **justificativa** da escolha. Eles formam um histórico de 
+> "por que fizemos assim" que é inestimável para novos membros da equipe e para o "eu do futuro".
+
+## Metadados
+
+| Campo | Valor |
+|-------|-------|
+| **ID** | ADR-XXXX |
+| **Data** | YYYY-MM-DD |
+| **Status** | Proposto / Em Discussão / Aceito / Depreciado / Substituído por [ADR-YYYY] |
+| **Autor** | Nome do autor |
+| **Revisores** | Lista de revisores |
+
+## Status
+
+**Proposto** | Em Discussão | Aceito | Depreciado | Substituído por [ADR-YYYY]
+
+> **Ciclo de vida típico:**
+> - **Proposto** → Ideia inicial, aguardando discussão
+> - **Em Discussão** → Sendo debatido pela equipe
+> - **Aceito** → Aprovado e em vigor
+> - **Depreciado** → Não mais recomendado, mas ainda válido
+> - **Substituído** → Substituído por ADR mais recente
+
+## Contexto
+
+Descreva o **contexto** e o **problema** que motivou esta decisão. Seja específico:
+
+- Qual é a situação atual?
+- Qual problema estamos tentando resolver?
+- Quais são as forças em jogo (restrições técnicas, negócio, tempo)?
+
+**Exemplo:**
+> Nosso sistema de autenticação atual usa sessões em memória, o que impede 
+> escalabilidade horizontal. Com a previsão de crescimento de 10x nos próximos 
+> 6 meses, precisamos de uma solução que suporte múltiplas instâncias.
+
+## Drivers de Decisão
+
+Liste os fatores que influenciam a decisão (em ordem de prioridade):
+
+- [Driver 1] - Ex: Performance (requisito de latência < 100ms)
+- [Driver 2] - Ex: Custo (orçamento limitado para infraestrutura)
+- [Driver 3] - Ex: Manutenibilidade (equipe pequena)
+- [Constraint 1] - Ex: Deve funcionar com banco existente
+
+## Opções Consideradas
+
+### Opção 1: [Nome da Opção]
+
+**Descrição:** Breve explicação da abordagem.
+
+**Prós:**
+- [Pro 1] - Explique o benefício
+- [Pro 2]
+
+**Contras:**
+- [Contra 1] - Explique a desvantagem
+- [Contra 2]
+
+**Estimativa de esforço:** [Baixo/Médio/Alto]
+
+### Opção 2: [Nome da Opção]
+
+**Descrição:** Breve explicação da abordagem.
+
+**Prós:**
+- [Pro 1]
+
+**Contras:**
+- [Contra 1]
+
+**Estimativa de esforço:** [Baixo/Médio/Alto]
+
+### Opção 3: Não fazer nada (sempre considere!)
+
+**Descrição:** Manter o sistema atual sem mudanças.
+
+**Prós:**
+- Sem esforço de implementação
+- Sem riscos de regressão
+
+**Contras:**
+- Problema original permanece
+- Pode piorar com o tempo
+
+## Decisão
+
+Escolhemos **[Opção X]** porque [justificativa clara e concisa].
+
+**Detalhamento da justificativa:**
+- Como esta opção atende aos drivers de decisão listados
+- Por que as outras opções foram descartadas
+- Quais trade-offs estamos aceitando
+
+## Consequências
+
+### Positivas
+- [Benefício 1] - Como isso melhora a situação
+- [Benefício 2]
+
+### Negativas
+- [Trade-off 1] - O que estamos sacrificando
+- [Trade-off 2]
+- **Mitigação:** Como vamos lidar com as consequências negativas
+
+### Neutras (observações)
+- [Observação] - Impactos que não são claramente positivos ou negativos
+
+## Plano de Implementação
+
+1. **Fase 1:** [Descrição] - Timeline estimado
+2. **Fase 2:** [Descrição] - Timeline estimado
+3. **Rollback:** Como reverter se necessário
+
+## Validação
+
+Como saberemos se a decisão foi correta?
+
+- [ ] Métrica 1: [Ex: Latência < 100ms em P95]
+- [ ] Métrica 2: [Ex: Zero downtime durante migração]
+- [ ] Data de revisão: YYYY-MM-DD
+
+## Links e Referências
+
+- [RFC/Discussão relacionada](URL)
+- [PR de implementação](URL)
+- [Documentação técnica](URL)
+- [ADR relacionado](ADR-YYYY)
+
+---
+
+> **Template baseado em:** [MADR](https://adr.github.io/madr/) (Markdown Any Decision Records)
+> 
+> **Dica:** ADRs não precisam ser perfeitos. Um ADR simples é melhor que nenhum ADR.

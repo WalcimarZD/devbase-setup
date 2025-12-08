@@ -1,0 +1,13 @@
+# Dotfiles
+
+Configurações pessoais do sistema.
+
+## Estrutura
+
+- ``shell/`` - Configurações de shell (PowerShell, bash, zsh)
+- ``git/`` - Configurações git (.gitconfig, .gitignore_global)
+- ``editors/`` - Configurações de editores (VS Code, Vim)
+
+## Backup
+
+Versionado em repositório separado para portabilidade.

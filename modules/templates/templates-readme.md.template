@@ -1,0 +1,98 @@
+# Templates
+
+> Padrões, prompts e workflows para desenvolvimento profissional
+
+## O que são Templates?
+
+Templates são modelos reutilizáveis que garantem **consistência** e **qualidade** em todo o seu trabalho. Eles funcionam como "receitas" que você segue para criar novos artefatos (documentos, código, configurações) de forma padronizada.
+
+**Por que usar templates?**
+- ✅ Economia de tempo (não precisa começar do zero)
+- ✅ Consistência entre projetos e equipes
+- ✅ Boas práticas embutidas
+- ✅ Documentação como código
+
+## Estrutura
+
+```
+05_templates/
+├── patterns/
+│   ├── padroes-sql.md          # Convenções SQL completas
+│   ├── padroes-git.md          # Conventional Commits, Git Flow
+│   └── github-workflow-ci.yml  # Template CI/CD pronto para uso
+└── prompts/
+    ├── system-prompt-dev.md    # Prompt para coding assistants
+    └── system-prompt-review.md # Prompt para code review
+```
+
+## Como Usar
+
+### 1. Padrões SQL
+
+Consulte [padroes-sql.md](patterns/padroes-sql.md) **antes** de criar:
+- Tabelas (nomenclatura, colunas de auditoria)
+- Stored Procedures (template CRUD)
+- Views e Índices
+- Migrations
+
+**Exemplo de uso:**
+```sql
+-- Seguindo o padrão DevBase
+CREATE TABLE [dbo].[users] (
+    id              INT             IDENTITY(1,1) NOT NULL,
+    name            NVARCHAR(100)   NOT NULL,
+    email           NVARCHAR(255)   NOT NULL,
+    -- Colunas de auditoria padrão
+    created_at      DATETIME2       NOT NULL DEFAULT GETDATE(),
+    updated_at      DATETIME2       NULL,
+    is_deleted      BIT             NOT NULL DEFAULT 0,
+    CONSTRAINT pk_users PRIMARY KEY (id)
+);
+```
+
+### 2. Padrões Git
+
+Consulte [padroes-git.md](patterns/padroes-git.md) para:
+- **Conventional Commits** - Formato padronizado de mensagens
+- **Branch Naming** - Como nomear branches
+- **Git Flow** - Estratégia de branching
+- **Rebase vs Merge** - Quando usar cada um
+
+**Exemplo de commit:**
+```bash
+feat(auth): add OAuth2 login support
+
+- Implemented Google OAuth2 provider
+- Added token refresh mechanism
+- Created user profile sync
+
+Closes #123
+```
+
+### 3. System Prompts
+
+Copie para seu IDE/AI assistant como contexto do projeto:
+
+1. **system-prompt-dev.md** - Para desenvolvimento diário
+   - Convenções de código
+   - Padrões de arquitetura
+   - Regras do projeto
+
+2. **system-prompt-review.md** - Para code review
+   - Checklist de revisão
+   - Critérios de qualidade
+   - Pontos de atenção
+
+## Criando Novos Templates
+
+Para adicionar um novo template:
+
+1. Crie o arquivo em `05_templates/` com extensão adequada
+2. Use placeholders para valores dinâmicos: `{{NOME_PROJETO}}`
+3. Inclua comentários explicando cada seção
+4. Documente o propósito e uso no início do arquivo
+
+**Convenções para templates:**
+- Use CAPS para placeholders: `{{AUTHOR}}`, `{{DATE}}`
+- Inclua exemplos sempre que possível
+- Mantenha em português ou inglês (consistente por arquivo)

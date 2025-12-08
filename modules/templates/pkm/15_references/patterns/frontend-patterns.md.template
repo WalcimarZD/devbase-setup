@@ -1,0 +1,95 @@
+# PADRÕES FRONTEND - DevBase v3.0
+
+> Convenções e boas práticas para desenvolvimento Frontend (React/TypeScript).
+
+## Estrutura de Projeto (Feature-Sliced Design)
+
+Prefira organizar por funcionalidade (`feature`), não por tipo (`components`, `hooks`).
+
+```
+src/
+├── app/            # Setup da aplicação, providers, store
+├── pages/          # Roteamento (se não usar meta-framework)
+├── widgets/        # Composições de features (Header, Sidebar)
+├── features/       # Lógica de negócio (auth, cart, user-profile)
+│   └── user-profile/
+│       ├── ui/         # Componentes React (UserProfileCard.tsx)
+│       ├── model/      # Lógica de estado (stores, hooks, services)
+│       └── api/        # Funções de requisição (fetchUserProfile.ts)
+├── entities/       # Entidades de negócio (User, Product)
+│   └── user/
+│       ├── ui/         # Componente de representação (Avatar.tsx)
+│       └── model/      # Tipos e estado (user.slice.ts)
+└── shared/         # Código reutilizável e agnóstico de negócio
+    ├── ui/           # Kit de UI (Button, Input, Spinner)
+    ├── lib/          # Funções auxiliares puras (formatDate)
+    └── config/       # Configurações globais (API_URL)
+```
+
+## Nomenclatura de Arquivos
+
+- **Componentes**: `PascalCase.tsx` (ex: `UserProfile.tsx`)
+- **Hooks**: `use-kebab-case.ts` (ex: `use-user-profile.ts`)
+- **Outros**: `kebab-case.ts` (ex: `api-client.ts`)
+- **Testes**: `*.test.ts` ou `*.spec.ts` (co-localizados com o arquivo testado)
+
+## Componentes React
+
+- **Funcionais com Hooks**: Sempre. Evite componentes de classe.
+- **Tipagem**: Use `React.FC` com `Props`.
+
+```typescript
+type UserProfileProps = {
+  userId: string;
+};
+
+export const UserProfile: React.FC<UserProfileProps> = ({ userId }) => {
+  // ...
+  return <div>...</div>;
+};
+```
+
+- **Estilização**: Use CSS-in-JS (Styled Components, Emotion) ou CSS Modules para escopo local. Evite CSS global.
+
+## Gerenciamento de Estado
+
+- **Estado Local**: `useState` e `useReducer` são suficientes para a maioria dos componentes.
+- **Estado Global**:
+  - `Context API`: Para estado simples e raramente atualizado (ex: tema, usuário autenticado).
+  - `Zustand` / `Jotai`: Para estado complexo e frequentemente atualizado. São mais simples e performáticos que Redux.
+  - `Redux Toolkit`: Para aplicações muito grandes com lógica de estado complexa e necessidade de debugging avançado (time-travel).
+
+## Requisições de API
+
+- Use `TanStack Query (React Query)` para gerenciar cache, revalidação e estado de requisições. Não reinvente a roda com `useEffect` e `useState`.
+
+```typescript
+import { useQuery } from '@tanstack/react-query';
+
+function useUserProfile(userId: string) {
+  return useQuery({
+    queryKey: ['users', userId],
+    queryFn: () => fetchUserProfile(userId),
+  });
+}
+```
+
+## Testes
+
+- **Ferramentas**: `Vitest` (ou `Jest`) + `React Testing Library`.
+- **Foco**: Teste o comportamento do usuário, não a implementação interna.
+- **Não teste**:
+  - Implementações de terceiros.
+  - Estilos visuais.
+
+```typescript
+test('deve exibir o nome do usuário', async () => {
+  render(<UserProfile userId="1" />);
+  
+  // Encontre o elemento como o usuário o veria
+  const heading = await screen.findByRole('heading', { name: /John Doe/i });
+  
+  // Verifique se ele está no documento
+  expect(heading).toBeInTheDocument();
+});
+```

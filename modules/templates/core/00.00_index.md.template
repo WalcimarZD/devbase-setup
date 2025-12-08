@@ -1,0 +1,107 @@
+# DevBase Index v{{POLICY_VERSION}}
+
+> Personal Engineering Operating System
+> Última atualização: {{DATE}}
+
+## 🎯 Quick Start
+
+Novo no DevBase? Comece por aqui:
+
+1. **Entenda a estrutura** → Leia a tabela Johnny.Decimal abaixo
+2. **Valide a instalação** → Execute `devbase doctor`
+3. **Configure seu ambiente** → Edite `01_dotfiles/`
+4. **Crie seu primeiro projeto** → `devbase new -Name meu-projeto`
+
+## 📊 Taxonomia Johnny.Decimal
+
+O sistema [Johnny.Decimal](https://johnnydecimal.com/) organiza tudo em **Áreas** (dezenas) e **Categorias** (unidades):
+
+| Área  | Nome           | Descrição                              | Storage Tier |
+|-------|----------------|----------------------------------------|--------------|
+| 00-09 | **SYSTEM**     | Configuração, dotfiles, inbox, hooks   | 0 (NVMe/SSD) |
+| 10-19 | **KNOWLEDGE**  | PKM, documentação, ADRs, referências   | 0 (NVMe/SSD) |
+| 20-29 | **CODE**       | Código fonte, projetos, monorepos      | 0 (NVMe/SSD) |
+| 30-39 | **OPERATIONS** | Automação, AI, backups, CLI            | 0 (NVMe/SSD) |
+| 40-49 | **MEDIA**      | Imagens, vídeos, ISOs, assets          | 1 (SSD/HDD)  |
+| 90-99 | **ARCHIVE**    | Projetos arquivados, cold storage      | 2 (HDD/NAS)  |
+
+### Por que Storage Tiers?
+
+- **Tier 0 (Hot):** Dados acessados diariamente → SSD/NVMe para performance
+- **Tier 1 (Warm):** Dados acessados ocasionalmente → SSD/HDD balanceado
+- **Tier 2 (Cold):** Dados históricos/arquivos → HDD/NAS para economia
+
+## ⚡ Comandos Rápidos
+
+```powershell
+# Validar estrutura e integridade
+devbase doctor
+
+# Criar novo projeto a partir do template
+devbase new -Name meu-projeto
+
+# Hidratar workspace com templates mais recentes
+devbase hydrate -Force
+
+# Auditar convenções de nomenclatura (kebab-case)
+devbase audit
+
+# Backup 3-2-1 (3 cópias, 2 mídias, 1 offsite)
+devbase backup
+
+# Sincronizar dotfiles para $HOME
+devbase link-dotfiles
+
+# Ver todos os comandos disponíveis
+devbase help
+```
+
+## 📂 Detalhamento por Área
+
+### 00-09: SYSTEM
+| ID | Pasta | Conteúdo |
+|----|-------|----------|
+| 00 | inbox | Caixa de entrada GTD - arquivos a processar |
+| 01 | dotfiles | .bashrc, .gitconfig, configurações |
+| 05 | templates | Padrões reutilizáveis (SQL, Git, CI) |
+| 06 | git_hooks | Hooks compartilhados entre projetos |
+
+### 10-19: KNOWLEDGE
+| ID | Pasta | Conteúdo |
+|----|-------|----------|
+| 11 | public_garden | Jardim digital, blog, TILs públicos |
+| 12 | private_vault | **AIR-GAP** - Dados sensíveis, NUNCA sync |
+| 15 | references | Padrões, checklists, documentação |
+| 18 | adr-decisions | Architecture Decision Records |
+
+### 20-29: CODE
+| ID | Pasta | Conteúdo |
+|----|-------|----------|
+| 21 | monorepo_apps | Projetos de produção |
+| __ | __template-clean-arch | Template para novos projetos |
+
+### 30-39: OPERATIONS
+| ID | Pasta | Conteúdo |
+|----|-------|----------|
+| 31 | backups | Scripts e logs de backup |
+| 32 | ai_models | Modelos de IA local |
+| 33 | ai_config | Configuração de IA/privacidade |
+| 35 | devbase_cli | CLI e scripts do DevBase |
+
+## 🔗 Links Importantes
+
+| Documento | Descrição |
+|-----------|-----------|
+| [Structure Policy](10-19_KNOWLEDGE/15_references/patterns/STRUCTURE_POLICY.md) | Política oficial de estrutura |
+| [SQL Patterns](10-19_KNOWLEDGE/15_references/patterns/sql-patterns.md) | Convenções SQL |
+| [Git Patterns](10-19_KNOWLEDGE/15_references/patterns/git-patterns.md) | Conventional Commits, Git Flow |
+| [ADR Template](10-19_KNOWLEDGE/18_adr-decisions/template-madr.md) | Template para decisões |
+
+## ⚠️ Segurança
+
+**CRÍTICO:** A pasta `12_private_vault/` é protegida por Air-Gap:
+- ❌ Nunca sincronize com Git
+- ❌ Nunca envie para cloud pública  
+- ✅ Faça backup local criptografado
+
+Verifique regularmente: `devbase doctor` alerta se houver exposição.

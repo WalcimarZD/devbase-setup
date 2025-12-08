@@ -1,0 +1,16 @@
+# 📥 Inbox
+
+> Caixa de entrada para itens não processados.
+
+## Regras
+
+1. **Tudo novo entra aqui primeiro**
+2. **Processar diariamente** (mover para local correto)
+3. **Máximo 7 dias** no inbox
+
+## Fluxo
+
+``````
+Inbox → Processar → Mover para área correta
+                 → ou Deletar
+``````

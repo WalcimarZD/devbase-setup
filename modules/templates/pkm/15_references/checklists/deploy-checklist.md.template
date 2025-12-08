@@ -1,0 +1,22 @@
+# Deploy Checklist
+
+## Pré-Deploy
+
+- [ ] Todas as PRs mergeadas
+- [ ] Testes CI passando
+- [ ] Database migrations testadas
+- [ ] Rollback plan documentado
+- [ ] Stakeholders notificados
+
+## Durante Deploy
+
+- [ ] Monitoramento ativo
+- [ ] Logs sendo verificados
+- [ ] Health checks passando
+
+## Pós-Deploy
+
+- [ ] Smoke tests executados
+- [ ] Métricas normais
+- [ ] Nenhum erro novo em logs
+- [ ] Stakeholders notificados de conclusão

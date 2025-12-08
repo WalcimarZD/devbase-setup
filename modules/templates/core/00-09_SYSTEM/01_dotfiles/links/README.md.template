@@ -1,0 +1,3 @@
+# Esta pasta contém os dotfiles que serão vinculados (symlinked) ao seu diretório HOME.
+# Coloque aqui arquivos como .gitconfig, .zshrc, etc.
+# Em seguida, execute o comando: devbase link-dotfiles

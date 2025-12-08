@@ -1,0 +1,242 @@
+# 🏗️ Arquitetura do DevBase
+
+> Documentação técnica detalhada sobre como o DevBase funciona internamente.
+
+---
+
+## 📋 Sumário
+
+1. [Visão Geral](#1-visão-geral)
+2. [Componentes Principais](#2-componentes-principais)
+3. [Fluxo de Execução](#3-fluxo-de-execução)
+4. [Sistema de Módulos](#4-sistema-de-módulos)
+5. [Motor de Templates](#5-motor-de-templates)
+6. [Engine de Migração](#6-engine-de-migração)
+7. [CLI (Interface de Linha de Comando)](#7-cli-interface-de-linha-de-comando)
+8. [Segurança](#8-segurança)
+9. [Extensibilidade](#9-extensibilidade)
+10. [Decisões de Design](#10-decisões-de-design)
+
+---
+
+## 1. Visão Geral
+
+### 1.1 Arquitetura de Alto Nível
+
+O DevBase é organizado em módulos que trabalham em conjunto para criar um Personal Engineering Operating System.
+
+### 1.2 Princípios Arquiteturais
+
+| Princípio | Descrição | Implementação |
+|-----------|-----------|---------------|
+| **Idempotência** | Executar múltiplas vezes produz mesmo resultado | `New-FileSafe` verifica existência antes de criar |
+| **Modularidade** | Funcionalidades separadas em módulos | Cada `setup-*.ps1` é independente |
+| **Declarativo** | Templates definem o estado desejado | Arquivos `.template` são processados automaticamente |
+| **Segurança** | Proteção contra path traversal e vazamentos | `Assert-SafePath`, validação de BOM |
+| **Portabilidade** | Funciona em Windows, Linux, macOS | PowerShell Core + fallback Python |
+
+---
+
+## 2. Componentes Principais
+
+### 2.1 Responsabilidades dos Módulos
+
+| Componente | Responsabilidade | Dependências |
+|------------|------------------|--------------|
+| `bootstrap.ps1` | Orquestrar execução, validações iniciais | `common-functions.ps1`, todos os `setup-*.ps1` |
+| `common-functions.ps1` | Funções utilitárias (Write-Step, New-FileSafe, etc.) | Nenhuma |
+| `setup-core.ps1` | Criar estrutura Johnny.Decimal base | `common-functions.ps1` |
+| `setup-pkm.ps1` | Criar estrutura de conhecimento | `common-functions.ps1` |
+| `setup-code.ps1` | Criar estrutura de código e templates | `common-functions.ps1` |
+| `setup-operations.ps1` | Instalar CLI e scripts de automação | `common-functions.ps1`, `assets/` |
+| `setup-hooks.ps1` | Instalar e configurar git hooks | `common-functions.ps1` |
+| `setup-ai.ps1` | Criar estrutura do módulo de IA | `common-functions.ps1` |
+| `devbase.ps1.asset` | CLI do usuário final | `common-functions.ps1` |
+
+---
+
+## 3. Fluxo de Execução
+
+### 3.1 Ordem de Execução dos Módulos
+
+1. setup-core.ps1       → Estrutura base Johnny.Decimal
+2. setup-pkm.ps1        → Knowledge Management (PKM)
+3. setup-code.ps1       → Templates de código
+4. setup-operations.ps1 → CLI e automação
+5. setup-templates.ps1  → Padrões técnicos
+6. setup-hooks.ps1      → Git hooks
+7. setup-ai.ps1         → Módulo de IA local
+
+A ordem importa! Módulos posteriores podem depender de estruturas criadas por módulos anteriores.
+
+---
+
+## 4. Sistema de Módulos
+
+### 4.1 Estrutura de um Módulo
+
+Cada módulo `setup-*.ps1` segue um padrão consistente para processar templates e criar estruturas de diretórios.
+
+### 4.2 Funções Compartilhadas (common-functions.ps1)
+
+```powershell
+# Funções de Output
+Write-Header "Título"           # Exibe cabeçalho formatado
+Write-Step "Mensagem" "OK"      # Exibe status [+] verde
+Write-Step "Mensagem" "WARN"    # Exibe status [!] amarelo
+Write-Step "Mensagem" "ERROR"   # Exibe status [X] vermelho
+Write-Step "Mensagem" "INFO"    # Exibe status [i] ciano
+
+# Funções de Segurança
+Assert-SafePath -TargetPath $path -AllowedRoot $root  # Previne path traversal
+Assert-NoBOM -Path $file                               # Remove BOM UTF-8
+
+# Funções de Filesystem (Atômicas)
+New-DirSafe -Path $path         # Cria diretório se não existir
+Write-FileAtomic -Path $path -Content $content  # Escrita atômica via temp file
+New-FileSafe -Path $path -Content $content      # Cria arquivo se não existir
+Copy-ItemAtomic -Source $src -Destination $dest    # Cópia atômica
+```
+
+---
+
+## 5. Motor de Templates
+
+### 5.1 Como Templates Funcionam
+
+Templates são arquivos com extensão `.template` que contêm placeholders. O DevBase lê cada template, substitui os placeholders por valores dinâmicos, e salva o resultado sem a extensão `.template`.
+
+### 5.2 Placeholders Disponíveis
+
+| Placeholder | Valor | Exemplo |
+|-------------|-------|---------|
+| `{{POLICY_VERSION}}` | Versão da política | `3.1` |
+| `{{DATE}}` | Data atual | `{{DATE}}` |
+| `{{YEAR}}` | Ano atual | `{{YEAR}}` |
+| `{{WEEK_NUMBER}}` | Número da semana | `{{WEEK_NUMBER}}` |
+
+### 5.3 Convenção de Nomes de Templates
+
+```
+[nome-arquivo].[extensão].template
+
+Exemplos:
+  README.md.template      → README.md
+  .gitignore.template     → .gitignore
+  pre-commit.ps1.template → pre-commit.ps1
+  ci-node.yml.template    → ci-node.yml
+```
+
+---
+
+## 6. Engine de Migração
+
+### 6.1 Arquivo de Estado
+
+O arquivo `.devbase_state.json` rastreia o estado do workspace e permite migrações entre versões.
+
+### 6.2 Rastreamento de Migrações
+
+O arquivo de estado inclui:
+- Versão do DevBase instalada
+- Data de instalação
+- Histórico de migrações executadas
+- Lista de módulos instalados
+
+---
+
+## 7. CLI (Interface de Linha de Comando)
+
+### 7.1 Comandos Disponíveis
+
+| Comando | Descrição |
+|---------|-----------|
+| `doctor` | Verifica integridade do workspace |
+| `audit` | Audita nomenclatura (kebab-case) |
+| `backup` | Executa backup 3-2-1 |
+| `clean` | Limpa arquivos temporários |
+| `new` | Cria novo projeto usando template |
+| `link-dotfiles` | Sincroniza dotfiles para $HOME |
+| `hydrate` | Atualiza todos os templates |
+| `track` | Registra atividade |
+| `stats` | Mostra estatísticas de uso |
+| `weekly` | Gera relatório semanal |
+| `brag` | Gera brag document |
+
+---
+
+## 8. Segurança
+
+### 8.1 Proteções Implementadas
+
+O DevBase implementa múltiplas camadas de segurança:
+
+1. **Path Traversal Prevention** - Assert-SafePath valida caminhos
+2. **BOM Sanitization** - Remove UTF-8 BOM de arquivos
+3. **Air-Gap Enforcement** - Vault privado nunca sai da máquina
+4. **Atomic Operations** - Escrita via temp file + rename
+5. **Permission Checks** - Valida permissões em arquivos sensíveis
+
+---
+
+## 9. Extensibilidade
+
+### 9.1 Adicionando Novo Módulo
+
+Para adicionar um novo módulo:
+
+1. Criar `modules/setup-meunome.ps1`
+2. Criar `modules/templates/meunome/` com templates
+3. Adicionar ao array de módulos em `bootstrap.ps1`
+4. Chamar a função no fluxo de execução
+
+### 9.2 Adicionando Comando à CLI
+
+Para adicionar um novo comando:
+
+1. Adicionar ao `ValidateSet` em `devbase.ps1`
+2. Criar função `Invoke-MeuComando`
+3. Adicionar ao switch de comandos
+
+---
+
+## 10. Decisões de Design
+
+### 10.1 Por que PowerShell?
+
+**Prós:**
+- Nativo no Windows (sem instalação)
+- PowerShell Core funciona em Linux/macOS
+- Sintaxe expressiva para manipulação de arquivos
+- Objetos ao invés de strings (mais robusto)
+
+**Contras:**
+- Menos familiar para desenvolvedores Unix
+- Performance em operações massivas
+
+### 10.2 Por que Johnny.Decimal?
+
+- **Previsibilidade**: Sempre sei onde está cada tipo de conteúdo
+- **Escalabilidade**: Funciona de 10 arquivos a 100.000
+- **Numeração**: Permite ordenação natural
+- **Áreas**: Separação clara de responsabilidades
+
+---
+
+## 📚 Referências
+
+- [PowerShell Documentation](https://docs.microsoft.com/powershell/)
+- [Johnny.Decimal](https://johnnydecimal.com/)
+- [Conventional Commits](https://conventionalcommits.org/)
+- [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+
+---
+
+<div align="center">
+
+**Documento Gerado**: {{DATE}}  
+**Versão**: {{POLICY_VERSION}}
+
+[⬆️ Voltar ao topo](#️-arquitetura-do-devbase)
+
+</div>

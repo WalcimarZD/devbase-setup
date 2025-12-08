@@ -1,0 +1,89 @@
+# Clean Architecture Template
+
+> Template de projeto seguindo Clean Architecture + DDD
+
+## Estrutura de Camadas
+
+``````
+src/
+├── domain/           # Regras de negócio (CORE)
+│   ├── entities/     # Entidades com identidade
+│   ├── value-objects/# Objetos de valor (imutáveis)
+│   ├── repositories/ # Interfaces de repositório
+│   ├── services/     # Domain services
+│   └── events/       # Domain events
+│
+├── application/      # Casos de uso
+│   ├── use-cases/    # Implementação dos casos de uso
+│   ├── dtos/         # Data Transfer Objects
+│   ├── mappers/      # Entity <-> DTO mappers
+│   └── interfaces/   # Ports (interfaces de infra)
+│
+├── infrastructure/   # Implementações concretas
+│   ├── persistence/  # Banco de dados
+│   │   ├── repositories/  # Implementações de repositório
+│   │   └── migrations/    # Migrações de schema
+│   ├── external/     # APIs externas
+│   └── messaging/    # Filas, eventos
+│
+└── presentation/     # Interface com usuário
+    ├── api/          # REST/GraphQL controllers
+    ├── cli/          # Command line interface
+    └── web/          # Frontend (se monolito)
+``````
+
+## Regra de Dependência
+
+``````
+presentation → application → domain
+                    ↓
+              infrastructure
+``````
+
+**NUNCA** faça ``domain`` importar de ``infrastructure``!
+
+## Como Usar
+
+### 1. Criar Entidade
+
+``````typescript
+// src/domain/entities/user.entity.ts
+export class User {
+    constructor(
+        public readonly id: string,
+        public readonly email: string,
+        private _name: string
+    ) {}
+    
+    get name(): string { return this._name; }
+    
+    changeName(newName: string): void {
+        // Validações de domínio aqui
+        this._name = newName;
+    }
+}
+``````
+
+### 2. Criar Use Case
+
+``````typescript
+// src/application/use-cases/create-user.use-case.ts
+export class CreateUserUseCase {
+    constructor(
+        private readonly userRepository: IUserRepository
+    ) {}
+    
+    async execute(dto: CreateUserDTO): Promise<User> {
+        // Lógica de aplicação
+    }
+}
+``````
+
+### 3. Implementar Repositório
+
+``````typescript
+// src/infrastructure/persistence/repositories/user.repository.ts
+export class UserRepository implements IUserRepository {
+    // Implementação concreta com Prisma/TypeORM/etc
+}
+``````

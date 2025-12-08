@@ -1,0 +1,53 @@
+<#
+.SYNOPSIS
+    Instala os Git hooks de PowerShell no repositório atual.
+.DESCRIPTION
+    Cria wrappers no diretório .git/hooks que invocam os scripts .ps1.
+    Isso é necessário porque o Git procura por nomes de arquivos exatos (ex: 'pre-commit').
+#>
+
+param(
+    [Parameter()]
+    [ValidateSet('copy', 'config')]
+    [string]$Method = 'copy' # Mudar default para 'copy' por ser mais robusto
+)
+
+$hooksSourceDir = $PSScriptRoot
+$gitRoot = git rev-parse --show-toplevel 2>$null
+if (-not $gitRoot) {
+    Write-Host "Erro: Não estamos em um repositório Git" -ForegroundColor Red
+    exit 1
+}
+
+$targetDir = Join-Path $gitRoot ".git\hooks"
+New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+
+$hooks = @('pre-commit', 'commit-msg', 'pre-push')
+
+Write-Host "Instalando Git hooks em '$targetDir'..." -ForegroundColor Cyan
+
+foreach ($hook in $hooks) {
+    $powerShellScriptPath = Join-Path $hooksSourceDir "$hook.ps1"
+    
+    # O hook em si, que será o executável dentro de .git/hooks
+    $hookWrapperPath = Join-Path $targetDir $hook
+    
+    # Cria um wrapper shell que invoca o script PowerShell de forma portável
+    # Isso funciona no cmd, powershell e git-bash no Windows.
+    $wrapperContent = "#!/bin/sh`n# DevBase Hook Wrapper`n`npwsh -NoProfile -File `"$powerShellScriptPath`" `$@`n"
+    
+    Set-Content -Path $hookWrapperPath -Value $wrapperContent -Encoding UTF8 -Force
+    
+    # Torna executável (essencial para ambientes *nix/macOS e Git Bash)
+    if (-not $IsWindows) {
+        try {
+            chmod +x $hookWrapperPath
+        } catch {
+            Write-Warning "Could not make hook executable. You may need to run 'chmod +x $($hookWrapperPath)' manually."
+        }
+    }
+    
+    Write-Host "  [OK] Instalado hook: $hook" -ForegroundColor Green
+}
+
+Write-Host "`nHooks PowerShell instalados com sucesso!" -ForegroundColor Green

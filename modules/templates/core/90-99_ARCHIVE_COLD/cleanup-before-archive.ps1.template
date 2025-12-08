@@ -1,0 +1,18 @@
+<#
+.SYNOPSIS
+    Higieniza projeto antes de arquivar
+#>
+param([Parameter(Mandatory)][string]$ProjectPath)
+
+$patterns = @("node_modules", "__pycache__", ".venv", "bin", "obj", "target", ".next", "dist")
+
+Write-Host "Higienizando: $ProjectPath" -ForegroundColor Yellow
+
+foreach ($pattern in $patterns) {
+    Get-ChildItem -Path $ProjectPath -Directory -Recurse -Filter $pattern -ErrorAction SilentlyContinue | ForEach-Object {
+        Remove-Item -Recurse -Force $_.FullName
+        Write-Host " [x] Removido: $($_.FullName)" -ForegroundColor Red
+    }
+}
+
+Write-Host "`nHigienização concluída!" -ForegroundColor Green

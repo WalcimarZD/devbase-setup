@@ -1,0 +1,84 @@
+<#
+.SYNOPSIS
+    AI Model Benchmark Tool (Local-First)
+.DESCRIPTION
+    Mede a performance de I/O do modelo e a latência da API local.
+    Gera relatórios JSON para observabilidade.
+#>
+param(
+    [string]$ModelName = "mistral",
+    [string]$Endpoint = "http://localhost:11434",
+    [string]$LogPath = "../metadata/benchmarks.jsonl"
+)
+
+$ErrorActionPreference = "Stop"
+
+function Measure-DiskIO {
+    param([string]$Path)
+    Write-Host " [bench] Measuring Disk I/O for model load..." -ForegroundColor Cyan
+    
+    if (-not (Test-Path $Path)) {
+        Write-Warning "Model file not found at $Path. Skipping disk bench."
+        return $null
+    }
+
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    # Ler primeiros 512MB para simular carregamento na RAM/VRAM
+    $bytes = Get-Content -Path $Path -TotalCount 512MB -Encoding Byte -ErrorAction SilentlyContinue
+    $sw.Stop()
+    
+    $mbSec = (512 / $sw.Elapsed.TotalSeconds)
+    Write-Host "   -> Speed: $([math]::Round($mbSec, 2)) MB/s" -ForegroundColor Gray
+    return $mbSec
+}
+
+function Measure-Inference {
+    Write-Host " [bench] Measuring Inference Latency (TTFT)..." -ForegroundColor Cyan
+    
+    $payload = @{
+        model = $ModelName
+        prompt = "Explain quantum computing in 1 sentence."
+        stream = $false
+    } | ConvertTo-Json
+
+    try {
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        $response = Invoke-RestMethod -Uri "$Endpoint/api/generate" -Method Post -Body $payload -ContentType "application/json"
+        $sw.Stop()
+
+        $duration = $sw.Elapsed.TotalMilliseconds
+        $tokens = $response.eval_count
+        $tps = if ($tokens) { $tokens / ($sw.Elapsed.TotalSeconds) } else { 0 }
+
+        Write-Host "   -> Latency: $([math]::Round($duration, 0)) ms" -ForegroundColor Green
+        Write-Host "   -> Throughput: $([math]::Round($tps, 1)) tokens/sec" -ForegroundColor Green
+        
+        return @{ LatencyMs = $duration; TPS = $tps }
+    }
+    catch {
+        Write-Warning "   -> Failed to connect to inference server at $Endpoint"
+        return $null
+    }
+}
+
+# --- Execution ---
+$timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
+$metrics = @{
+    Timestamp = $timestamp
+    Model = $ModelName
+}
+
+# 1. IO Bench (Simulado busca do arquivo se soubermos onde está, senão ignora)
+# $metrics.DiskSpeed = Measure-DiskIO -Path "..." 
+
+# 2. Inference Bench
+$infMetrics = Measure-Inference
+if ($infMetrics) {
+    $metrics.LatencyMs = $infMetrics.LatencyMs
+    $metrics.TPS = $infMetrics.TPS
+}
+
+# 3. Telemetry (Local Only)
+$jsonMetrics = $metrics | ConvertTo-Json -Compress
+Add-Content -Path $LogPath -Value $jsonMetrics -Force
+Write-Host "`n[✔] Benchmark recorded to $LogPath" -ForegroundColor Cyan

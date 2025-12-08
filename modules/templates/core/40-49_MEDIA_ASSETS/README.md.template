@@ -1,0 +1,13 @@
+# Media Assets
+
+> Tier 1 Storage - Otimizado para throughput sequencial.
+
+## Estrutura
+
+- ``41_raw_images/`` - Fotos RAW, PSDs
+- ``42_videos_render/`` - Projetos de vídeo
+- ``43_exports/`` - Outputs finais
+
+## Backup
+
+Backup mensal ou append-only (Tier 2).

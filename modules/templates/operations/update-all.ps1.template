@@ -1,0 +1,60 @@
+<#
+.SYNOPSIS
+    Updates all cross-platform development tools.
+#>
+
+Write-Host "=== Update All Dev Tools ===" -ForegroundColor Cyan
+
+# Cross-Platform Tools
+if (Get-Command npm -ErrorAction SilentlyContinue) {
+    Write-Host "`n[npm] Updating global packages..." -ForegroundColor White
+    npm update -g
+}
+if (Get-Command dotnet -ErrorAction SilentlyContinue) {
+    Write-Host "`n[dotnet] Updating tools..." -ForegroundColor White
+    dotnet tool list -g | Select-Object -Skip 2 | ForEach-Object {
+        $tool = ($_ -split '\s+')[0]
+        if ($tool) { dotnet tool update -g $tool }
+    }
+}
+if (Get-Command rustup -ErrorAction SilentlyContinue) {
+    Write-Host "`n[rustup] Updating Rust..." -ForegroundColor White
+    rustup update
+}
+
+# OS Specific Tools
+if ($IsWindows) {
+    Write-Host "`n--- Windows ---" -ForegroundColor Magenta
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "`n[winget] Updating packages..." -ForegroundColor White
+        winget upgrade --all --include-unknown --accept-package-agreements --accept-source-agreements
+    }
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        Write-Host "`n[scoop] Updating packages..." -ForegroundColor White
+        scoop update *
+    }
+}
+elseif ($IsLinux) {
+    Write-Host "`n--- Linux ---" -ForegroundColor Magenta
+    if (Get-Command apt -ErrorAction SilentlyContinue) {
+        Write-Host "`n[apt] Updating packages (requires sudo)..." -ForegroundColor White
+        sudo apt update && sudo apt upgrade -y
+    }
+    elseif (Get-Command dnf -ErrorAction SilentlyContinue) {
+        Write-Host "`n[dnf] Updating packages (requires sudo)..." -ForegroundColor White
+        sudo dnf upgrade -y
+    }
+    elseif (Get-Command yum -ErrorAction SilentlyContinue) {
+        Write-Host "`n[yum] Updating packages (requires sudo)..." -ForegroundColor White
+        sudo yum upgrade -y
+    }
+}
+elseif ($IsMacOS) {
+    Write-Host "`n--- macOS ---" -ForegroundColor Magenta
+    if (Get-Command brew -ErrorAction SilentlyContinue) {
+        Write-Host "`n[brew] Updating packages..." -ForegroundColor White
+        brew update && brew upgrade
+    }
+}
+
+Write-Host "`n=== Updates complete! ===" -ForegroundColor Green

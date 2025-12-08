@@ -1,0 +1,4 @@
+# NUNCA versionar este diretório
+*
+!.gitignore
+!README.md

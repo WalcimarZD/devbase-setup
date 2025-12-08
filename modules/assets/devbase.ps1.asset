@@ -1,0 +1,643 @@
+<#
+.SYNOPSIS
+    DevBase CLI - Ferramenta de gestão do DevBase (v3.2)
+.DESCRIPTION
+    Comandos para manutenção, validação, automação e telemetria pessoal.
+.EXAMPLE
+    .\devbase.ps1 doctor           # Verifica integridade
+    .\devbase.ps1 track "Feat X"   # Regista trabalho (Telemetria)
+    .\devbase.ps1 weekly           # Gera resumo semanal
+    .\devbase.ps1 backup           # Executa backup 3-2-1
+#>
+
+param(
+    [Parameter(Position=0)]
+    [ValidateSet(
+        'doctor', 'audit', 'backup', 'clean', 'new', 'link-dotfiles', 'hydrate', 'help', # Core
+        'track', 'stats', 'weekly', 'brag' # Telemetry v3.2
+    )]
+    [string]$Command = 'help',
+    
+    # Parâmetros para 'new' e 'hydrate'
+    [Parameter(ParameterSetName='NewProject')]
+    [string]$Name,
+
+    [Parameter()]
+    [switch]$Fix,
+    
+    [Parameter(ParameterSetName='Hydrate')]
+    [switch]$Force,
+    
+    # Parâmetros para Telemetria (v3.2)
+    [Parameter(ParameterSetName='Telemetry')]
+    [string]$Message,
+    
+    [Parameter(ParameterSetName='Telemetry')]
+    [string]$Type = "work",
+    
+    [Parameter(ParameterSetName='Telemetry')]
+    [string]$Output, # Caminho para exportar (weekly/brag)
+
+    [Parameter()]
+    [switch]$ShowDetails
+)
+
+$ErrorActionPreference = 'Stop'
+
+# Detectar root e carregar funções comuns
+# Correção v3.1: Carregar common-functions localmente
+$DevBaseRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$commonFunctionsPath = Join-Path $PSScriptRoot "common-functions.ps1"
+
+if (Test-Path $commonFunctionsPath) {
+    . $commonFunctionsPath
+} else {
+    # Fallback para modo desenvolvimento
+    $devModePath = Join-Path $DevBaseRoot "modules/common-functions.ps1"
+    if (Test-Path $devModePath) { . $devModePath }
+    else { Write-Host "ERRO CRÍTICO: 'common-functions.ps1' não encontrado." -ForegroundColor Red; exit 1 }
+}
+
+# Cores
+$script:ColorSuccess = "Green"
+$script:ColorWarning = "Yellow"
+$script:ColorError = "Red"
+$script:ColorInfo = "Cyan"
+$script:ColorHeader = "Magenta"
+
+# ============================================
+# FUNÇÕES CORE
+# ============================================
+
+# ============================================
+# COMANDO: HYDRATE
+# ============================================
+
+function Invoke-Hydrate {
+    Write-Header "DevBase Hydrate"
+    Write-Host "Sincronizando workspace com os templates mais recentes..." -ForegroundColor $script:ColorInfo
+    if ($Force) {
+        Write-Host "Modo Forçado: Todos os arquivos de template serão sobreescritos, independentemente da data." -ForegroundColor $script:ColorWarning
+    }
+
+    $modulesDir = Join-Path $DevBaseRoot "modules"
+    
+    try {
+        Write-Step "Hidratando Core..." "INFO" # Pass string "INFO" instead of ColorInfo variable
+        . (Join-Path $modulesDir "setup-core.ps1")
+        Setup-Core -RootPath $DevBaseRoot -Force:$Force # Pass -Force to setup module
+        
+        Write-Step "Hidratando PKM..." "INFO"
+        . (Join-Path $modulesDir "setup-pkm.ps1")
+        Setup-PKM -RootPath $DevBaseRoot -Force:$Force # Pass -Force to setup module
+
+        Write-Step "Hidratando Code..." "INFO"
+        . (Join-Path $modulesDir "setup-code.ps1")
+        Setup-Code -RootPath $DevBaseRoot -Force:$Force # Pass -Force to setup module
+
+        Write-Step "Hidratando Operations..." "INFO"
+        . (Join-Path $modulesDir "setup-operations.ps1")
+        Setup-Operations -RootPath $DevBaseRoot -Force:$Force # Pass -Force to setup module
+
+        Write-Step "Hidratando Templates..." "INFO"
+        . (Join-Path $modulesDir "setup-templates.ps1")
+        Setup-Templates -RootPath $DevBaseRoot -Force:$Force # Pass -Force to setup module
+
+        Write-Step "Hidratando Hooks..." "INFO"
+        . (Join-Path $modulesDir "setup-hooks.ps1")
+        Setup-Hooks -RootPath $DevBaseRoot -Force:$Force # Pass -Force to setup module
+
+        Write-Host "`n✅ Hidratação concluída." -ForegroundColor $script:ColorSuccess
+    } catch {
+        Write-Step "Ocorreu um erro durante a hidratação: $_" "ERROR"
+    }
+}
+
+
+# ============================================
+# COMANDO: LINK-DOTFILES
+# ============================================
+
+function Invoke-LinkDotfiles {
+    Write-Header "DevBase Link Dotfiles"
+    
+    $sourceDir = Join-Path $DevBaseRoot "00-09_SYSTEM" "01_dotfiles" "links"
+    $targetDir = $HOME
+
+    if (-not (Test-Path $sourceDir)) {
+        Write-Step "Diretório de origem para links não encontrado: $sourceDir" "WARN"
+        Write-Host "Crie este diretório e coloque os dotfiles que deseja vincular dentro dele." -ForegroundColor $script:ColorInfo
+        return
+    }
+
+    $dotfiles = Get-ChildItem -Path $sourceDir -File
+    if ($dotfiles.Count -eq 0) {
+        Write-Step "Nenhum dotfile encontrado em $sourceDir para vincular." "INFO"
+        return
+    }
+
+    Write-Host "Vinculando dotfiles de '$sourceDir' para '$targetDir'..." -ForegroundColor $script:ColorInfo
+
+    foreach ($file in $dotfiles) {
+        $sourceFile = $file.FullName
+        $targetFile = Join-Path $targetDir $file.Name
+
+        try {
+            if (Test-Path $targetFile -PathType Container) { # Added PathType for clarity
+                 Write-Step "Um diretório com o mesmo nome já existe em '$targetFile'. Pulando." "WARN"
+                 continue
+            }
+            if (Test-Path $targetFile) {
+                $backupPath = "$targetFile.bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
+                Write-Step "Arquivo existente encontrado em '$targetFile'. Fazendo backup para '$backupPath'..." "WARN"
+                Move-Item -Path $targetFile -Destination $backupPath -Force
+            }
+
+            New-Item -ItemType SymbolicLink -Path $targetFile -Value $sourceFile -Force
+            Write-Step "Link criado: '$targetFile' -> '$sourceFile'" "OK"
+
+        } catch {
+            Write-Step "Falha ao criar link para '$($file.Name)': $_" "ERROR"
+        }
+    }
+    Write-Host "`nVinculação de dotfiles concluída." -ForegroundColor $script:ColorSuccess
+}
+
+
+# ============================================
+# COMANDO: NEW
+# ============================================
+
+
+# === COMANDO: NEW ===
+
+function Invoke-NewProject {
+    param([string]$ProjectName)
+
+    Write-Header "DevBase New Project"
+
+    if (-not $ProjectName) {
+        $ProjectName = Read-Host "Digite o nome para o novo projeto (ex: my-cool-app)"
+        if (-not $ProjectName) {
+            Write-Step "Nome do projeto não pode ser vazio." "ERROR"
+            return
+        }
+    }
+
+    $templateName = "__template-clean-arch"
+    $sourcePath = Join-Path $DevBaseRoot "20-29_CODE_WORK" $templateName
+    $destinationPath = Join-Path $DevBaseRoot "20-29_CODE_WORK" "21_monorepo_apps" $ProjectName
+
+    if (-not (Test-Path $sourcePath)) {
+        Write-Step "Diretório de template '$templateName' não encontrado." "ERROR"
+        return
+    }
+
+    if (Test-Path $destinationPath) {
+        Write-Step "O projeto '$ProjectName' já existe no destino." "ERROR"
+        return
+    }
+
+    Write-Host "Criando projeto '$ProjectName' a partir do template '$templateName'..." -ForegroundColor $script:ColorInfo
+    
+    try {
+        Copy-Item -Path $sourcePath -Destination $destinationPath -Recurse -Force
+        Write-Step "Projeto '$ProjectName' criado com sucesso em:" "OK"
+        Write-Host $destinationPath -ForegroundColor Gray
+        
+        # TODO: Adicionar lógica para substituir placeholders dentro dos arquivos do novo projeto.
+        # Ex: Get-ChildItem -Path $destinationPath -Recurse | Where-Object { -not $_.PSIsContainer } | ForEach-Object { (Get-Content $_.FullName -Raw) -replace '{{PROJECT_NAME}}', $ProjectName | Set-Content $_.FullName -Encoding UTF8 }
+
+    } catch {
+        Write-Step "Falha ao criar o projeto: $_" "ERROR"
+    }
+}
+
+
+# ============================================
+# COMANDO: DOCTOR
+# ============================================
+
+function Invoke-Doctor {
+    Write-Header "DevBase Doctor"
+    Write-Host "Verificando integridade do DevBase em: $DevBaseRoot`n" -ForegroundColor $script:ColorInfo
+    
+    $issues = 0
+    
+    # 1. Verificar estrutura de áreas
+    Write-Host "Verificando estrutura de áreas..." -ForegroundColor $script:ColorInfo
+    $requiredAreas = @(
+        '00-09_SYSTEM',
+        '10-19_KNOWLEDGE_PKM',
+        '20-29_CODE_WORK',
+        '30-39_OPERATIONS',
+        '40-49_MEDIA_ASSETS',
+        '90-99_ARCHIVE_COLD'
+    )
+    
+    foreach ($area in $requiredAreas) {
+        $path = Join-Path $DevBaseRoot $area
+        if (Test-Path $path) {
+            Write-Step "$area" "OK"
+        } else {
+            Write-Step "$area - NÃO ENCONTRADO" "ERROR"
+            $issues++
+        }
+    }
+    
+    # 2. Verificar arquivos de governança
+    Write-Host "`nVerificando arquivos de governança..." -ForegroundColor $script:ColorInfo
+    $requiredFiles = @(
+        '.editorconfig',
+        '.gitignore',
+        '00.00_index.md',
+        '.devbase_state.json'
+    )
+    
+    foreach ($file in $requiredFiles) {
+        $path = Join-Path $DevBaseRoot $file
+        if (Test-Path $path) {
+            Write-Step "$file" "OK"
+        } else {
+            Write-Step "$file - NÃO ENCONTRADO" "WARN"
+            $issues++
+        }
+    }
+    
+    # 3. Verificar Air-Gap do Private Vault
+    Write-Host "`nVerificando Air-Gap do Private Vault..." -ForegroundColor $script:ColorInfo
+    $privatePath = Join-Path $DevBaseRoot '10-19_KNOWLEDGE_PKM' '12_private_vault'
+    $gitignorePath = Join-Path $DevBaseRoot '.gitignore'
+    
+    if (Test-Path $privatePath) {
+        if (Test-Path $gitignorePath) {
+            $gitignoreContent = Get-Content $gitignorePath -Raw
+            if ($gitignoreContent -match '12_private_vault') {
+                Write-Step "Private Vault está protegido no .gitignore" "OK"
+            } else {
+                Write-Step "Private Vault NÃO está no .gitignore!" "ERROR"
+                $issues++
+            }
+        } else {
+            Write-Step ".gitignore não encontrado" "WARN"
+        }
+    } else {
+        Write-Step "Private Vault não existe" "INFO"
+    }
+
+    # 4. Verificar Git Hooks do Repositório Raiz
+    Write-Host "`nVerificando configuração de Git Hooks..." -ForegroundColor $script:ColorInfo
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        $isGitRepo = git -C $DevBaseRoot rev-parse --is-inside-work-tree 2>$null
+        if ($isGitRepo) {
+            $hooksPath = (git -C $DevBaseRoot config core.hooksPath 2>$null).Replace('\', '/')
+            $expectedPath = "00-09_SYSTEM/06_git_hooks"
+            if ($hooksPath -eq $expectedPath) {
+                Write-Step "Git Hooks configurados corretamente para o repositório raiz." "OK"
+            } else {
+                Write-Step "Git Hooks não configurados para o repositório raiz. (Esperado: '$expectedPath', Atual: '$hooksPath')" "WARN"
+            }
+        } else {
+            Write-Step "O diretório raiz não é um repositório Git. Verificação de hooks pulada." "INFO"
+        }
+    } else {
+        Write-Step "Comando 'git' não encontrado. Verificação de hooks pulada." "INFO"
+    }
+    
+    # 5. Verificar nomenclatura kebab-case
+    Write-Host "`nVerificando nomenclatura kebab-case..." -ForegroundColor $script:ColorInfo
+    $violations = Get-ChildItem -Path $DevBaseRoot -Recurse -Directory |
+        Where-Object { 
+            $_.Name -notmatch '^[a-z0-9]+(-[a-z0-9]+)*$' -and
+            $_.Name -notmatch '^\d{2}(-\d{2})?_' -and
+            $_.Name -notmatch '^\.' -and
+            $_.Name -notmatch '^__' -and
+            $_.Name -notmatch '^node_modules$'
+        } |
+        Select-Object -First 10
+    
+    if ($violations.Count -eq 0) {
+        Write-Step "Nomenclatura OK" "OK"
+    } else {
+        Write-Step "$($violations.Count)+ violações de nomenclatura" "WARN"
+        $violations | ForEach-Object {
+            Write-Host "    - $($_.FullName)" -ForegroundColor $script:ColorWarning
+        }
+    }
+    
+    # 6. Verificar state file
+    Write-Host "`nVerificando state file..." -ForegroundColor $script:ColorInfo
+    $statePath = Join-Path $DevBaseRoot '.devbase_state.json'
+    if (Test-Path $statePath) {
+        try {
+            $state = Get-Content $statePath | ConvertFrom-Json
+            Write-Step "Versão: $($state.version)" "OK"
+            Write-Step "Instalado em: $($state.installed_at)" "INFO"
+        } catch {
+            Write-Step "State file corrompido" "ERROR"
+            $issues++
+        }
+    }
+    
+    # Resultado final
+    Write-Host "`n" + "="*50 -ForegroundColor $script:ColorHeader
+    if ($issues -eq 0) {
+        Write-Host "DevBase está SAUDÁVEL" -ForegroundColor $script:ColorSuccess
+    } else {
+        Write-Host "Encontrados $issues problemas" -ForegroundColor $script:ColorWarning
+        Write-Host "Execute 'devbase doctor -Fix' para tentar corrigir" -ForegroundColor $script:ColorWarning
+    }
+}
+
+# ============================================
+# COMANDO: AUDIT
+# ============================================
+
+function Invoke-Audit {
+    Write-Header "DevBase Audit"
+    Write-Host "Auditando nomenclatura em: $DevBaseRoot`n" -ForegroundColor $script:ColorInfo
+    
+    $violations = @()
+    
+    # Padrões permitidos
+    $allowedPatterns = @(
+        '^\d{2}(-\d{2})?_',     # Johnny.Decimal (00-09_NAME)
+        '^[a-z0-9]+(-[a-z0-9]+)*$',  # kebab-case
+        '^\.',                   # Dotfiles
+        '^__',                   # Dunder (templates)
+        '^node_modules$',        # Exceptions
+        '^\.git$'
+    )
+    
+    Get-ChildItem -Path $DevBaseRoot -Recurse -Directory | ForEach-Object {
+        $name = $_.Name
+        $isAllowed = $false
+        
+        foreach ($pattern in $allowedPatterns) {
+            if ($name -match $pattern) {
+                $isAllowed = $true
+                break
+            }
+        }
+        
+        if (-not $isAllowed) {
+            $violations += [PSCustomObject]@{
+                Path = $_.FullName
+                Name = $name
+                Suggestion = ($name -replace '([a-z])([A-Z])', '$1-$2').ToLower() -replace '[_ ]', '-'
+            }
+        }
+    }
+    
+    if ($violations.Count -eq 0) {
+        Write-Step "Nenhuma violação encontrada" "OK"
+    } else {
+        Write-Host "Encontradas $($violations.Count) violações:`n" -ForegroundColor $script:ColorWarning
+        
+        $violations | ForEach-Object {
+            Write-Host "  Atual:     " -NoNewline -ForegroundColor $script:ColorError
+            Write-Host $_.Name -ForegroundColor $script:ColorError
+            Write-Host "  Sugerido:  " -NoNewline -ForegroundColor $script:ColorSuccess
+            Write-Host $_.Suggestion -ForegroundColor $script:ColorSuccess
+            Write-Host "  Path:      $($_.Path)" -ForegroundColor Gray
+            Write-Host ""
+        }
+        
+        if ($Fix) {
+            Write-Host "Aplicando correções..." -ForegroundColor $script:ColorInfo
+            $violations | ForEach-Object {
+                $newPath = Join-Path (Split-Path $_.Path -Parent) $_.Suggestion
+                try {
+                    Rename-Item -Path $_.Path -NewName $_.Suggestion -ErrorAction Stop
+                    Write-Step "Renomeado: $($_.Name) -> $($_.Suggestion)" "OK"
+                } catch {
+                    Write-Step "Falha ao renomear: $($_.Name)" "ERROR"
+                }
+            }
+        }
+    }
+}
+
+# ============================================
+# COMANDO: BACKUP
+# ============================================
+
+function Invoke-Backup {
+    Write-Header "DevBase Backup 3-2-1"
+    
+    $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+    $backupName = "devbase_backup_$timestamp"
+    $backupPath = Join-Path $DevBaseRoot "30-39_OPERATIONS" "31_backups" "local" $backupName
+    
+    Write-Host "Criando backup em: $backupPath`n" -ForegroundColor $script:ColorInfo
+    
+    try {
+        if ($IsWindows) {
+            Write-Host "Usando 'robocopy' para backup otimizado no Windows..." -ForegroundColor $script:ColorInfo
+            $exclude = @(
+                'node_modules',
+                '.git',
+                '31_backups'
+            )
+            $excludeDirs = $exclude | ForEach-Object { "/XD", $_ }
+            robocopy $DevBaseRoot $backupPath /MIR $excludeDirs /XF *.log /NFL /NDL /NJH /NJS
+        }
+        else { # Linux ou macOS
+            if (-not (Get-Command rsync -ErrorAction SilentlyContinue)) {
+                Write-Step "Comando 'rsync' não encontrado. Backup automático não suportado neste sistema." $script:ColorError
+                Write-Host "Por favor, instale 'rsync' ou use outra ferramenta de backup manual." -ForegroundColor $script:ColorInfo
+                return
+            }
+            
+            Write-Host "Usando 'rsync' para backup em ambiente non-Windows..." -ForegroundColor $script:ColorInfo
+            $rsyncExcludes = @(
+                '--exclude=node_modules/',
+                '--exclude=.git/',
+                '--exclude=31_backups/',
+                '--exclude=*.log'
+            )
+            # A barra no final do caminho de origem é crucial para o rsync
+            $sourcePath = "$DevBaseRoot/"
+            
+            # -a: modo archive (recursivo, preserva links, permissões, etc.)
+            # --delete: deleta arquivos no destino que não existem mais na origem
+            rsync -a --delete $rsyncExcludes $sourcePath $backupPath
+        }
+
+        Write-Step "Backup local criado com sucesso" $script:ColorSuccess
+        Write-Host "  Localização: $backupPath" -ForegroundColor Gray
+        
+        # Calcular tamanho (método cross-platform)
+        $size = (Get-ChildItem -Path $backupPath -Recurse -File | Measure-Object -Property Length -Sum).Sum
+        $sizeMB = [math]::Round($size / 1MB, 2)
+        Write-Host "  Tamanho: $sizeMB MB" -ForegroundColor Gray
+        
+    } catch {
+        Write-Step "Falha no backup: $_" $script:ColorError
+    }
+    
+    Write-Host "`nEstratégia 3-2-1:" -ForegroundColor $script:ColorInfo
+    Write-Host "  [1] Local: $backupPath" -ForegroundColor Gray
+    Write-Host "  [2] Segundo disco: Copie para um disco externo." -ForegroundColor $script:ColorWarning
+    Write-Host "  [3] Off-site: Sincronize com a nuvem (exceto private_vault)." -ForegroundColor $script:ColorWarning
+}
+
+# ============================================
+# COMANDO: CLEAN
+# ============================================
+
+function Invoke-Clean {
+    Write-Header "DevBase Clean"
+    
+    Write-Host "Limpando arquivos temporários...`n" -ForegroundColor $script:ColorInfo
+    
+    $patterns = @(
+        '*.log',
+        '*.tmp',
+        '*~',
+        'Thumbs.db',
+        '.DS_Store'
+    )
+    
+    $cleaned = 0
+    
+    foreach ($pattern in $patterns) {
+        $files = Get-ChildItem -Path $DevBaseRoot -Filter $pattern -Recurse -File -ErrorAction SilentlyContinue
+        foreach ($file in $files) {
+            Remove-Item $file.FullName -Force
+            $cleaned++
+        }
+    }
+    
+    Write-Step "Removidos $cleaned arquivos temporários" $script:ColorSuccess
+    
+    # Limpar backups antigos (manter últimos 5)
+    $backupDir = Join-Path $DevBaseRoot "30-39_OPERATIONS" "31_backups" "local"
+    if (Test-Path $backupDir) {
+        $oldBackups = Get-ChildItem -Path $backupDir -Directory |
+            Sort-Object CreationTime -Descending |
+            Select-Object -Skip 5
+        
+        if ($oldBackups.Count -gt 0) {
+            Write-Host "`nRemovendo backups antigos..." -ForegroundColor $script:ColorInfo
+            $oldBackups | ForEach-Object {
+                Remove-Item $_.FullName -Recurse -Force
+                Write-Step "Removido: $($_.Name)" $script:ColorSuccess
+            }
+        }
+    }
+}
+
+# ============================================
+# TELEMETRIA & OBSERVABILIDADE (v3.2)
+# ============================================
+
+function Invoke-Track {
+    # Wrapper para telemetry.ps1 record
+    if (-not $Message) {
+        $Message = Read-Host "Digite a mensagem para o log (ex: 'Corrigi bug X')"
+    }
+    
+    $telemetryScript = Join-Path $PSScriptRoot "telemetry.ps1"
+    if (Test-Path $telemetryScript) {
+        & pwsh -File $telemetryScript record $Type $Message
+    } else {
+        Write-Step "Script de telemetria não encontrado em: $telemetryScript" "ERROR"
+    }
+}
+
+function Invoke-Stats {
+    # Wrapper para telemetry.ps1 stats
+    $telemetryScript = Join-Path $PSScriptRoot "telemetry.ps1"
+    if (Test-Path $telemetryScript) {
+        & pwsh -File $telemetryScript stats
+    }
+}
+
+function Invoke-Weekly {
+    # Wrapper para telemetry.ps1 weekly
+    $telemetryScript = Join-Path $PSScriptRoot "telemetry.ps1"
+    if (Test-Path $telemetryScript) {
+        $argsList = @("weekly")
+        if ($Output) { $argsList += "-OutputPath"; $argsList += $Output }
+        
+        & pwsh -File $telemetryScript @argsList
+    }
+}
+
+function Invoke-Brag {
+    # Wrapper para telemetry.ps1 brag
+    $telemetryScript = Join-Path $PSScriptRoot "telemetry.ps1"
+    if (Test-Path $telemetryScript) {
+        $argsList = @("brag")
+        if ($Output) { $argsList += "-OutputPath"; $argsList += $Output }
+        
+        & pwsh -File $telemetryScript @argsList
+    }
+}
+
+# ============================================
+# HELP & DISPATCHER
+# ============================================
+
+function Show-Help {
+    Write-Host @"
+
+╔══════════════════════════════════════════════════════════════╗
+║                     DevBase CLI v3.2                        ║
+╚══════════════════════════════════════════════════════════════╝
+
+COMANDOS DE GESTÃO:
+  doctor        Verifica integridade do DevBase
+  audit         Audita nomenclatura (kebab-case)
+  backup        Executa backup 3-2-1
+  clean         Limpa arquivos temporários
+  hydrate       Atualiza templates
+  new           Cria novo projeto (-Name)
+  link-dotfiles Sincroniza dotfiles
+
+COMANDOS DE TELEMETRIA (v3.2):
+  track         Regista uma atividade (ex: track -Message "Feat X")
+  stats         Mostra estatísticas de uso local
+  weekly        Gera relatório semanal (Markdown)
+  brag          Gera 'Brag Document' das conquistas
+
+OPÇÕES:
+  -Message      Mensagem para o comando 'track'
+  -Type         Tipo de evento (default: work)
+  -Output       Caminho para salvar relatórios (weekly/brag)
+  -Fix          Corrige problemas automaticamente (audit)
+  -Force        Força operações (hydrate)
+
+EXEMPLOS:
+  .\devbase.ps1 track "Implementei módulo de IA"
+  .\devbase.ps1 weekly -Output ./weeknotes.md
+  .\devbase.ps1 backup
+
+"@
+}
+
+# === DISPATCHER ===
+
+# Precisa re-incluir as chamadas às funções antigas se não estiverem no bloco acima
+# Mas aqui está o switch atualizado:
+
+switch ($Command) {
+    'doctor' { Invoke-Doctor }
+    'audit'  { Invoke-Audit }
+    'backup' { Invoke-Backup }
+    'clean'  { Invoke-Clean }
+    'new'    { Invoke-NewProject -ProjectName $Name }
+    'link-dotfiles' { Invoke-LinkDotfiles }
+    'hydrate' { Invoke-Hydrate -Force:$Force }
+    
+    # Novos comandos v3.2
+    'track'  { Invoke-Track }
+    'stats'  { Invoke-Stats }
+    'weekly' { Invoke-Weekly }
+    'brag'   { Invoke-Brag }
+    'init-ci' { Invoke-InitCI -DevBaseRoot $DevBaseRoot }
+
+    'help'   { Show-Help }
+    default  { Show-Help }
+}

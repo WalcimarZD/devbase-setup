@@ -1,0 +1,215 @@
+# PADRÕES GIT - DevBase v3.0
+
+> Convenções para commits, branches, e fluxo de trabalho
+
+## Conventional Commits
+
+Formato: `<type>(<scope>): <description>`
+
+### Types
+
+| Type       | Descrição                                    | Exemplo                              |
+|------------|----------------------------------------------|--------------------------------------|
+| `feat`     | Nova funcionalidade                          | `feat(auth): add OAuth2 login`       |
+| `fix`      | Correção de bug                              | `fix(cart): resolve quantity bug`    |
+| `docs`     | Documentação                                 | `docs(api): update endpoint docs`    |
+| `style`    | Formatação (sem mudança de código)           | `style: format with prettier`        |
+| `refactor` | Refatoração (sem mudança de comportamento)   | `refactor(user): extract service`    |
+| `perf`     | Melhoria de performance                      | `perf(query): add index`             |
+| `test`     | Adição/correção de testes                    | `test(auth): add login tests`        |
+| `build`    | Mudanças no build/deps                       | `build: upgrade webpack to v5`       |
+| `ci`       | Mudanças em CI/CD                            | `ci: add GitHub Actions`             |
+| `chore`    | Tarefas de manutenção                        | `chore: update .gitignore`           |
+| `revert`   | Reverter commit anterior                     | `revert: feat(auth)...`              |
+
+### Scope (opcional)
+
+Módulo ou área afetada:
+- `auth`, `api`, `ui`, `db`, `config`, etc.
+
+### Breaking Changes
+
+```
+feat(api)!: change response format
+
+BREAKING CHANGE: API now returns data wrapped in { data: ... }
+```
+
+### Exemplos
+
+```bash
+# Feature simples
+feat(cart): add product quantity selector
+
+# Bug fix com issue reference
+fix(checkout): resolve payment timeout (#123)
+
+# Breaking change
+feat(api)!: migrate to v2 endpoints
+
+BREAKING CHANGE: All v1 endpoints are now deprecated.
+Migration guide: docs/migration-v2.md
+
+# Commit com body
+docs(readme): add installation instructions
+
+Added step-by-step guide for:
+- Local development setup
+- Docker deployment
+- Production configuration
+```
+
+## Branch Naming
+
+### Formato
+
+```
+<type>/<ticket>-<short-description>
+```
+
+### Tipos
+
+| Prefixo    | Uso                        |
+|------------|----------------------------|
+| `feature/` | Nova funcionalidade        |
+| `fix/`     | Correção de bug            |
+| `hotfix/`  | Correção urgente em prod   |
+| `release/` | Preparação de release      |
+| `docs/`    | Documentação               |
+| `refactor/`| Refatoração                |
+| `test/`    | Adição de testes           |
+| `chore/`   | Manutenção                 |
+
+### Exemplos
+
+```bash
+feature/PROJ-123-user-authentication
+fix/PROJ-456-login-timeout
+hotfix/PROJ-789-critical-security-patch
+release/v2.1.0
+docs/update-api-reference
+```
+
+## Git Flow
+
+```
+main (produção)
+  │
+  └── develop (desenvolvimento)
+        │
+        ├── feature/xxx
+        ├── feature/yyy
+        │
+        └── release/v1.0
+              │
+              └── main (tag v1.0)
+```
+
+### Comandos Comuns
+
+```bash
+# Iniciar feature
+git checkout develop
+git pull origin develop
+git checkout -b feature/PROJ-123-description
+
+# Finalizar feature
+git checkout develop
+git pull origin develop
+git merge --no-ff feature/PROJ-123-description
+git branch -d feature/PROJ-123-description
+
+# Criar release
+git checkout develop
+git checkout -b release/v1.0.0
+# ... ajustes finais ...
+git checkout main
+git merge --no-ff release/v1.0.0
+git tag -a v1.0.0 -m "Release v1.0.0"
+git checkout develop
+git merge --no-ff release/v1.0.0
+
+# Hotfix
+git checkout main
+git checkout -b hotfix/PROJ-789-critical-fix
+# ... fix ...
+git checkout main
+git merge --no-ff hotfix/PROJ-789-critical-fix
+git tag -a v1.0.1 -m "Hotfix v1.0.1"
+git checkout develop
+git merge --no-ff hotfix/PROJ-789-critical-fix
+```
+
+## Trunk-Based Development (alternativa)
+
+Para times menores ou CI/CD maduro:
+
+```
+main ─────●─────●─────●─────●─────●─────
+          │     │     │     │     │
+          └─────┴─────┴─────┴─────┘
+          (feature branches curtas, < 1 dia)
+```
+
+```bash
+# Feature curta (mesmo dia)
+git checkout -b feature/small-change
+# ... trabalho ...
+git checkout main
+git pull --rebase origin main
+git merge --squash feature/small-change
+git push origin main
+```
+
+## Rebase vs Merge
+
+### Quando usar Rebase
+
+- Atualizar feature branch com mudanças de develop
+- Limpar histórico antes de PR
+
+```bash
+git checkout feature/xxx
+git rebase develop
+# Resolver conflitos se houver
+git push --force-with-lease origin feature/xxx
+```
+
+### Quando usar Merge
+
+- Integrar feature em develop/main
+- Manter histórico completo
+
+```bash
+git checkout develop
+git merge --no-ff feature/xxx
+```
+
+## Dicas
+
+### Aliases Úteis
+
+```bash
+# ~/.gitconfig
+[alias]
+    co = checkout
+    br = branch
+    ci = commit
+    st = status
+    lg = log --oneline --graph --all
+    unstage = reset HEAD --
+    last = log -1 HEAD
+    amend = commit --amend --no-edit
+```
+
+### Pre-commit Hooks
+
+Ver `.git/hooks/` para hooks de validação automática.
+
+### Squash antes de Merge
+
+```bash
+# Na feature branch, antes do PR
+git rebase -i develop
+# Marcar commits como 'squash' ou 'fixup'
+```

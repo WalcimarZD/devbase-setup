@@ -1,0 +1,246 @@
+# PADRÕES SQL - DevBase v3.0
+
+> Convenções e boas práticas para desenvolvimento SQL
+
+## Nomenclatura
+
+### Tabelas
+- **snake_case** para nomes de tabelas
+- Plural para coleções: `users`, `orders`, `products`
+- Prefixos para tipo:
+  - `tb_` - tabelas regulares (opcional)
+  - `vw_` - views
+  - `fn_` - functions
+  - `sp_` - stored procedures
+  - `tr_` - triggers
+  - `ix_` - indexes
+  - `pk_` - primary keys
+  - `fk_` - foreign keys
+  - `ck_` - check constraints
+  - `uq_` - unique constraints
+
+### Colunas
+- **snake_case** para nomes
+- Sufixos comuns:
+  - `_id` - identificadores
+  - `_at` - timestamps (`created_at`, `updated_at`, `deleted_at`)
+  - `_by` - referência a usuário (`created_by`, `modified_by`)
+  - `_count` - contadores
+  - `_date` - apenas data (sem hora)
+  - `_flag` ou `is_` - booleanos (`is_active`, `is_deleted`)
+
+## Colunas Padrão
+
+Toda tabela DEVE ter:
+
+```sql
+-- Auditoria básica
+created_at      DATETIME2       NOT NULL DEFAULT GETDATE(),
+updated_at      DATETIME2       NULL,
+created_by      NVARCHAR(100)   NULL,
+updated_by      NVARCHAR(100)   NULL,
+
+-- Soft delete (opcional mas recomendado)
+is_deleted      BIT             NOT NULL DEFAULT 0,
+deleted_at      DATETIME2       NULL,
+deleted_by      NVARCHAR(100)   NULL
+```
+
+## Template de Tabela
+
+```sql
+-- ============================================
+-- Tabela: [schema].[table_name]
+-- Descrição: [Breve descrição]
+-- Autor: [Nome]
+-- Data: [YYYY-MM-DD]
+-- ============================================
+
+CREATE TABLE [schema].[table_name] (
+    -- PK
+    id                  INT             IDENTITY(1,1) NOT NULL,
+    
+    -- Campos de negócio
+    name                NVARCHAR(100)   NOT NULL,
+    description         NVARCHAR(500)   NULL,
+    status              TINYINT         NOT NULL DEFAULT 1,
+    
+    -- Auditoria
+    created_at          DATETIME2       NOT NULL DEFAULT GETDATE(),
+    updated_at          DATETIME2       NULL,
+    created_by          NVARCHAR(100)   NULL,
+    updated_by          NVARCHAR(100)   NULL,
+    is_deleted          BIT             NOT NULL DEFAULT 0,
+    deleted_at          DATETIME2       NULL,
+    
+    -- Constraints
+    CONSTRAINT pk_table_name PRIMARY KEY CLUSTERED (id),
+    CONSTRAINT ck_table_name_status CHECK (status IN (0, 1, 2))
+);
+
+-- Índices
+CREATE NONCLUSTERED INDEX ix_table_name_status 
+    ON [schema].[table_name] (status) 
+    WHERE is_deleted = 0;
+
+-- Comentários
+EXEC sp_addextendedproperty 
+    @name = N'MS_Description',
+    @value = N'Descrição da tabela',
+    @level0type = N'SCHEMA', @level0name = 'schema',
+    @level1type = N'TABLE',  @level1name = 'table_name';
+```
+
+## Stored Procedures
+
+### Template CRUD
+
+```sql
+-- ============================================
+-- SP: [schema].[sp_table_name_action]
+-- Descrição: [Ação sobre table_name]
+-- ============================================
+
+CREATE OR ALTER PROCEDURE [schema].[sp_table_name_get_by_id]
+    @id         INT,
+    @user       NVARCHAR(100) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    
+    BEGIN TRY
+        SELECT 
+            id,
+            name,
+            description,
+            status,
+            created_at,
+            updated_at
+        FROM [schema].[table_name]
+        WHERE id = @id
+          AND is_deleted = 0;
+          
+    END TRY
+    BEGIN CATCH
+        THROW;
+    END CATCH
+END;
+GO
+```
+
+### Template com Transaction
+
+```sql
+CREATE OR ALTER PROCEDURE [schema].[sp_table_name_create]
+    @name           NVARCHAR(100),
+    @description    NVARCHAR(500) = NULL,
+    @user           NVARCHAR(100),
+    @new_id         INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        
+        INSERT INTO [schema].[table_name] (
+            name,
+            description,
+            created_by
+        )
+        VALUES (
+            @name,
+            @description,
+            @user
+        );
+        
+        SET @new_id = SCOPE_IDENTITY();
+        
+        COMMIT TRANSACTION;
+        
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+```
+
+## Views
+
+```sql
+-- ============================================
+-- View: [schema].[vw_table_name_active]
+-- Descrição: Registros ativos de table_name
+-- ============================================
+
+CREATE OR ALTER VIEW [schema].[vw_table_name_active]
+AS
+SELECT 
+    id,
+    name,
+    description,
+    status,
+    created_at,
+    updated_at
+FROM [schema].[table_name]
+WHERE is_deleted = 0;
+GO
+```
+
+## Migrations
+
+Nomenclatura: `YYYYMMDD_HHMMSS_description.sql`
+
+```sql
+-- Migration: 20241213_143000_create_users_table.sql
+-- Author: Developer Name
+-- Description: Creates users table with audit columns
+
+-- UP
+CREATE TABLE [dbo].[users] (
+    -- ...
+);
+
+-- DOWN (rollback)
+-- DROP TABLE [dbo].[users];
+```
+
+## Performance
+
+### Índices
+- Sempre criar índice em FKs
+- Índices compostos: coluna mais seletiva primeiro
+- Usar `INCLUDE` para covering indexes
+- Filtrar registros deletados: `WHERE is_deleted = 0`
+
+### Queries
+- Evitar `SELECT *`
+- Usar `SET NOCOUNT ON`
+- Preferir `EXISTS` sobre `IN` para subqueries
+- Usar CTEs para legibilidade
+
+```sql
+-- Bom: CTE para legibilidade
+WITH active_users AS (
+    SELECT id, name
+    FROM users
+    WHERE is_deleted = 0
+      AND status = 1
+)
+SELECT u.name, COUNT(o.id) as order_count
+FROM active_users u
+LEFT JOIN orders o ON u.id = o.user_id
+GROUP BY u.name;
+```
+
+## Segurança
+
+- Sempre usar parâmetros (nunca concatenar strings)
+- Validar inputs na aplicação E no banco
+- Usar SCHEMAS para separar permissões
+- Audit trails em tabelas sensíveis

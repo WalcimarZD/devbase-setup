@@ -1,0 +1,472 @@
+# 📖 Guia de Uso Completo do DevBase
+
+> Este guia abrangente ensina você a utilizar todas as funcionalidades do DevBase, do básico ao avançado.
+
+---
+
+## 📋 Sumário
+
+1. [Introdução](#1-introdução)
+2. [Primeiros Passos](#2-primeiros-passos)
+3. [Entendendo a Estrutura Johnny.Decimal](#3-entendendo-a-estrutura-johnnydecimal)
+4. [Usando a CLI do DevBase](#4-usando-a-cli-do-devbase)
+5. [Gerenciamento de Conhecimento (PKM)](#5-gerenciamento-de-conhecimento-pkm)
+6. [Trabalhando com Código](#6-trabalhando-com-código)
+7. [Git Hooks e Automação](#7-git-hooks-e-automação)
+8. [Segurança e Private Vault](#8-segurança-e-private-vault)
+9. [Backup e Recuperação](#9-backup-e-recuperação)
+10. [Telemetria Pessoal](#10-telemetria-pessoal)
+
+---
+
+## 1. Introdução
+
+### O que é o DevBase?
+
+O **DevBase** é um **Sistema Operacional de Engenharia Pessoal** — uma metodologia e conjunto de ferramentas para:
+
+- 📁 **Organizar** todos os seus arquivos de desenvolvimento de forma consistente
+- 📚 **Documentar** conhecimento de forma estruturada e recuperável
+- 🔧 **Automatizar** tarefas repetitivas
+- 🔒 **Proteger** dados sensíveis
+- 📊 **Rastrear** produtividade e conquistas
+
+### Para quem é o DevBase?
+
+- **Desenvolvedores Solo**: Organize seu caos criativo
+- **Freelancers**: Gerencie múltiplos projetos com consistência
+- **Estudantes**: Documente aprendizado de forma estruturada
+- **Tech Leads**: Estabeleça padrões para equipes
+
+---
+
+## 2. Primeiros Passos
+
+### 2.1 Verificando Pré-requisitos
+
+**Windows:**
+```powershell
+# Verificar versão do PowerShell
+$PSVersionTable.PSVersion
+# Deve ser 5.1 ou superior (recomendado: PowerShell 7+)
+
+# Verificar Git
+git --version
+# Deve ser 2.25 ou superior
+```
+
+**Linux/macOS:**
+```bash
+# Verificar Python
+python3 --version
+# Deve ser 3.8 ou superior
+
+# Verificar Git
+git --version
+```
+
+### 2.2 Instalação Passo a Passo
+
+#### **Passo 1: Clone o Repositório**
+
+```powershell
+# Windows
+cd C:\Projetos
+git clone https://github.com/seu-usuario/devbase-setup-v3.git
+cd devbase-setup-v3
+
+# Linux/macOS
+cd ~/Projetos
+git clone https://github.com/seu-usuario/devbase-setup-v3.git
+cd devbase-setup-v3
+```
+
+#### **Passo 2: Execute o Bootstrap**
+
+```powershell
+# Windows - Execução básica
+.\bootstrap.ps1
+
+# Windows - Em local personalizado
+.\bootstrap.ps1 -RootPath "D:\MeuWorkspace"
+```
+
+```bash
+# Linux/macOS
+chmod +x install.sh
+./install.sh
+```
+
+#### **Passo 3: Verifique a Instalação**
+
+```powershell
+# O workspace foi criado em:
+cd ~/Dev_Workspace
+
+# Execute o comando doctor
+.\30-39_OPERATIONS\35_devbase_cli\devbase.ps1 doctor
+```
+
+---
+
+## 3. Entendendo a Estrutura Johnny.Decimal
+
+### 3.1 O que é Johnny.Decimal?
+
+[Johnny.Decimal](https://johnnydecimal.com/) é um sistema de organização que usa números para categorizar e localizar informações rapidamente.
+
+**Formato:** `XX-XX_AREA/XX_categoria/item`
+
+### 3.2 As Áreas do DevBase
+
+| Range | Área | Propósito | Exemplos |
+|-------|------|-----------|----------|
+| **00-09** | SYSTEM | Configurações, inbox, templates | `.editorconfig`, dotfiles |
+| **10-19** | KNOWLEDGE | Documentação, notas, decisões | ADRs, journal, referências |
+| **20-29** | CODE | Código fonte, projetos | Apps, bibliotecas, worktrees |
+| **30-39** | OPERATIONS | Automação, backups, IA | CLI, scripts, modelos |
+| **40-49** | MEDIA_ASSETS | Mídia e recursos visuais | Imagens, vídeos, exports |
+| **90-99** | ARCHIVE_COLD | Arquivo frio | Projetos antigos |
+
+### 3.3 Convenções de Nomenclatura
+
+O DevBase usa **kebab-case** para todos os nomes:
+
+```
+✅ CORRETO:
+meu-projeto/
+componente-usuario/
+api-autenticacao/
+
+❌ INCORRETO:
+MeuProjeto/
+componente_usuario/
+apiAutenticacao/
+```
+
+Use o comando `devbase audit` para verificar violações.
+
+---
+
+## 4. Usando a CLI do DevBase
+
+### 4.1 Visão Geral dos Comandos
+
+```powershell
+devbase help  # Exibe todos os comandos disponíveis
+```
+
+### 4.2 Comandos de Diagnóstico
+
+#### `devbase doctor`
+
+Verifica a saúde do workspace:
+
+```powershell
+devbase doctor
+```
+
+**O que verifica:**
+- ✅ Existência de todas as áreas (00-09, 10-19, etc.)
+- ✅ Arquivos de governança (.editorconfig, .gitignore)
+- ✅ Proteção Air-Gap do vault privado
+- ✅ Configuração de Git hooks
+- ✅ Nomenclatura kebab-case
+
+#### `devbase audit`
+
+Audita a nomenclatura de pastas:
+
+```powershell
+# Apenas verificar
+devbase audit
+
+# Verificar e corrigir automaticamente
+devbase audit -Fix
+```
+
+### 4.3 Comandos de Criação
+
+#### `devbase new`
+
+Cria um novo projeto a partir do template Clean Architecture:
+
+```powershell
+# Com nome especificado
+devbase new -Name "api-usuarios"
+
+# Interativo (solicita o nome)
+devbase new
+```
+
+#### `devbase hydrate`
+
+Atualiza o workspace com os templates mais recentes:
+
+```powershell
+# Atualizar apenas arquivos ausentes
+devbase hydrate
+
+# Forçar atualização de todos os templates
+devbase hydrate -Force
+```
+
+### 4.4 Comandos de Manutenção
+
+#### `devbase backup`
+
+Executa backup usando estratégia 3-2-1:
+
+```powershell
+devbase backup
+```
+
+#### `devbase clean`
+
+Remove arquivos temporários:
+
+```powershell
+devbase clean
+```
+
+---
+
+## 5. Gerenciamento de Conhecimento (PKM)
+
+### 5.1 O que é PKM?
+
+**Personal Knowledge Management** é uma metodologia para capturar, organizar e recuperar conhecimento pessoal.
+
+### 5.2 Estrutura do PKM no DevBase
+
+```
+10-19_KNOWLEDGE/
+├── 11_public_garden/     # Conteúdo para compartilhar
+│   ├── posts/            # Blog posts
+│   ├── notes/            # Notas avulsas
+│   └── til/              # Today I Learned
+├── 12_private_vault/     # 🔒 Nunca sincronizar!
+│   ├── journal/          # Diário
+│   ├── finances/         # Finanças
+│   ├── credentials/      # Senhas/chaves
+│   └── brag-docs/        # Conquistas
+├── 15_references/        # Material de referência
+│   ├── patterns/         # Padrões técnicos
+│   ├── checklists/       # Checklists
+│   └── papers/           # Papers/artigos
+└── 18_adr-decisions/     # Decisões arquiteturais
+```
+
+### 5.3 TIL (Today I Learned)
+
+O "jardim digital" é onde você cultiva ideias públicas:
+
+```markdown
+# Git Rebase com Autostash
+
+Descobri que você pode configurar o Git para fazer stash automático:
+
+```bash
+git config --global rebase.autostash true
+```
+
+Tags: git, produtividade
+```
+
+### 5.4 ADRs (Architectural Decision Records)
+
+ADRs documentam decisões técnicas importantes do seu projeto.
+
+---
+
+## 6. Trabalhando com Código
+
+### 6.1 Estrutura de Código
+
+```
+20-29_CODE/
+├── 21_monorepo_apps/         # Aplicações
+├── 22_monorepo_packages/     # Bibliotecas
+├── 23_worktrees/             # Git worktrees
+└── __template-clean-arch/    # Template
+```
+
+### 6.2 Criando um Novo Projeto
+
+```powershell
+# 1. Criar projeto
+devbase new -Name "api-pedidos"
+
+# 2. Navegar até o projeto
+cd .\20-29_CODE\21_monorepo_apps\api-pedidos\
+
+# 3. Inicializar Git (se desejar)
+git init
+
+# 4. Começar a desenvolver!
+```
+
+### 6.3 Template Clean Architecture
+
+O DevBase inclui um template seguindo Clean Architecture + DDD com estrutura de pastas:
+- `src/domain/` - Núcleo do negócio
+- `src/application/` - Casos de uso
+- `src/infrastructure/` - Implementações
+- `src/presentation/` - Interfaces
+
+---
+
+## 7. Git Hooks e Automação
+
+### 7.1 Hooks Disponíveis
+
+```
+00-09_SYSTEM/06_git_hooks/
+├── pre-commit.ps1    # Antes de cada commit
+├── commit-msg.ps1    # Valida mensagem do commit
+├── pre-push.ps1      # Antes de cada push
+└── install-hooks.ps1 # Instalador
+```
+
+### 7.2 O que Cada Hook Faz
+
+**pre-commit.ps1:**
+- Executa formatação (prettier, eslint)
+- Detecta credenciais/secrets no código
+- Verifica arquivos grandes
+
+**commit-msg.ps1:**
+- Valida formato Conventional Commits
+- Exemplos: `feat(auth): add OAuth2 login`
+
+**pre-push.ps1:**
+- Executa testes antes do push
+- Alerta sobre force push
+
+### 7.3 Conventional Commits
+
+O DevBase valida commits seguindo o padrão:
+
+```
+<type>(<scope>): <description>
+```
+
+**Tipos:** feat, fix, docs, style, refactor, perf, test, build, ci, chore
+
+**Exemplos:**
+```bash
+feat(auth): add OAuth2 Google provider
+fix(cart): resolve quantity calculation bug
+docs(api): update endpoint documentation
+```
+
+---
+
+## 8. Segurança e Private Vault
+
+### 8.1 O que é Air-Gap?
+
+"Air-Gap" significa uma separação física/lógica que impede vazamento de dados. O `12_private_vault` **NUNCA** deve sair da máquina local.
+
+### 8.2 O que Colocar no Vault
+
+| Conteúdo | Pasta | Nunca Sincronizar |
+|----------|-------|:-----------------:|
+| Senhas, tokens, chaves | `credentials/` | ✅ |
+| Diário pessoal | `journal/` | ✅ |
+| Dados financeiros | `finances/` | ✅ |
+
+### 8.3 Proteções Implementadas
+
+1. **`.gitignore`** inclui `12_private_vault`
+2. **`devbase doctor`** verifica se vault está protegido
+3. **Pre-commit hook** pode detectar secrets
+
+---
+
+## 9. Backup e Recuperação
+
+### 9.1 Estratégia 3-2-1
+
+O DevBase recomenda a estratégia 3-2-1:
+- **3** cópias dos dados
+- **2** tipos de mídia diferentes
+- **1** cópia off-site
+
+### 9.2 Usando `devbase backup`
+
+```powershell
+# Executar backup
+devbase backup
+```
+
+**O que acontece:**
+1. Cria pasta em `31_backups/local/`
+2. Copia todo o workspace (exceto exclusões)
+3. Mostra tamanho do backup
+4. Limpa backups antigos (mantém 5)
+
+### 9.3 Sincronização com Nuvem
+
+**IMPORTANTE:** Exclua sempre o vault privado!
+
+```powershell
+# Exemplo rclone
+rclone sync ~/Dev_Workspace remote:DevBase \
+  --exclude "12_private_vault/**" \
+  --exclude ".git/**"
+```
+
+---
+
+## 10. Telemetria Pessoal
+
+### 10.1 Comandos de Telemetria
+
+```powershell
+# Registrar atividade
+devbase track -Message "Implementei autenticação OAuth2"
+
+# Ver estatísticas
+devbase stats
+
+# Gerar relatório semanal
+devbase weekly
+
+# Gerar brag document
+devbase brag
+```
+
+### 10.2 Exemplo de Workflow Diário
+
+```powershell
+# Início do dia
+devbase doctor  # Verificar ambiente
+
+# Durante o dia, registrar trabalho
+devbase track -Message "Corrigido bug de timeout"
+devbase track -Message "PR #456 aprovado"
+
+# Final do dia
+devbase stats  # Ver resumo
+```
+
+---
+
+## 📚 Próximas Etapas
+
+Para mais informações detalhadas, consulte:
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Arquitetura interna
+- Execute `devbase help` - Comandos disponíveis
+- Explore `00-09_SYSTEM/06_git_hooks/` - Configurações de hooks
+
+---
+
+<div align="center">
+
+**Documento Gerado**: {{DATE}}  
+**Versão**: {{POLICY_VERSION}}
+
+[⬆️ Voltar ao topo](#-guia-de-uso-completo-do-devbase)
+
+</div>

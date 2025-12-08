@@ -1,0 +1,46 @@
+# AI Model Policy (DevBase)
+
+Purpose
+
+Define model selection, privacy guardrails, versioning and activation rules for local-first AI within DevBase.
+
+Model Classification
+
+- `open_local`: small open models allowed to run locally (low-resource, permissive license)
+- `large_local`: larger models hosted locally (may require user opt-in and disk/ram checks)
+- `remote_api`: remote-hosted models (disallowed for sensitive data unless explicitly permitted)
+
+Selection Rules
+
+1. Prefer `open_local` models for default interactive workflows.
+2. Use `large_local` only if `models_path` reports sufficient disk and memory and user explicitly opts in.
+3. `remote_api` usage must be opt-in and recorded in telemetry with explicit consent.
+
+Privacy & Data Handling
+
+- Default: PII and private vault data MUST not be sent to `remote_api` models.
+- Context stores must support redaction rules and blacklists for sensitive keys.
+- Provide a `telemetry_opt_in` config flag; if false, do not emit personal telemetry.
+
+Security
+
+- Require SHA256 checksum verification for all model files before activation.
+- Require signature verification for production `large_local` models. Use PEM signatures (OpenSSL) or XML keys for local verification.
+- Models should be stored under `32_ai_models/models/` and metadata in `32_ai_models/metadata/`.
+
+Versioning & Activation
+
+- Model files should include semantic version in filename (e.g. `model-v1.2.0.ggml`).
+- Activation requires writing metadata entry with `installed_at`, `checksum`, and `source_url`.
+- Keep previous backup of replaced models for fast rollback (see `update_model.ps1`).
+
+Operational Notes
+
+- Provide `devbase ai list` to enumerate available models and `devbase ai select <name>` to choose runtime.
+- Log model activation events to local audit log (private vault or local-only telemetry).
+
+Acceptance Criteria
+
+- Policy documented in `33_ai_config/policy.md`.
+- Tools enforce checksum and optional signature verification before model activation.
+- Config flag `telemetry_opt_in` controls telemetry emission.

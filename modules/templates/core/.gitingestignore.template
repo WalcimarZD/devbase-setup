@@ -1,0 +1,36 @@
+# ===================================================
+# Arquivo .gitingestignore para projetos .NET
+# ===================================================
+
+# === Compilação e Cache do .NET ===
+bin/
+obj/
+
+# === Código Gerado pela IDE ===
+*.suo
+*.user
+.vscode/
+Properties/Settings.Designer.cs
+Web References/
+Areas/HelpPage/
+
+# === Ferramentas e Utilitários ===
+Rotativa/
+App_Browsers/
+
+# === Bibliotecas de Front-End (PASTAS) ===
+fonts/
+Content/fontawesome-free*/
+Content/jquery-ui/
+Scripts/tinymce/
+
+# === Bibliotecas de Front-End (ARQUIVOS) ===
+Scripts/jquery-*.js
+Scripts/jquery.validate*.js
+Scripts/bootstrap*.js
+Scripts/modernizr-*.js
+
+# === CSS de Bibliotecas ===
+Content/bootstrap*.css
+Content/PagedList.css
+Content/font-awesome.css

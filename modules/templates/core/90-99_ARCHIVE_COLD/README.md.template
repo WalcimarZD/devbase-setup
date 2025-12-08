@@ -1,0 +1,13 @@
+# Archive Cold Storage
+
+> Tier 2 - Otimizado para custo e retenção longa.
+
+## Antes de Arquivar
+
+Execute o script de higienização:
+
+``````powershell
+.\cleanup-before-archive.ps1 -ProjectPath "caminho\do\projeto"
+``````
+
+Remove: node_modules, bin, obj, __pycache__, .venv, target

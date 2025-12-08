@@ -1,0 +1,27 @@
+# Project Setup Checklist
+
+## Repositório
+
+- [ ] README.md criado
+- [ ] .gitignore configurado
+- [ ] .editorconfig presente
+- [ ] LICENSE definida
+
+## Estrutura
+
+- [ ] Clean Architecture aplicada
+- [ ] Pastas domain/, application/, infrastructure/
+- [ ] Testes separados
+
+## Configuração
+
+- [ ] .env.example criado
+- [ ] CI/CD configurado
+- [ ] Linting configurado
+- [ ] Pre-commit hooks instalados
+
+## Documentação
+
+- [ ] ADR inicial criado
+- [ ] API documentada (se aplicável)
+- [ ] Contributing guide (se open source)

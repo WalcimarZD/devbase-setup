@@ -1,0 +1,45 @@
+# === DevBase Global .gitignore v{{POLICY_VERSION}} ===
+
+# === IDE ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Secrets (NUNCA commitar) ===
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+credentials/
+
+# === Build Artifacts ===
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+bin/
+obj/
+dist/
+build/
+target/
+*.dll
+*.exe
+
+# === Logs ===
+*.log
+logs/
+
+# === DevBase Específico ===
+12_private_vault/
+.devbase_state.json

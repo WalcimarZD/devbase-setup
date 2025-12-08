@@ -1,0 +1,27 @@
+<#
+.SYNOPSIS
+    Cleans up unused Docker resources
+#>
+
+Write-Host "=== Docker Cleanup ===" -ForegroundColor Cyan
+
+# Stopped containers
+Write-Host "`nRemoving stopped containers..."
+docker container prune -f
+
+# Unused images
+Write-Host "`nRemoving dangling images..."
+docker image prune -f
+
+# Unused volumes
+Write-Host "`nRemoving unused volumes..."
+docker volume prune -f
+
+# Unused networks
+Write-Host "`nRemoving unused networks..."
+docker network prune -f
+
+Write-Host "`nCleanup complete!" -ForegroundColor Green
+
+# Show recovered space
+docker system df

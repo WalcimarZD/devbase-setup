@@ -1,0 +1,37 @@
+# Code Review Checklist
+
+## Antes de Submeter (Autor)
+
+- [ ] Testes passando localmente
+- [ ] Sem console.log / print de debug
+- [ ] Sem credenciais hardcoded
+- [ ] Documentação atualizada (se necessário)
+- [ ] Commit messages seguem convenção
+
+## Durante Review (Revisor)
+
+### Funcionalidade
+- [ ] Código faz o que deveria fazer
+- [ ] Edge cases tratados
+- [ ] Erros tratados adequadamente
+
+### Qualidade
+- [ ] Código legível e bem nomeado
+- [ ] DRY - sem duplicação desnecessária
+- [ ] SOLID principles respeitados
+- [ ] Sem código comentado
+
+### Segurança
+- [ ] Inputs validados
+- [ ] SQL parametrizado
+- [ ] Sem exposição de dados sensíveis
+
+### Performance
+- [ ] Sem N+1 queries
+- [ ] Sem loops desnecessários
+- [ ] Recursos liberados (connections, files)
+
+### Testes
+- [ ] Testes unitários presentes
+- [ ] Testes cobrem casos importantes
+- [ ] Mocks apropriados

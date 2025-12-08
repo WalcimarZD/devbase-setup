@@ -1,0 +1,29 @@
+#! /usr/bin/env pwsh
+# DevBase v3.0 - Pre-push Hook (PowerShell)
+
+Write-Host "🔍 Running pre-push checks..." -ForegroundColor Cyan
+
+# === VERIFICAR BRANCH PROTEGIDA ===
+$currentBranch = git symbolic-ref HEAD 2>$null | ForEach-Object { $_.Replace('refs/heads/', '') }
+$protectedBranches = "main", "master", "production"
+
+if ($currentBranch -in $protectedBranches) {
+    Write-Warning "Pushing directly to protected branch '$currentBranch'. Consider using a PR."
+}
+
+# === EXECUTAR TESTES (se disponível) ===
+if (Test-Path "package.json") {
+    $packageJson = Get-Content "package.json" | ConvertFrom-Json
+    if ($packageJson.scripts.test) {
+        Write-Host "  Running tests..." -ForegroundColor White
+        npm test
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ Tests failed. Push aborted." -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "  ✅ Tests passed" -ForegroundColor Green
+    }
+}
+
+Write-Host "✅ Pre-push checks passed!" -ForegroundColor Green
+exit 0

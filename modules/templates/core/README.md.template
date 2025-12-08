@@ -1,0 +1,89 @@
+# DevBase v{{POLICY_VERSION}}
+
+> Personal Engineering Operating System - Seu sistema operacional pessoal para engenharia de software
+
+## 🎯 O que é o DevBase?
+
+DevBase é uma estrutura organizada para gerenciar todo o seu trabalho de desenvolvimento:
+- Código e projetos
+- Documentação e conhecimento
+- Automação e scripts
+- Arquivos e assets
+
+**Filosofia:** "Um lugar para cada coisa, e cada coisa em seu lugar."
+
+## 📁 Estrutura Johnny.Decimal
+
+O DevBase usa o sistema [Johnny.Decimal](https://johnnydecimal.com/) para organização:
+
+```
+DevBase/
+├── 00-09_SYSTEM/           # Configurações, dotfiles, inbox
+│   ├── 00_inbox/           # Caixa de entrada (GTD)
+│   ├── 01_dotfiles/        # Configurações pessoais
+│   ├── 05_templates/       # Templates reutilizáveis
+│   └── 06_git_hooks/       # Git hooks compartilhados
+│
+├── 10-19_KNOWLEDGE/        # Conhecimento, documentação
+│   ├── 11_public_garden/   # Jardim digital (público)
+│   ├── 12_private_vault/   # Vault privado (Air-Gap!)
+│   ├── 15_references/      # Referências e padrões
+│   └── 18_adr-decisions/   # Decisões de arquitetura
+│
+├── 20-29_CODE/             # Código fonte, projetos
+│   ├── 21_monorepo_apps/   # Projetos principais
+│   └── __template-clean-arch/  # Template Clean Architecture
+│
+├── 30-39_OPERATIONS/       # Automação, AI, DevOps
+│   ├── 31_backups/         # Backups (3-2-1)
+│   ├── 32_ai_models/       # Modelos de IA local
+│   └── 35_devbase_cli/     # CLI do DevBase
+│
+├── 40-49_MEDIA_ASSETS/     # Mídia e assets
+│
+└── 90-99_ARCHIVE_COLD/     # Arquivo histórico (cold storage)
+```
+
+## 🚀 Comandos Rápidos
+
+```powershell
+# Validar estrutura
+devbase doctor
+
+# Criar novo projeto usando template
+devbase new -Name meu-projeto
+
+# Sincronizar dotfiles para HOME
+devbase link-dotfiles
+
+# Aplicar atualizações/migrações
+devbase update
+
+# Backup 3-2-1
+devbase backup
+
+# Ajuda completa
+devbase help
+```
+
+## 📚 Documentação
+
+| Documento | Descrição |
+|-----------|-----------|
+| [00.00_index.md](00.00_index.md) | Índice principal do workspace |
+| [USAGE-GUIDE.md](00-09_SYSTEM/07_documentation/USAGE-GUIDE.md) | Guia completo de utilização |
+| [ARCHITECTURE.md](00-09_SYSTEM/07_documentation/ARCHITECTURE.md) | Arquitetura interna |
+| [18_adr-decisions/](10-19_KNOWLEDGE/18_adr-decisions/) | Decisões de arquitetura |
+
+## ⚠️ Segurança
+
+**IMPORTANTE:** A pasta `12_private_vault/` é protegida por **Air-Gap**:
+- ❌ Nunca sincronize com Git
+- ❌ Nunca envie para cloud pública
+- ✅ Faça backup local criptografado
+
+## 🆘 Precisa de Ajuda?
+
+1. Execute `devbase doctor` para diagnóstico
+2. Consulte o [USAGE-GUIDE.md](00-09_SYSTEM/07_documentation/USAGE-GUIDE.md)
+3. Veja os ADRs para entender decisões de design

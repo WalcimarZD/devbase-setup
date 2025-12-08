@@ -1,0 +1,114 @@
+<#
+pipeline_template.ps1
+
+Minimal pipeline template showing ingest -> context -> model selection -> invoke (placeholder).
+This is a template, not an actual model runner.
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $false)]
+    [string]$Prompt,
+
+    [string]$ContextPath,
+    [string]$ModelsMetaDir,
+    [int]$MaxTokens = 256
+)
+
+$script:PipelineScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+function Load-Context {
+    param($path)
+    if (-not (Test-Path $path)) { return @{ entries = @() } }
+    Get-Content $path -Raw | ConvertFrom-Json
+}
+
+function Append-Context {
+    param($path, $entry)
+    $ctx = Load-Context $path
+    $ctx.entries += $entry
+    $ctx | ConvertTo-Json -Depth 10 | Out-File -FilePath $path -Encoding UTF8
+}
+
+function Ensure-ContextPath {
+    param($path)
+    $dir = Split-Path -Parent $path
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+}
+
+function Select-Model {
+    param($metaDir)
+    $metafiles = Get-ChildItem -Path $metaDir -Filter '*.json' -ErrorAction SilentlyContinue
+    if (-not $metafiles) { return $null }
+    $candidates = @()
+    foreach ($mf in $metafiles) {
+        $m = Get-Content $mf.FullName -Raw | ConvertFrom-Json
+        if ($m) { $candidates += $m }
+    }
+    if (-not $candidates) { return $null }
+    $open = $candidates | Where-Object { $_.name -match 'open' } | Sort-Object checksum
+    if ($open) { return $open[0].path }
+    return $candidates[0].path
+}
+
+function Invoke-Pipeline {
+    param(
+        [Parameter(Mandatory = $true)][string]$Prompt,
+        [string]$ContextPath,
+        [string]$ModelsMetaDir,
+        [int]$MaxTokens = 256
+    )
+
+    $ctxPath = if ($ContextPath) { $ContextPath } else { Join-Path $script:PipelineScriptRoot "..\31_ai_local\context\context.json" }
+    $metaDir = if ($ModelsMetaDir) { $ModelsMetaDir } else { Join-Path $script:PipelineScriptRoot "..\32_ai_models\metadata" }
+    Ensure-ContextPath -path $ctxPath
+
+    $entry = @{ type = 'user'; source = 'cli'; text = $Prompt; created_at = (Get-Date).ToString('o') }
+    Append-Context -path $ctxPath -entry $entry
+    $ctx = Load-Context $ctxPath
+
+    $modelPath = Select-Model -metaDir $metaDir
+    if (-not $modelPath) {
+        return [pscustomobject]@{ Success = $false; Error = "No model metadata found in $metaDir"; Output = $null }
+    }
+
+    $runtimeAdapter = Join-Path $script:PipelineScriptRoot "..\31_ai_local\runtime_adapter.ps1"
+    $output = $null
+    if (Test-Path $runtimeAdapter) {
+        try {
+            $output = & $runtimeAdapter -ModelPath $modelPath -Prompt $Prompt -MaxTokens $MaxTokens
+            if ($LASTEXITCODE -ne 0) { throw "adapter exit $LASTEXITCODE" }
+        }
+        catch {
+            $output = "[SIMULATION] adapter failed: $_. Running model at $modelPath with prompt: $Prompt"
+        }
+    }
+    else {
+        $output = "[SIMULATION] would run model at $modelPath with prompt: $Prompt"
+    }
+
+    $audit = @{ event = 'invoke'; model = $modelPath; prompt_summary = ($Prompt.Substring(0, [math]::Min(120, $Prompt.Length))); at = (Get-Date).ToString('o') }
+    $auditPath = Join-Path (Split-Path $ctxPath -Parent) 'audit.log'
+    $audit | ConvertTo-Json -Depth 5 | Out-File -FilePath $auditPath -Append -Encoding UTF8
+
+    $global:LASTEXITCODE = 0
+    return [pscustomobject]@{
+        Success        = $true
+        Model          = $modelPath
+        Output         = $output
+        ContextEntries = $ctx.entries.Count
+        ContextPath    = $ctxPath
+        AuditPath      = $auditPath
+    }
+}
+
+if ($MyInvocation.InvocationName -ne '.') {
+    if (-not $Prompt) {
+        Write-Host "Usage: .\pipeline_template.ps1 -Prompt 'your prompt' [-ContextPath <path>] [-ModelsMetaDir <dir>] [-MaxTokens <n>]"
+        exit 1
+    }
+
+    $result = Invoke-Pipeline -Prompt $Prompt -ContextPath $ContextPath -ModelsMetaDir $ModelsMetaDir -MaxTokens $MaxTokens
+    if (-not $result.Success) { Write-Error $result.Error; exit 1 }
+    Write-Host $result.Output
+    exit 0
+}

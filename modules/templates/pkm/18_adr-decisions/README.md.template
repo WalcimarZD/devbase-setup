@@ -1,0 +1,26 @@
+# Architecture Decision Records (ADR)
+
+> Documentation of architectural decisions using MADR format.
+
+## How to use
+
+1. Copy ``template-madr.md``
+2. Rename to ``XXXX-title-kebab-case.md``
+3. Fill in the sections
+4. Submit for review
+
+## Numbering
+
+- 0001-0099: General Architecture
+- 0100-0199: Frontend
+- 0200-0299: Backend
+- 0300-0399: Database
+- 0400-0499: DevOps
+- 0500-0599: Security
+
+## Status
+
+- **Proposed**: Awaiting discussion
+- **Accepted**: Approved and effective
+- **Deprecated**: No longer valid
+- **Superseded**: Replaced by another ADR

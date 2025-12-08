@@ -1,0 +1,187 @@
+<#
+update_model.ps1
+
+Update an existing model atomically with backup and optional signature verification.
+
+Usage:
+./update_model.ps1 -Name test.bin -Url file:///C:/path/new.bin -Checksum <sha256> [-SignaturePath <sig>] [-PubKeyPath <pub.pem>] [-Force]
+
+Behavior:
+- Downloads/fetches new model into temp
+- Verifies checksum if provided
+- Optionally verifies signature using openssl if `-SignaturePath` (or URL) and `-PubKeyPath` provided
+- Moves existing model to a backup (`.bak.<timestamp>`) before replacing
+- On failure, attempts to restore backup
+- Writes metadata including `previous_backup`
+#>
+
+Param(
+    [Parameter(Mandatory = $true)][string]$Name,
+    [Parameter(Mandatory = $true)][string]$Url,
+    [string]$Checksum = $null,
+    [string]$SignaturePath = $null,
+    [string]$PubKeyPath = $null,
+    [switch]$Force,
+    [switch]$KeepBackup
+)
+
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$root = Split-Path -Parent $scriptDir
+$modelsDir = Join-Path $root "32_ai_models\models"
+$metaDir = Join-Path $root "32_ai_models\metadata"
+$tempFile = [System.IO.Path]::GetTempFileName() + ".update"
+$destPath = Join-Path $modelsDir $Name
+$metaPath = Join-Path $metaDir ($Name + ".json")
+
+New-Item -ItemType Directory -Path $modelsDir -Force | Out-Null
+New-Item -ItemType Directory -Path $metaDir -Force | Out-Null
+
+function Write-ErrAndExit($msg) {
+    Write-Error $msg
+    if (Test-Path $tempFile) { Remove-Item $tempFile -ErrorAction SilentlyContinue }
+    exit 1
+}
+
+# Fetch new model (support file:// and local paths)
+try {
+    Write-Host "Fetching $Url -> $tempFile"
+    if ($Url -match '^file://') {
+        $u = [System.Uri]$Url
+        $localPath = $u.LocalPath
+        if (-not (Test-Path $localPath)) { Write-ErrAndExit "Local file not found: $localPath" }
+        Copy-Item -Path $localPath -Destination $tempFile -Force
+    }
+    elseif (Test-Path $Url) {
+        Copy-Item -Path $Url -Destination $tempFile -Force
+    }
+    else {
+        Invoke-WebRequest -Uri $Url -OutFile $tempFile -UseBasicParsing -ErrorAction Stop
+    }
+}
+catch {
+    Write-ErrAndExit "Failed to fetch $Url : $_"
+}
+
+# Checksum verification
+if ($Checksum) {
+    try {
+        $h = (Get-FileHash -Path $tempFile -Algorithm SHA256).Hash
+    }
+    catch {
+        Write-ErrAndExit "Failed to compute hash for downloaded file: $_"
+    }
+    if ($h -ne $Checksum) { Write-ErrAndExit "Checksum mismatch: expected $Checksum but got $h" }
+    Write-Host "Checksum verified: $h"
+}
+
+# Signature verification (optional) using openssl if provided
+if ($SignaturePath -and $PubKeyPath) {
+    # fetch signature to temp if it's a URL
+    $sigTemp = [System.IO.Path]::GetTempFileName() + ".sig"
+    try {
+        if ($SignaturePath -match '^file://') {
+            $u = [System.Uri]$SignaturePath
+            $localSig = $u.LocalPath
+            if (-not (Test-Path $localSig)) { Write-ErrAndExit "Signature file not found: $localSig" }
+            Copy-Item -Path $localSig -Destination $sigTemp -Force
+        }
+        elseif (Test-Path $SignaturePath) {
+            Copy-Item -Path $SignaturePath -Destination $sigTemp -Force
+        }
+        else {
+            Invoke-WebRequest -Uri $SignaturePath -OutFile $sigTemp -UseBasicParsing -ErrorAction Stop
+        }
+    }
+    catch {
+        if (Test-Path $sigTemp) { Remove-Item $sigTemp -ErrorAction SilentlyContinue }
+        Write-ErrAndExit "Failed to fetch signature: $_"
+    }
+
+    # Attempt to verify signature. Prefer openssl; fallback to .NET verification if public key is XML.
+    $openssl = Get-Command openssl -ErrorAction SilentlyContinue
+    if ($openssl) {
+        if (-not (Test-Path $PubKeyPath)) { Remove-Item $sigTemp -ErrorAction SilentlyContinue; Write-ErrAndExit "Public key not found: $PubKeyPath" }
+        try {
+            $proc = Start-Process -FilePath $openssl.Source -ArgumentList "dgst -sha256 -verify `"$PubKeyPath`" -signature `"$sigTemp`" `"$tempFile`"" -NoNewWindow -Wait -PassThru -ErrorAction Stop
+            if ($proc.ExitCode -ne 0) { throw "openssl exit code $($proc.ExitCode)" }
+        }
+        catch {
+            Remove-Item $sigTemp -ErrorAction SilentlyContinue
+            Write-ErrAndExit "Signature verification failed (openssl): $_"
+        }
+        Remove-Item $sigTemp -ErrorAction SilentlyContinue
+        Write-Host "Signature verified with public key (openssl): $PubKeyPath"
+    }
+    else {
+        # Fallback: if public key is XML (PowerShell .NET), verify using RSACryptoServiceProvider
+        if (-not (Test-Path $PubKeyPath)) { Remove-Item $sigTemp -ErrorAction SilentlyContinue; Write-ErrAndExit "Public key not found: $PubKeyPath" }
+        try {
+            $pubXml = Get-Content $PubKeyPath -Raw
+            $sigBytes = [System.IO.File]::ReadAllBytes($sigTemp)
+            $dataBytes = [System.IO.File]::ReadAllBytes($tempFile)
+            $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
+            $rsa.PersistKeyInCsp = $false
+            $rsa.FromXmlString($pubXml)
+            $sha256 = New-Object System.Security.Cryptography.SHA256Managed
+            $ok = $rsa.VerifyData($dataBytes, $sha256, $sigBytes)
+            if (-not $ok) { throw "Signature verification failed (dotnet)" }
+            Remove-Item $sigTemp -ErrorAction SilentlyContinue
+            Write-Host "Signature verified with public key (dotnet XML): $PubKeyPath"
+        }
+        catch {
+            Remove-Item $sigTemp -ErrorAction SilentlyContinue
+            Write-ErrAndExit "Signature verification failed (dotnet): $_"
+        }
+    }
+}
+
+# Prepare backup of existing model (if exists)
+$backupPath = $null
+if (Test-Path $destPath -PathType Leaf) {
+    $ts = Get-Date -Format yyyyMMddHHmmss
+    $backupPath = "$destPath.bak.$ts"
+    try {
+        Write-Host "Backing up existing model: $destPath -> $backupPath"
+        Copy-Item -Path $destPath -Destination $backupPath -Force
+    }
+    catch {
+        Write-ErrAndExit "Failed to backup existing model: $_"
+    }
+}
+
+# Replace with new model atomically
+$replaced = $false
+try {
+    Write-Host "Replacing model: $tempFile -> $destPath"
+    Move-Item -Path $tempFile -Destination $destPath -Force
+    $replaced = $true
+}
+catch {
+    Write-Error "Failed to move new model into place: $_"
+    # attempt rollback
+    if ($backupPath -and (Test-Path $backupPath)) {
+        try { Copy-Item -Path $backupPath -Destination $destPath -Force; Write-Host "Rolled back to backup: $backupPath" } catch { Write-Error "Rollback failed: $_" }
+    }
+    if (Test-Path $tempFile) { Remove-Item $tempFile -ErrorAction SilentlyContinue }
+    exit 1
+}
+
+# Optionally remove backup unless KeepBackup
+if ($backupPath -and -not $KeepBackup) {
+    try { Remove-Item $backupPath -Force; $backupPath = "$backupPath (removed)" } catch { }
+}
+
+# Write metadata
+$meta = @{
+    name            = $Name
+    path            = $destPath
+    checksum        = (Get-FileHash -Path $destPath -Algorithm SHA256).Hash
+    url             = $Url
+    updated_at      = (Get-Date).ToString("o")
+    previous_backup = $backupPath
+}
+$meta | ConvertTo-Json -Depth 6 | Out-File -FilePath $metaPath -Encoding UTF8
+
+Write-Host "Model updated: $destPath"
+Write-Host "Metadata written: $metaPath"
+exit 0

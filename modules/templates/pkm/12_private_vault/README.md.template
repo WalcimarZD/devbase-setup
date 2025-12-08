@@ -1,0 +1,106 @@
+# 🔐 Private Vault
+
+> **⚠️ AIR-GAP ZONE** - Esta pasta NUNCA deve ser sincronizada com Git ou cloud pública.
+
+## O que é o Vault Privado?
+
+O vault privado é o espaço mais seguro do seu DevBase. Aqui você guarda informações que são **estritamente pessoais** e que poderiam causar danos se expostas (financeiros, profissionais, ou pessoais).
+
+## 📁 Estrutura
+
+```
+12_private_vault/
+├── journal/           # Diário pessoal, Engineering Daybook
+├── finances/          # Dados financeiros pessoais
+├── credentials/       # Senhas, tokens (use um gerenciador!)
+├── brag-docs/         # Registro de conquistas profissionais
+├── legal/             # Documentos legais, contratos
+└── personal/          # Outros arquivos pessoais sensíveis
+```
+
+## 📓 Engineering Daybook (journal/)
+
+O [Engineering Daybook](https://www.jamierubin.net/2020/10/06/what-i-learned-from-a-year-of-daily-notes/) é uma prática de registrar seu trabalho diário:
+
+**O que registrar:**
+- Problemas encontrados e soluções
+- Decisões tomadas e por quê
+- Coisas aprendidas (TILs)
+- Anotações de reuniões
+- Ideias para investigar depois
+
+**Formato sugerido:**
+```markdown
+# 2024-01-15
+
+## Trabalhei em
+- Implementação do OAuth2 no projeto X
+- Review do PR #123
+
+## Problemas/Soluções
+- **Problema:** Token refresh não estava funcionando
+- **Solução:** Adicionei interceptor no axios (ver código em...)
+
+## Aprendi
+- JWT pode ter claims customizados (TIL)
+
+## Amanhã
+- Finalizar testes do OAuth
+- Meeting com equipe às 10h
+```
+
+## 💰 Brag Docs (brag-docs/)
+
+[Brag Documents](https://jvns.ca/blog/brag-documents/) são registros das suas conquistas profissionais. Essenciais para:
+
+- Avaliações de desempenho
+- Pedidos de promoção
+- Atualização de currículo
+- Entrevistas de emprego
+
+**O que registrar:**
+- Projetos entregues e impacto
+- Métricas de sucesso
+- Feedback positivo recebido
+- Habilidades desenvolvidas
+- Mentorias realizadas
+
+## 🔑 Segurança
+
+### Regras Obrigatórias
+
+1. ❌ **Nunca** commitar esta pasta no Git
+2. ❌ **Nunca** sincronizar com Dropbox/OneDrive/Google Drive
+3. ✅ Fazer backup local criptografado
+4. ✅ Usar gerenciador de senhas (não arquivos .txt!)
+
+### Backup Seguro
+
+```bash
+# Backup criptografado com 7-Zip
+7z a -p"sua-senha-forte" -mhe=on vault-backup.7z 12_private_vault/
+
+# Ou com GPG
+tar -czf - 12_private_vault/ | gpg -c > vault-backup.tar.gz.gpg
+```
+
+### Verificação
+
+```powershell
+# Este comando deve retornar VAZIO (nenhum arquivo do vault no git)
+git ls-files 12_private_vault/
+
+# Confirmar que está no .gitignore
+Get-Content .gitignore | Select-String "private_vault"
+```
+
+## ❓ FAQ
+
+**P: E se eu precisar acessar de outro computador?**
+R: Use backup criptografado em HD externo ou pen drive. Nunca cloud pública.
+
+**P: Posso usar cloud privada (self-hosted)?**
+R: Com cautela. Prefira Syncthing com criptografia. Evite soluções que armazenam chaves no servidor.
+
+**P: E para senhas de desenvolvimento (APIs, databases)?**
+R: Use um gerenciador de senhas (1Password, Bitwarden) ou variáveis de ambiente. Nunca arquivos de texto.

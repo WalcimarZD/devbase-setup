@@ -1,0 +1,110 @@
+# PADRÕES PYTHON - DevBase v3.0
+
+> Convenções e boas práticas para desenvolvimento Python.
+
+## Estrutura de Projeto
+
+Siga o padrão `src-layout`.
+
+```
+meu-projeto/
+├── src/
+│   └── meu_pacote/
+│       ├── __init__.py
+│       └── main.py
+├── tests/
+│   └── test_main.py
+├── .gitignore
+├── pyproject.toml
+└── README.md
+```
+
+- **pyproject.toml**: Use para definir metadados do projeto e dependências (PEP 621). Prefira em vez de `setup.py`.
+- **Gerenciador de Dependências**: Use `poetry` ou `pdm`. Evite `pip` com `requirements.txt` em bibliotecas.
+
+## Estilo de Código - PEP 8
+
+Use `ruff` ou `black` para formatação automática.
+
+- **Nomenclatura**:
+  - `snake_case` para variáveis, funções e módulos.
+  - `PascalCase` para classes.
+  - `_` (underline) para variáveis "privadas".
+- **Linhas**: Máximo de 88-120 caracteres. `black` usa 88 por padrão.
+- **Imports**: Agrupados por (1) biblioteca padrão, (2) libs de terceiros, (3) código local. Use `isort` (integrado no `ruff`).
+
+## Type Hinting - PEP 484
+
+**SEMPRE** use type hints.
+
+```python
+# RUIM
+def minha_funcao(a, b):
+    return a + b
+
+# BOM
+def minha_funcao(a: int, b: int) -> int:
+    return a + b
+```
+
+Use `mypy` no CI para checagem estática de tipos.
+
+## Docstrings - PEP 257
+
+Use o formato do Google ou `numpydoc`.
+
+```python
+def minha_funcao(a: int, b: int) -> int:
+    """Soma dois números inteiros.
+
+    Args:
+        a: O primeiro número.
+        b: O segundo número.
+
+    Returns:
+        A soma de a e b.
+    
+    Raises:
+        TypeError: Se os argumentos não forem inteiros.
+    """
+    if not isinstance(a, int) or not isinstance(b, int):
+        raise TypeError("Argumentos devem ser inteiros")
+    return a + b
+```
+
+## Testes
+
+Use `pytest`.
+
+- **Nomenclatura**: `tests/test_*.py`.
+- **Estrutura**: Use o padrão `Arrange-Act-Assert`.
+
+```python
+def test_soma_positivos():
+    # Arrange (Organizar)
+    a = 5
+    b = 10
+    
+    # Act (Agir)
+    resultado = minha_funcao(a, b)
+    
+    # Assert (Verificar)
+    assert resultado == 15
+```
+
+## Logging
+
+Use a biblioteca padrão `logging`. **NÃO USE `print()`** em aplicações.
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def minha_operacao():
+    logging.info("Iniciando operação...")
+    # ...
+    logging.warning("Configuração X não encontrada, usando padrão.")
+    # ...
+    logging.info("Operação concluída.")
+```

@@ -1,0 +1,130 @@
+<#
+install_model.ps1
+
+Usage examples:
+.
+# Download a model with checksum verification
+./install_model.ps1 -Name "local-small-v1.bin" -Url "https://example.com/models/local-small-v1.bin" -Checksum "<sha256>"
+
+Parameters:
+-Name: file name to store under `32_ai_models/models/`
+-Url: download URL
+-Checksum: expected SHA256 checksum (optional but recommended)
+-Force: overwrite existing model even if checksum matches
+
+Behavior:
+- Downloads to a temp file
+- Verifies SHA256 when provided
+- Moves file atomically into `32_ai_models/models/` (idempotent)
+- Writes metadata to `32_ai_models/metadata/<Name>.json`
+#>
+
+Param(
+    [Parameter(Mandatory = $true)][string]$Name,
+    [Parameter(Mandatory = $true)][string]$Url,
+    [string]$Checksum = $null,
+    [switch]$Force
+)
+
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$root = Split-Path -Parent $scriptDir
+$modelsDir = Join-Path $root "32_ai_models\models"
+$metaDir = Join-Path $root "32_ai_models\metadata"
+$tempFile = [System.IO.Path]::GetTempFileName() + ".download"
+$destPath = Join-Path $modelsDir $Name
+$metaPath = Join-Path $metaDir ($Name + ".json")
+
+New-Item -ItemType Directory -Path $modelsDir -Force | Out-Null
+New-Item -ItemType Directory -Path $metaDir -Force | Out-Null
+
+function Write-ErrAndExit($msg) {
+    Write-Error $msg
+    if (Test-Path $tempFile) { Remove-Item $tempFile -ErrorAction SilentlyContinue }
+    exit 1
+}
+
+# If destination exists and checksum provided, compare and skip if matches
+if (Test-Path $destPath -PathType Leaf) {
+    if ($Checksum) {
+        $existingHash = (Get-FileHash -Path $destPath -Algorithm SHA256).Hash
+        if ($existingHash -ieq $Checksum -and -not $Force) {
+            Write-Host "Model already installed and checksum matches: $destPath"
+            $meta = @{
+                name         = $Name
+                path         = $destPath
+                checksum     = $existingHash
+                url          = $Url
+                installed_at = (Get-Date).ToString("o")
+                status       = "present"
+            }
+            $meta | ConvertTo-Json -Depth 5 | Out-File -FilePath $metaPath -Encoding UTF8
+            exit 0
+        }
+    }
+    if ($Force) {
+        Write-Host "Force: removing existing file: $destPath"
+        Remove-Item $destPath -Force
+    }
+}
+
+try {
+    Write-Host "Fetching $Url -> $tempFile"
+    if ($Url -match '^file://') {
+        try {
+            $u = [System.Uri]$Url
+            $localPath = $u.LocalPath
+        }
+        catch {
+            Write-ErrAndExit "Invalid file URI: $Url : $_"
+        }
+        if (-not (Test-Path $localPath)) { Write-ErrAndExit "Local file not found: $localPath" }
+        Copy-Item -Path $localPath -Destination $tempFile -Force
+    }
+    elseif (Test-Path $Url) {
+        Copy-Item -Path $Url -Destination $tempFile -Force
+    }
+    else {
+        Write-Host "Downloading $Url -> $tempFile"
+        Invoke-WebRequest -Uri $Url -OutFile $tempFile -UseBasicParsing -ErrorAction Stop
+    }
+}
+catch {
+    Write-ErrAndExit "Failed to fetch $Url : $_"
+}
+
+# Verify checksum if provided
+if ($Checksum) {
+    try {
+        $h = (Get-FileHash -Path $tempFile -Algorithm SHA256).Hash
+    }
+    catch {
+        Write-ErrAndExit "Failed to compute hash for downloaded file: $_"
+    }
+    if ($h -ine $Checksum) {
+        Write-ErrAndExit "Checksum mismatch: expected $Checksum but got $h"
+    }
+    Write-Host "Checksum verified (SHA256): $h"
+}
+
+# Atomic move: move temp file into place; if failure, attempt cleanup
+try {
+    Write-Host "Moving $tempFile -> $destPath"
+    Move-Item -Path $tempFile -Destination $destPath -Force
+}
+catch {
+    Write-ErrAndExit "Failed to move file into place: $_"
+}
+
+# Write metadata
+$meta = @{
+    name         = $Name
+    path         = $destPath
+    checksum     = (Get-FileHash -Path $destPath -Algorithm SHA256).Hash
+    url          = $Url
+    installed_at = (Get-Date).ToString("o")
+}
+$meta | ConvertTo-Json -Depth 5 | Out-File -FilePath $metaPath -Encoding UTF8
+
+Write-Host "Installed model: $destPath"
+Write-Host "Metadata written: $metaPath"
+exit 0

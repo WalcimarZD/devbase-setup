@@ -1,0 +1,130 @@
+<#
+.SYNOPSIS
+  DevBase FS Performance Tooling - disk usage and IO benchmark utilities.
+
+.DESCRIPTION
+  Subcommands:
+    usage     - Show disk usage for DevBase directories
+    benchmark - Run simple read/write IO benchmark
+
+.NOTES
+  Author: DevBase
+  Version: 1.0.0
+#>
+
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true, Position = 0)]
+    [ValidateSet('usage', 'benchmark')]
+    [string]$Command,
+
+    [string]$Path,
+    [int]$SizeMB = 10,
+    [switch]$Help
+)
+
+function Show-Usage {
+    Write-Host "Usage: fs_performance.ps1 <usage|benchmark> [options]"
+    Write-Host "  usage [-Path <dir>]                - Show disk usage (default: DevBase root)"
+    Write-Host "  benchmark [-Path <dir>] [-SizeMB <n>] - Run IO benchmark (default: 10 MB)"
+}
+
+if ($Help) { Show-Usage; exit 0 }
+
+# Resolve DevBase root
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$devbaseRoot = Split-Path -Parent (Split-Path -Parent $scriptRoot)
+
+function Get-DirSize {
+    param([string]$Dir)
+    $items = Get-ChildItem -Path $Dir -Recurse -File -ErrorAction SilentlyContinue
+    $totalBytes = ($items | Measure-Object -Property Length -Sum).Sum
+    return $totalBytes
+}
+
+function Format-Size {
+    param([long]$Bytes)
+    if ($Bytes -ge 1GB) { return "{0:N2} GB" -f ($Bytes / 1GB) }
+    if ($Bytes -ge 1MB) { return "{0:N2} MB" -f ($Bytes / 1MB) }
+    if ($Bytes -ge 1KB) { return "{0:N2} KB" -f ($Bytes / 1KB) }
+    return "$Bytes B"
+}
+
+function Show-DiskUsage {
+    param([string]$BasePath)
+    $target = if ($BasePath) { $BasePath } else { $devbaseRoot }
+    if (-not (Test-Path $target)) {
+        Write-Error "Path not found: $target"
+        exit 1
+    }
+    Write-Host "Disk usage for: $target"
+    Write-Host ("-" * 60)
+    $dirs = Get-ChildItem -Path $target -Directory -ErrorAction SilentlyContinue
+    $totalSize = 0
+    foreach ($d in $dirs) {
+        $size = Get-DirSize -Dir $d.FullName
+        $totalSize += $size
+        Write-Host ("{0,-40} {1,15}" -f $d.Name, (Format-Size $size))
+    }
+    Write-Host ("-" * 60)
+    Write-Host ("{0,-40} {1,15}" -f "TOTAL", (Format-Size $totalSize))
+}
+
+function Run-Benchmark {
+    param([string]$Dir, [int]$MB)
+    $target = if ($Dir) { $Dir } else { $devbaseRoot }
+    if (-not (Test-Path $target)) {
+        Write-Error "Path not found: $target"
+        exit 1
+    }
+    $tempFile = Join-Path $target ".fs_benchmark_temp_$([guid]::NewGuid().ToString('N')).bin"
+    $bytes = $MB * 1MB
+    $data = [byte[]]::new($bytes)
+    [System.Random]::new().NextBytes($data)
+
+    Write-Host "Running IO benchmark in: $target"
+    Write-Host "Test file size: $MB MB"
+    Write-Host ""
+
+    # Write benchmark
+    $swWrite = [System.Diagnostics.Stopwatch]::StartNew()
+    [System.IO.File]::WriteAllBytes($tempFile, $data)
+    $swWrite.Stop()
+    $writeMBs = $MB / ($swWrite.Elapsed.TotalSeconds)
+    Write-Host ("Write speed: {0:N2} MB/s" -f $writeMBs)
+
+    # Read benchmark
+    $swRead = [System.Diagnostics.Stopwatch]::StartNew()
+    $readData = [System.IO.File]::ReadAllBytes($tempFile)
+    $swRead.Stop()
+    $readMBs = $MB / ($swRead.Elapsed.TotalSeconds)
+    Write-Host ("Read speed:  {0:N2} MB/s" -f $readMBs)
+
+    # Cleanup
+    Remove-Item -Path $tempFile -Force -ErrorAction SilentlyContinue
+
+    # Output JSON for telemetry integration
+    $result = @{
+        path      = $target
+        sizeMB    = $MB
+        writeMBs  = [math]::Round($writeMBs, 2)
+        readMBs   = [math]::Round($readMBs, 2)
+        timestamp = (Get-Date).ToString('o')
+    }
+    Write-Host ""
+    Write-Host "Benchmark result (JSON):"
+    $result | ConvertTo-Json -Compress
+}
+
+switch ($Command) {
+    'usage' {
+        Show-DiskUsage -BasePath $Path
+    }
+    'benchmark' {
+        Run-Benchmark -Dir $Path -MB $SizeMB
+    }
+    Default {
+        Show-Usage
+        exit 1
+    }
+}
