@@ -1,2 +1,5 @@
 pytest>=7.0
 flake8>=6.0
+black>=24.9
+isort>=5.12
+pre-commit>=3.4

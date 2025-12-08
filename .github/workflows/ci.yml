@@ -21,32 +21,35 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install Python deps (if present)
+      - name: Install Python deps
         shell: bash
         run: |
-          if [ -f requirements.txt ]; then python -m pip install --upgrade pip && pip install -r requirements.txt || true; else echo "no requirements.txt"; fi
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if: runner.os == 'Linux'
 
-      - name: Run Python tests & linters (Linux)
+      - name: Run pre-commit & linters (Linux)
         shell: bash
         run: |
-          if python -c "import importlib,sys; importlib.util.find_spec('pytest')" 2>/dev/null; then pytest -q || true; else echo "pytest not installed; skipping"; fi
-          if python -c "import importlib,sys; importlib.util.find_spec('flake8')" 2>/dev/null; then flake8 . || true; else echo "flake8 not installed; skipping"; fi
+          python -m pip install pre-commit
+          pre-commit run --all-files
+          pytest -q
         if: runner.os == 'Linux'
-
-      - name: Windows: Install Python deps and run tests
+      - name: Windows: Install Python deps and run pre-commit/tests
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          if (Test-Path requirements.txt) { python -m pip install --upgrade pip; pip install -r requirements.txt } else { Write-Host "no requirements.txt" }
-          try { python -c "import pytest"; pytest -q } catch { Write-Host "pytest not installed; skipping" }
-          try { python -c "import flake8"; flake8 . } catch { Write-Host "flake8 not installed; skipping" }
+          python -m pip install --upgrade pip
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
+          pip install pre-commit
+          pre-commit run --all-files
+          pytest -q
 
       - name: Node: install & test (if present)
         uses: actions/setup-node@v4
         with:
           node-version: '18'
         run: |
-          if [ -f package.json ]; then npm ci || npm install; if [ -f package.json ] && jq -e '.scripts.test' package.json >/dev/null 2>&1; then npm test || true; else echo "no test script"; fi; else echo "no package.json"; fi
+          if [ -f package.json ]; then npm ci || npm install; if jq -e '.scripts.test' package.json >/dev/null 2>&1; then npm test; fi; if jq -e '.scripts.lint' package.json >/dev/null 2>&1; then npm run lint; fi; else echo "no package.json"; fi
         shell: bash
         if: runner.os == 'Linux'
