@@ -1,5 +1,7 @@
 # 🚀 DevBase - Personal Engineering Operating System
 
+[![Codecov](https://img.shields.io/codecov/c/gh/WalcimarZD/devbase-setup.svg?logo=codecov)](https://codecov.io/gh/WalcimarZD/devbase-setup)
+
 <div align="center">
 
 ```
