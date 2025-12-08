@@ -50,21 +50,21 @@ from datetime import datetime
 # Esta técnica é comum em scripts standalone que precisam de
 # módulos auxiliares sem criar um pacote Python formal.
 # ============================================
-sys.path.append(os.path.join(os.path.dirname(__file__), 'modules', 'python'))
-from filesystem import FileSystem
+sys.path.append(os.path.join(os.path.dirname(__file__), "modules", "python"))
+from filesystem import FileSystem  # noqa: E402
 
 
 def main():
     """
     Função principal do DevBase Python CLI.
-    
+
     Fluxo de execução:
     1. Parse dos argumentos de linha de comando
     2. Exibição do banner/informações
     3. Criação da estrutura de diretórios (Johnny.Decimal)
     4. Geração dos arquivos de governança básicos
     5. Resumo e próximos passos
-    
+
     Returns:
         None (exit code 0 se sucesso)
     """
@@ -76,24 +76,22 @@ def main():
     # ============================================
     parser = argparse.ArgumentParser(
         description="DevBase Setup (Python) - Personal Engineering Operating System",
-        epilog="Para funcionalidade completa, use bootstrap.ps1 com PowerShell Core."
+        epilog="Para funcionalidade completa, use bootstrap.ps1 com PowerShell Core.",
     )
     parser.add_argument(
-        "--root", 
-        default=os.path.expanduser("~/Dev_Workspace"), 
-        help="Caminho raiz para o workspace DevBase (padrão: ~/Dev_Workspace)"
+        "--root",
+        default=os.path.expanduser("~/Dev_Workspace"),
+        help="Caminho raiz para o workspace DevBase (padrão: ~/Dev_Workspace)",
     )
     parser.add_argument(
-        "--force", 
-        action="store_true", 
-        help="Forçar sobrescrita de arquivos existentes"
+        "--force", action="store_true", help="Forçar sobrescrita de arquivos existentes"
     )
     args = parser.parse_args()
 
     # ============================================
     # BANNER E INFORMAÇÕES
     # ============================================
-    print(f"\nDevBase v3.1 (Python Mode)")
+    print("\nDevBase v3.1 (Python Mode)")
     print(f"Root: {args.root}")
     print("-" * 40)
 
@@ -119,28 +117,23 @@ def main():
     # ============================================
     structure = [
         # SYSTEM (00-09): Infraestrutura
-        "00-09_SYSTEM/00_inbox",              # Caixa de entrada GTD
-        "00-09_SYSTEM/01_dotfiles/links",     # Configurações (symlinks)
-        "00-09_SYSTEM/05_templates",          # Templates reutilizáveis
-        "00-09_SYSTEM/06_git_hooks",          # Git hooks compartilhados
-        
+        "00-09_SYSTEM/00_inbox",  # Caixa de entrada GTD
+        "00-09_SYSTEM/01_dotfiles/links",  # Configurações (symlinks)
+        "00-09_SYSTEM/05_templates",  # Templates reutilizáveis
+        "00-09_SYSTEM/06_git_hooks",  # Git hooks compartilhados
         # KNOWLEDGE (10-19): Gestão de conhecimento
-        "10-19_KNOWLEDGE/11_public_garden",           # Jardim digital público
-        "10-19_KNOWLEDGE/12_private_vault/credentials", # Vault privado (Air-Gap!)
-        "10-19_KNOWLEDGE/18_adr-decisions",           # Architecture Decision Records
-        
+        "10-19_KNOWLEDGE/11_public_garden",  # Jardim digital público
+        "10-19_KNOWLEDGE/12_private_vault/credentials",  # Vault privado (Air-Gap!)
+        "10-19_KNOWLEDGE/18_adr-decisions",  # Architecture Decision Records
         # CODE (20-29): Desenvolvimento
-        "20-29_CODE/21_monorepo_apps",        # Projetos monorepo
-        
+        "20-29_CODE/21_monorepo_apps",  # Projetos monorepo
         # OPERATIONS (30-39): DevOps e automação
-        "30-39_OPERATIONS/30_ai",             # Módulo AI (simplificado)
-        "30-39_OPERATIONS/31_backups",        # Scripts de backup
-        
+        "30-39_OPERATIONS/30_ai",  # Módulo AI (simplificado)
+        "30-39_OPERATIONS/31_backups",  # Scripts de backup
         # MEDIA (40-49): Assets multimídia
         "40-49_MEDIA_ASSETS",
-        
         # ARCHIVE (90-99): Arquivos históricos
-        "90-99_ARCHIVE_COLD"
+        "90-99_ARCHIVE_COLD",
     ]
 
     # ============================================
@@ -162,7 +155,7 @@ def main():
     # garantir que o arquivo nunca fique em estado inconsistente.
     # ============================================
     print("\n2. Generating Governance Files...")
-    
+
     # README básico com timestamp de geração
     readme_content = f"""# DevBase Workspace
 
