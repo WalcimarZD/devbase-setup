@@ -1,14 +1,21 @@
+
 # Security Policy
 
 If you discover a security vulnerability in this project, please report it
-privately to the maintainers so it can be addressed swiftly.
+privately so we can address it before public disclosure.
 
-Responsible disclosure
-- Email: security@walcimarzd.dev (replace with preferred contact) or open a private
-  vulnerability report via the repository's security settings on GitHub.
-- Do not post sensitive details publicly until a fix is available.
+Reporting options
+- Preferred: open a private security advisory for this repository via GitHub
+  (Repository -> Security -> Report a vulnerability).
+- Secondary: email the security contact: security@walcimarzd.dev
 
-We will respond to valid reports within 7 business days and provide updates
-until the issue is resolved.
+Do not post sensitive details in public issues or pull requests. Once a
+fix is available we will coordinate disclosure and provide a CVE if
+appropriate.
 
-For general vulnerability disclosures, see GitHub's security advisories.
+Response timeline
+- We aim to acknowledge all valid reports within 7 business days and
+  provide progress updates until the issue is resolved.
+
+For more information see: https://docs.github.com/en/code-security
+
