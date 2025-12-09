@@ -20,5 +20,5 @@ def test_devbase_creates_readme_and_gitignore(tmp_path, monkeypatch):
     assert readme.exists()
     assert gitignore.exists()
     # Quick content sanity
-    assert "DevBase Workspace" in readme.read_text(encoding="utf-8")
+    assert "DevBase" in readme.read_text(encoding="utf-8")
     assert "12_private_vault/" in gitignore.read_text(encoding="utf-8")

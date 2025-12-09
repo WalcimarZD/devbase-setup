@@ -257,3 +257,53 @@ class FileSystem:
             if tmp_path.exists():
                 os.unlink(tmp_path)  # Remove arquivo temporário
             raise  # Re-lança a exceção para o chamador tratar
+
+    def copy_atomic(self, source_path: str, dest_path: str) -> None:
+        """
+        Copia arquivo de forma atômica (copy-to-temp-then-rename).
+
+        Equivalente ao Copy-ItemAtomic do PowerShell.
+
+        Args:
+            source_path: Caminho do arquivo de origem (absoluto ou relativo)
+            dest_path: Caminho do arquivo de destino (absoluto ou relativo)
+        """
+        src = Path(source_path)
+        dst = Path(dest_path)
+
+        # Resolução de paths
+        if not src.is_absolute():
+            src = self.root / src
+        if not dst.is_absolute():
+            dst = self.root / dst
+
+        # Validação de segurança para o DESTINO apenas
+        # (Origem pode ser fora se for um template do sistema, mas neste contexto
+        #  assumimos que tudo roda dentro do repo ou workspace)
+        self.assert_safe_path(dst)
+        
+        # Se origem não existe, falha
+        if not src.exists():
+            raise FileNotFoundError(f"Source file not found: {src}")
+
+        # Garante diretório destino
+        self.ensure_dir(dst.parent)
+
+        # Temp file logic
+        tmp_name = f".{dst.name}.{uuid.uuid4()}.tmp"
+        tmp_path = dst.parent / tmp_name
+
+        try:
+            # COPY para tep
+            import shutil
+            shutil.copy2(src, tmp_path)
+            
+            # RENAME atômico
+            tmp_path.replace(dst)
+            print(f" [OK] Copied atomic: {src.name} -> {dst.name}")
+            
+        except Exception as e:
+            print(f" [ERR] Failed to copy {src} to {dst}: {e}")
+            if tmp_path.exists():
+                os.unlink(tmp_path)
+            raise

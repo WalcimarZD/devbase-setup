@@ -15,9 +15,9 @@
 ╚═══════════════════════════════════════════════════════════╝
 ```
 
-**Versão 3.1** | [🤝 Contribuição](CONTRIBUTING.md)
+**Versão 3.1.0 (Python Edition)** | [🤝 Contribuição](CONTRIBUTING.md)
 
-> **📖 Documentação:** Após instalar via `bootstrap.ps1`, consulte `00-09_SYSTEM/07_documentation/USAGE-GUIDE.md` e `ARCHITECTURE.md` no seu workspace
+> **📖 Documentação:** Após instalar via `devbase.py`, consulte `00-09_SYSTEM/07_documentation/USAGE-GUIDE.md` e `ARCHITECTURE.md` no seu workspace
 
 </div>
 
@@ -71,32 +71,27 @@ O **DevBase** é um **Sistema Operacional de Engenharia Pessoal** — uma estrut
 | **Python** (Linux/macOS) | 3.8+ | `python3 --version` |
 | **Git** | 2.25+ | `git --version` |
 
-### Instalação em 3 Passos
+### Instalação (Cross-Platform)
 
-#### **Windows (PowerShell)**
-
-```powershell
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/devbase-setup-v3.git
-cd devbase-setup-v3
-
-# 2. Execute o bootstrap (localização padrão: ~/Dev_Workspace)
-.\bootstrap.ps1
-
-# 3. (Opcional) Especifique um caminho personalizado
-.\bootstrap.ps1 -RootPath "D:\MeuWorkspace"
-```
-
-#### **Linux/macOS**
+#### **Opção 1: Python CLI (Recomendado - Windows/Linux/macOS)**
 
 ```bash
 # 1. Clone o repositório
 git clone https://github.com/seu-usuario/devbase-setup-v3.git
 cd devbase-setup-v3
 
-# 2. Torne o instalador executável e execute
-chmod +x install.sh
-./install.sh
+# 2. Execute o setup
+python devbase.py
+
+# 3. (Opcional) Especifique um caminho personalizado
+python devbase.py --root ~/MeuWorkspace
+```
+
+#### **Opção 2: PowerShell (Legacy - Windows)**
+
+```powershell
+# Execute o bootstrap antigo
+.\bootstrap.ps1
 ```
 
 ### Verificação da Instalação
@@ -268,7 +263,19 @@ devbase backup
 
 ## ⚙️ Configuração Avançada
 
-### Parâmetros do Bootstrap
+### Parâmetros da CLI Python
+
+```bash
+python devbase.py [parâmetros]
+```
+
+| Parâmetro | Descrição | Valor Padrão |
+|-----------|-----------|--------------|
+| `--root` | Diretório raiz do workspace | `~/Dev_Workspace` |
+| `--force` | Sobrescreve todos os templates | `False` |
+| `--no-color` | Desabilita cores no output | `False` |
+
+### Parâmetros do Bootstrap (Legacy PowerShell)
 
 ```powershell
 .\bootstrap.ps1 [parâmetros]
@@ -394,15 +401,13 @@ Referências técnicas também incluídas:
 
 ### Estrutura dos Módulos
 
-| Módulo | Arquivo | Responsabilidade |
-|--------|---------|------------------|
-| Core | `setup-core.ps1` | Estrutura base e governança |
-| PKM | `setup-pkm.ps1` | Knowledge Management |
-| Code | `setup-code.ps1` | Templates de código |
-| Operations | `setup-operations.ps1` | CLI e automação |
-| Templates | `setup-templates.ps1` | Padrões técnicos |
-| Hooks | `setup-hooks.ps1` | Git hooks |
-| AI | `setup-ai.ps1` | Módulo de IA local |
+| Módulo | Arquivo Python | Arquivo Legacy | Responsabilidade |
+|--------|----------------|----------------|------------------|
+| Core | `setup_core.py` | `setup-core.ps1` | Estrutura base e governança |
+| PKM | `setup_pkm.py` | `setup-pkm.ps1` | Knowledge Management |
+| Code | `setup_code.py` | `setup-code.ps1` | Templates de código |
+| Operations | `setup_operations.py` | `setup-operations.ps1` | CLI e automação |
+| AI | `setup_ai.py` | `setup-ai.ps1` | Módulo de IA local |
 
 ---
 
