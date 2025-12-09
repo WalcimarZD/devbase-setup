@@ -169,7 +169,6 @@ function Invoke-LinkDotfiles {
 # COMANDO: NEW
 # ============================================
 
-
 # === COMANDO: NEW ===
 
 function Invoke-NewProject {
@@ -186,11 +185,19 @@ function Invoke-NewProject {
     }
 
     $templateName = "__template-clean-arch"
-    $sourcePath = Join-Path $DevBaseRoot "20-29_CODE_WORK" $templateName
-    $destinationPath = Join-Path $DevBaseRoot "20-29_CODE_WORK" "21_monorepo_apps" $ProjectName
+    
+    # CORREÇÃO: Caminho ajustado de "20-29_CODE_WORK" para "20-29_CODE"
+    # O Join-Path aninhado garante compatibilidade com PS 5.1 e 7+
+    $codeArea = Join-Path $DevBaseRoot "20-29_CODE"
+    $sourcePath = Join-Path $codeArea $templateName
+    
+    # Destino: 20-29_CODE/21_monorepo_apps/NomeDoProjeto
+    $appsDir = Join-Path $codeArea "21_monorepo_apps"
+    $destinationPath = Join-Path $appsDir $ProjectName
 
     if (-not (Test-Path $sourcePath)) {
         Write-Step "Diretório de template '$templateName' não encontrado." "ERROR"
+        Write-Host "   Procurado em: $sourcePath" -ForegroundColor Gray
         return
     }
 
@@ -204,16 +211,13 @@ function Invoke-NewProject {
     try {
         Copy-Item -Path $sourcePath -Destination $destinationPath -Recurse -Force
         Write-Step "Projeto '$ProjectName' criado com sucesso em:" "OK"
-        Write-Host $destinationPath -ForegroundColor Gray
+        Write-Host "   Caminho: $destinationPath" -ForegroundColor Gray
 
-        # TODO: Adicionar lógica para substituir placeholders dentro dos arquivos do novo projeto.
-        # Ex: Get-ChildItem -Path $destinationPath -Recurse | Where-Object { -not $_.PSIsContainer } | ForEach-Object { (Get-Content $_.FullName -Raw) -replace '{{PROJECT_NAME}}', $ProjectName | Set-Content $_.FullName -Encoding UTF8 }
-
+        # Opcional: Aqui poderíamos adicionar lógica para renomear placeholders no código
     } catch {
         Write-Step "Falha ao criar o projeto: $_" "ERROR"
     }
 }
-
 
 # ============================================
 # COMANDO: DOCTOR
