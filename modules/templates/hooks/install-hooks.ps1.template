@@ -50,3 +50,4 @@ foreach ($hook in $hooks) {
 }
 
 Write-Host "`nHooks PowerShell instalados com sucesso!" -ForegroundColor Green
+
