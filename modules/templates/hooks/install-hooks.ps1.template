@@ -13,16 +13,15 @@ param(
 )
 
 $hooksSourceDir = $PSScriptRoot
-$gitRoot = git rev-parse --show-toplevel 2>$null
-if (-not $gitRoot) {
-    Write-Host "Erro: Não estamos em um repositório Git" -ForegroundColor Red
+$gitDir = git rev-parse --absolute-git-dir 2>$null
+if (-not $gitDir) {
+    Write-Host "Erro: Não estamos em um repositório Git ou o .git não pode ser resolvido." -ForegroundColor Red
     exit 1
 }
-
-$targetDir = Join-Path $gitRoot ".git\hooks"
+$targetDir = Join-Path $gitDir "hooks"
 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 
-$hooks = @('pre-commit', 'commit-msg', 'pre-push')
+$hooks = @('pre-commit', 'commit-msg', 'pre-push', 'post-commit')
 
 Write-Host "Instalando Git hooks em '$targetDir'..." -ForegroundColor Cyan
 

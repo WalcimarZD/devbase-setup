@@ -1,0 +1,72 @@
+#!/usr/bin/env pwsh
+# Git hook: post-commit
+# Automatiza o stage e commit de alterações de submodule no repositório pai.
+
+# Salva o diretório atual para retornar depois
+$originalDir = Get-Location
+
+try {
+    # Caminho absoluto para o diretório .git/hooks do submodule
+    $hooksDir = $PSScriptRoot
+    # Caminho absoluto para a raiz do submodule (ex: MedSempreMVC)
+    $submoduleRoot = (Get-Item -Path "$hooksDir/..").Parent.FullName
+    # Nome do submodule (ex: MedSempreMVC)
+    $submoduleName = (Get-Item -Path $submoduleRoot).Name
+
+    # Função para encontrar a raiz do repositório principal (Dev_Workspace)
+    function Find-MainRepoRoot {
+        $dir = $submoduleRoot
+        while ($dir.Parent) {
+            # Verifica se o diretório atual é a raiz do repositório principal
+            # Procuramos por .git e .gitmodules (marcador de repositório pai com submodules)
+            if ((Test-Path -Path (Join-Path $dir ".git")) -and (Test-Path -Path (Join-Path $dir ".gitmodules"))) {
+                return $dir
+            }
+            $dir = $dir.Parent
+        }
+        return $null
+    }
+    
+    $mainRepoRoot = Find-MainRepoRoot
+    if (-not $mainRepoRoot) {
+        Write-Error "DevBase Auto-Commit Hook: Não foi possível encontrar a raiz do repositório principal."
+        exit 1
+    }
+
+    # Navega para a raiz do repositório principal
+    Set-Location $mainRepoRoot
+
+    # Obtém o caminho relativo do submodule a partir da raiz do repositório principal
+    $relativeSubmodulePath = (Resolve-Path $submoduleRoot -Relative).Path.Replace(".\", "")
+
+    Write-Host "DevBase Auto-Commit Hook: Processando submodule: '$relativeSubmodulePath'"
+
+    # Adiciona a mudança do submodule ao stage do repositório principal
+    git add $relativeSubmodulePath
+
+    # Gera a mensagem de commit
+    $lastSubmoduleCommitMessage = git -C $submoduleRoot log -1 --pretty=format:%s
+    $commitMessage = "chore(submodule): Update '$submoduleName' (via '$relativeSubmodulePath') - $($lastSubmoduleCommitMessage)"
+    
+    # Limita o tamanho da mensagem para seguir a convenção de commits
+    if ($commitMessage.Length -gt 100) { # Adjusted length for better readability
+        $commitMessage = "chore(submodule): Update '$submoduleName' (via '$relativeSubmodulePath') - $($lastSubmoduleCommitMessage.Substring(0, 50))..."
+    }
+    
+    # Verifica se há algo para commitar no repositório principal
+    $statusOutput = git status --porcelain $relativeSubmodulePath
+    if ($statusOutput) {
+        git commit -m $commitMessage
+        Write-Host "DevBase Auto-Commit Hook: Commit automático do submodule '$submoduleName' realizado no repositório pai."
+    } else {
+        Write-Host "DevBase Auto-Commit Hook: Nenhuma mudança para commitar para o submodule '$submoduleName' no repositório pai."
+    }
+
+} catch {
+    Write-Error "DevBase Auto-Commit Hook: Ocorreu um erro: $($_.Exception.Message)"
+    exit 1
+} finally {
+    Set-Location $originalDir # Retorna ao diretório original
+}
+
+exit 0
