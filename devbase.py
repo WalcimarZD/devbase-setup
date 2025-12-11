@@ -691,6 +691,125 @@ def cmd_dashboard(args, ui: UI, root: Path):
     # Start server
     run_server(port=port, debug=False)
 
+
+def cmd_ai(args, ui: UI, root: Path):
+    """Comando: ai - Assistente de IA local."""
+    from ai_assistant import OllamaClient, SYSTEM_PROMPTS, get_workspace_context
+    
+    subcommand = getattr(args, 'ai_command', 'chat')
+    model = getattr(args, 'model', 'phi')
+    
+    # Check Ollama availability
+    client = OllamaClient(model=model)
+    
+    if not client.is_available():
+        ui.print_header("DevBase AI")
+        ui.print_step("Ollama is not running", "ERROR")
+        print("\nTo use AI features, install and start Ollama:")
+        print("  1. Download: https://ollama.com/download")
+        print("  2. Install and start Ollama")
+        print("  3. Run: ollama pull phi")
+        print("  4. Try again: devbase ai chat")
+        return
+    
+    # Build context
+    workspace_context = get_workspace_context(root)
+    
+    if subcommand == "chat":
+        ui.print_header("DevBase AI Chat")
+        print(f"Model: {model} | Type 'exit' to quit\n")
+        
+        system = SYSTEM_PROMPTS["default"] + "\n\n" + workspace_context
+        
+        while True:
+            try:
+                user_input = input("You: ").strip()
+                if user_input.lower() in ('exit', 'quit', 'q'):
+                    print("Bye!")
+                    break
+                if not user_input:
+                    continue
+                
+                print("AI: ", end="", flush=True)
+                response = client.generate(user_input, system=system)
+                print(response)
+                print()
+            except KeyboardInterrupt:
+                print("\nBye!")
+                break
+            except Exception as e:
+                ui.print_step(f"Error: {e}", "ERROR")
+    
+    elif subcommand == "summarize":
+        ui.print_header("DevBase AI Summarize")
+        
+        file_path = getattr(args, 'file', None)
+        if not file_path:
+            ui.print_step("Please provide a file to summarize", "ERROR")
+            return
+        
+        file_path = Path(file_path)
+        if not file_path.exists():
+            ui.print_step(f"File not found: {file_path}", "ERROR")
+            return
+        
+        content = file_path.read_text(encoding="utf-8")[:4000]  # Limit context
+        prompt = f"Summarize the following document:\n\n{content}"
+        
+        print(f"Summarizing: {file_path.name}\n")
+        response = client.generate(prompt, system=SYSTEM_PROMPTS["summarize"])
+        print(response)
+    
+    elif subcommand == "explain":
+        ui.print_header("DevBase AI Explain")
+        
+        topic = getattr(args, 'topic', None)
+        if not topic:
+            ui.print_step("Please provide a topic to explain", "ERROR")
+            return
+        
+        prompt = f"Explain this concept clearly: {topic}"
+        response = client.generate(prompt, system=SYSTEM_PROMPTS["explain"])
+        print(response)
+    
+    elif subcommand == "adr":
+        ui.print_header("DevBase AI - Generate ADR")
+        
+        decision = getattr(args, 'decision', None)
+        if not decision:
+            ui.print_step("Please provide a decision to document", "ERROR")
+            return
+        
+        prompt = f"Generate an ADR for this decision: {decision}"
+        response = client.generate(prompt, system=SYSTEM_PROMPTS["adr"])
+        print(response)
+        
+        # Optionally save
+        if getattr(args, 'save', False):
+            adr_dir = root / "10-19_KNOWLEDGE" / "18_adr-decisions"
+            adr_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Find next ADR number
+            existing = list(adr_dir.glob("adr-*.md"))
+            next_num = len(existing) + 1
+            adr_file = adr_dir / f"adr-{next_num:03d}.md"
+            
+            adr_file.write_text(response, encoding="utf-8")
+            ui.print_step(f"Saved to: {adr_file}", "OK")
+    
+    elif subcommand == "til":
+        ui.print_header("DevBase AI - Generate TIL")
+        
+        learning = getattr(args, 'learning', None)
+        if not learning:
+            ui.print_step("Please provide what you learned", "ERROR")
+            return
+        
+        prompt = f"Generate a TIL entry for: {learning}"
+        response = client.generate(prompt, system=SYSTEM_PROMPTS["til"])
+        print(response)
+
+
 def main():
     """Entry point principal."""
     common = get_common_parser()
@@ -773,9 +892,29 @@ VERSION: """ + SCRIPT_VERSION
     sp_dashboard.add_argument("--no-browser", action="store_true",
         help="Don't open browser automatically")
 
+    # === AI ===
+    sp_ai = subparsers.add_parser("ai", parents=[common],
+        help="Local AI assistant (requires Ollama)")
+    sp_ai.add_argument("ai_command", nargs="?", default="chat",
+        choices=["chat", "summarize", "explain", "adr", "til"],
+        help="AI subcommand (default: chat)")
+    sp_ai.add_argument("--model", "-m", default="phi",
+        help="Model to use (default: phi)")
+    sp_ai.add_argument("--file", "-f",
+        help="File to process (for summarize)")
+    sp_ai.add_argument("--topic", "-t",
+        help="Topic to explain (for explain)")
+    sp_ai.add_argument("--decision", "-d",
+        help="Decision to document (for adr)")
+    sp_ai.add_argument("--learning", "-l",
+        help="What you learned (for til)")
+    sp_ai.add_argument("--save", "-s", action="store_true",
+        help="Save generated ADR/TIL to file")
+
     # Enable shell autocompletion if argcomplete is installed
     if HAS_ARGCOMPLETE:
         argcomplete.autocomplete(parser)
+
 
 
     # Parse args
@@ -809,7 +948,9 @@ VERSION: """ + SCRIPT_VERSION
         "stats": cmd_stats,
         "weekly": cmd_weekly,
         "dashboard": cmd_dashboard,
+        "ai": cmd_ai,
     }
+
 
 
     cmd_func = commands.get(args.command)
