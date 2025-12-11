@@ -13,11 +13,14 @@ param(
 )
 
 $hooksSourceDir = $PSScriptRoot
+
+# Usa --absolute-git-dir para suportar submodules (onde .git é um arquivo, não diretório)
 $gitDir = git rev-parse --absolute-git-dir 2>$null
 if (-not $gitDir) {
     Write-Host "Erro: Não estamos em um repositório Git ou o .git não pode ser resolvido." -ForegroundColor Red
     exit 1
 }
+
 $targetDir = Join-Path $gitDir "hooks"
 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 
