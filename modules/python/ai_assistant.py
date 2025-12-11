@@ -184,34 +184,172 @@ Generate Today I Learned (TIL) entries following this format:
 [Code or practical example]
 
 ## References
-- [Source]"""
+- [Source]""",
+
+    "quiz": """You are a quiz generator for learning reinforcement.
+Based on the content provided, generate 5 multiple-choice questions.
+Format each question as:
+
+Q1. [Question]
+A) [Option]
+B) [Option]
+C) [Option]
+D) [Option]
+Answer: [Letter]
+
+After all questions, provide a section with all answers explained.""",
+
+    "flashcards": """You are a flashcard generator for spaced repetition learning.
+Based on the content provided, generate flashcards in this format:
+
+---
+**Front:** [Question or concept]
+**Back:** [Answer or explanation]
+---
+
+Generate 10 flashcards covering the key concepts.""",
+
+    "readme": """You are a README generator for software projects.
+Based on the project structure provided, generate a professional README.md with:
+
+# [Project Name]
+
+[Brief description]
+
+## Features
+
+- [Feature 1]
+- [Feature 2]
+
+## Installation
+
+```bash
+[Installation commands]
+```
+
+## Usage
+
+```bash
+[Usage examples]
+```
+
+## License
+
+[License info]"""
 }
 
 
 def get_workspace_context(root: Path) -> str:
-    """Build context about the workspace structure."""
-    context_parts = ["## DevBase Workspace Structure\n"]
+    """Build comprehensive context about the workspace."""
+    import json
+    from datetime import datetime, timedelta
     
-    # List top-level areas
+    context_parts = ["## DevBase Workspace Context\n"]
+    
+    # 1. Workspace structure
+    context_parts.append("### Structure (Johnny.Decimal)")
     areas = [
-        "00-09_SYSTEM",
-        "10-19_KNOWLEDGE", 
-        "20-29_CODE",
-        "30-39_OPERATIONS",
-        "40-49_MEDIA_ASSETS",
-        "90-99_ARCHIVE_COLD"
+        ("00-09_SYSTEM", "System configs, dotfiles, templates"),
+        ("10-19_KNOWLEDGE", "Documentation, ADRs, TILs, notes"),
+        ("20-29_CODE", "Source code, monorepo, worktrees"),
+        ("30-39_OPERATIONS", "Automation, backups, CLI, AI"),
+        ("40-49_MEDIA_ASSETS", "Images, videos, exports"),
+        ("90-99_ARCHIVE_COLD", "Archived projects")
     ]
     
-    for area in areas:
+    for area, desc in areas:
         area_path = root / area
         if area_path.exists():
-            context_parts.append(f"- {area}/")
-            # List first-level subdirs
             try:
-                for subdir in sorted(area_path.iterdir()):
-                    if subdir.is_dir() and not subdir.name.startswith("."):
-                        context_parts.append(f"  - {subdir.name}/")
+                subdirs = [d.name for d in area_path.iterdir() 
+                          if d.is_dir() and not d.name.startswith(".")]
+                context_parts.append(f"- **{area}**: {desc}")
+                if subdirs:
+                    context_parts.append(f"  Folders: {', '.join(subdirs[:5])}")
             except PermissionError:
                 pass
     
+    # 2. Recent activity (from telemetry)
+    events_file = root / ".telemetry" / "events.jsonl"
+    if events_file.exists():
+        try:
+            context_parts.append("\n### Recent Activity (last 7 days)")
+            week_ago = datetime.now() - timedelta(days=7)
+            recent = []
+            
+            with open(events_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            event = json.loads(line)
+                            ts = datetime.fromisoformat(event.get("timestamp", ""))
+                            if ts >= week_ago:
+                                recent.append(event)
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+            
+            if recent:
+                context_parts.append(f"Total activities: {len(recent)}")
+                for event in recent[-5:]:  # Last 5
+                    context_parts.append(f"- [{event.get('type', 'work')}] {event.get('message', '')}")
+        except Exception:
+            pass
+    
+    # 3. Project stats
+    context_parts.append("\n### Quick Stats")
+    
+    # Count projects
+    code_dir = root / "20-29_CODE" / "21_monorepo_apps"
+    if code_dir.exists():
+        try:
+            projects = [d for d in code_dir.iterdir() 
+                       if d.is_dir() and not d.name.startswith(".")]
+            context_parts.append(f"- Projects: {len(projects)}")
+        except PermissionError:
+            pass
+    
+    # Count ADRs
+    adr_dir = root / "10-19_KNOWLEDGE" / "18_adr-decisions"
+    if adr_dir.exists():
+        try:
+            adrs = list(adr_dir.glob("*.md"))
+            context_parts.append(f"- ADRs: {len(adrs)}")
+        except PermissionError:
+            pass
+    
     return "\n".join(context_parts)
+
+
+def get_project_context(project_path: Path) -> str:
+    """Build context about a specific project."""
+    context_parts = [f"## Project: {project_path.name}\n"]
+    
+    # Check for common files
+    files_to_check = [
+        ("README.md", "Has README"),
+        ("package.json", "Node.js project"),
+        ("requirements.txt", "Python project"),
+        ("Cargo.toml", "Rust project"),
+        ("*.csproj", "C# project"),
+        (".git", "Git repository"),
+    ]
+    
+    for pattern, label in files_to_check:
+        if pattern.startswith("*"):
+            if list(project_path.glob(pattern)):
+                context_parts.append(f"- {label}")
+        elif (project_path / pattern).exists():
+            context_parts.append(f"- {label}")
+    
+    # List main directories
+    context_parts.append("\n### Directories:")
+    try:
+        for item in sorted(project_path.iterdir()):
+            if item.is_dir() and not item.name.startswith("."):
+                context_parts.append(f"- {item.name}/")
+    except PermissionError:
+        pass
+    
+    return "\n".join(context_parts)
+

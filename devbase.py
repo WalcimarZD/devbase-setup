@@ -808,7 +808,72 @@ def cmd_ai(args, ui: UI, root: Path):
         prompt = f"Generate a TIL entry for: {learning}"
         response = client.generate(prompt, system=SYSTEM_PROMPTS["til"])
         print(response)
-
+    
+    elif subcommand == "quiz":
+        ui.print_header("DevBase AI - Generate Quiz")
+        
+        file_path = getattr(args, 'file', None)
+        if not file_path:
+            ui.print_step("Please provide a file with --file", "ERROR")
+            return
+        
+        file_path = Path(file_path)
+        if not file_path.exists():
+            ui.print_step(f"File not found: {file_path}", "ERROR")
+            return
+        
+        content = file_path.read_text(encoding="utf-8")[:4000]
+        prompt = f"Based on this content, generate a quiz:\n\n{content}"
+        
+        print(f"Generating quiz from: {file_path.name}\n")
+        response = client.generate(prompt, system=SYSTEM_PROMPTS["quiz"])
+        print(response)
+    
+    elif subcommand == "flashcards":
+        ui.print_header("DevBase AI - Generate Flashcards")
+        
+        file_path = getattr(args, 'file', None)
+        if not file_path:
+            ui.print_step("Please provide a file with --file", "ERROR")
+            return
+        
+        file_path = Path(file_path)
+        if not file_path.exists():
+            ui.print_step(f"File not found: {file_path}", "ERROR")
+            return
+        
+        content = file_path.read_text(encoding="utf-8")[:4000]
+        prompt = f"Generate flashcards from this content:\n\n{content}"
+        
+        print(f"Generating flashcards from: {file_path.name}\n")
+        response = client.generate(prompt, system=SYSTEM_PROMPTS["flashcards"])
+        print(response)
+    
+    elif subcommand == "readme":
+        from ai_assistant import get_project_context
+        ui.print_header("DevBase AI - Generate README")
+        
+        project_dir = getattr(args, 'project', None)
+        if project_dir:
+            project_path = Path(project_dir)
+        else:
+            project_path = Path.cwd()
+        
+        if not project_path.exists():
+            ui.print_step(f"Directory not found: {project_path}", "ERROR")
+            return
+        
+        project_context = get_project_context(project_path)
+        prompt = f"Generate a README.md for this project:\n\n{project_context}"
+        
+        print(f"Generating README for: {project_path.name}\n")
+        response = client.generate(prompt, system=SYSTEM_PROMPTS["readme"])
+        print(response)
+        
+        if getattr(args, 'save', False):
+            readme_file = project_path / "README.md"
+            readme_file.write_text(response, encoding="utf-8")
+            ui.print_step(f"Saved to: {readme_file}", "OK")
 
 def main():
     """Entry point principal."""
@@ -896,20 +961,23 @@ VERSION: """ + SCRIPT_VERSION
     sp_ai = subparsers.add_parser("ai", parents=[common],
         help="Local AI assistant (requires Ollama)")
     sp_ai.add_argument("ai_command", nargs="?", default="chat",
-        choices=["chat", "summarize", "explain", "adr", "til"],
+        choices=["chat", "summarize", "explain", "adr", "til", "quiz", "flashcards", "readme"],
         help="AI subcommand (default: chat)")
     sp_ai.add_argument("--model", "-m", default="phi",
         help="Model to use (default: phi)")
     sp_ai.add_argument("--file", "-f",
-        help="File to process (for summarize)")
+        help="File to process (for summarize/quiz/flashcards)")
     sp_ai.add_argument("--topic", "-t",
         help="Topic to explain (for explain)")
     sp_ai.add_argument("--decision", "-d",
         help="Decision to document (for adr)")
     sp_ai.add_argument("--learning", "-l",
         help="What you learned (for til)")
+    sp_ai.add_argument("--project", "-p",
+        help="Project directory (for readme)")
     sp_ai.add_argument("--save", "-s", action="store_true",
-        help="Save generated ADR/TIL to file")
+        help="Save generated output to file")
+
 
     # Enable shell autocompletion if argcomplete is installed
     if HAS_ARGCOMPLETE:
