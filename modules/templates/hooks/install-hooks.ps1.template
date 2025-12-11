@@ -33,9 +33,16 @@ foreach ($hook in $hooks) {
 
     # Cria um wrapper shell que invoca o script PowerShell de forma portável
     # Isso funciona no cmd, powershell e git-bash no Windows.
-    $wrapperContent = "#!/bin/sh`n# DevBase Hook Wrapper`n`npwsh -NoProfile -File `"$powerShellScriptPath`" `$@`n"
+    # IMPORTANTE: O arquivo DEVE terminar com newline (requisito POSIX) para evitar "Exec format error"
+    $wrapperContent = @"
+#!/bin/sh
+pwsh -NoProfile -File "$powerShellScriptPath" "`$@"
+exit `$?
 
-    Set-Content -Path $hookWrapperPath -Value $wrapperContent -Encoding UTF8 -Force
+"@
+
+    # Usa WriteAllText para UTF-8 sem BOM (BOM causa "Exec format error" no Git Bash)
+    [System.IO.File]::WriteAllText($hookWrapperPath, $wrapperContent)
 
     # Torna executável (essencial para ambientes *nix/macOS e Git Bash)
     if (-not $IsWindows) {
