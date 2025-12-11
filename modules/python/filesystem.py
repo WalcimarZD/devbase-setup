@@ -72,19 +72,22 @@ class FileSystem:
         >>> fs.write_atomic("README.md", "# My Workspace")
     """
 
-    def __init__(self, root_path: str):
+    def __init__(self, root_path: str, dry_run: bool = False):
         """
         Inicializa o FileSystem com o diretório raiz.
 
         Args:
             root_path: Caminho para o diretório raiz do DevBase.
                        Pode ser relativo (será resolvido para absoluto).
+            dry_run: Se True, operações são logadas mas não executadas.
 
         Note:
             O path é resolvido (.resolve()) para obter caminho absoluto
             e normalizado, prevenindo problemas com symlinks e ..
         """
         self.root = Path(root_path).resolve()
+        self.dry_run = dry_run
+
 
     def assert_safe_path(self, target_path: Path) -> bool:
         """
@@ -161,8 +164,11 @@ class FileSystem:
         # parents=True: cria diretórios intermediários (como mkdir -p)
         # exist_ok=True: não falha se já existir (idempotente)
         if not target.exists():
-            target.mkdir(parents=True, exist_ok=True)
-            print(f" [+] Created directory: {target}")
+            if self.dry_run:
+                print(f" [DRY-RUN] Would create directory: {target}")
+            else:
+                target.mkdir(parents=True, exist_ok=True)
+                print(f" [+] Created directory: {target}")
 
         return target
 
@@ -218,6 +224,11 @@ class FileSystem:
         # O . no início esconde o arquivo em sistemas Unix
         tmp_name = f".{target.name}.{uuid.uuid4()}.tmp"
         tmp_path = target.parent / tmp_name
+
+        # DRY-RUN: Apenas loga a operação
+        if self.dry_run:
+            print(f" [DRY-RUN] Would write: {target.name}")
+            return
 
         try:
             # === PASSO 1: Escreve em arquivo temporário ===

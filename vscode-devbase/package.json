@@ -1,0 +1,114 @@
+{
+    "name": "vscode-devbase",
+    "displayName": "DevBase",
+    "description": "DevBase integration for VS Code - Personal Engineering Operating System",
+    "version": "0.1.0",
+    "publisher": "devbase",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "keywords": [
+        "devbase",
+        "productivity",
+        "organization",
+        "johnny-decimal"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "devbase.doctor",
+                "title": "DevBase: Doctor - Check Workspace Health"
+            },
+            {
+                "command": "devbase.newProject",
+                "title": "DevBase: New Project"
+            },
+            {
+                "command": "devbase.track",
+                "title": "DevBase: Track Activity"
+            },
+            {
+                "command": "devbase.dashboard",
+                "title": "DevBase: Open Dashboard"
+            },
+            {
+                "command": "devbase.hydrate",
+                "title": "DevBase: Hydrate Templates"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "devbase",
+                    "title": "DevBase",
+                    "icon": "resources/devbase-icon.svg"
+                }
+            ]
+        },
+        "views": {
+            "devbase": [
+                {
+                    "id": "devbaseStructure",
+                    "name": "Workspace Structure"
+                },
+                {
+                    "id": "devbaseRecent",
+                    "name": "Recent Activity"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "devbase.doctor",
+                    "when": "view == devbaseStructure",
+                    "group": "navigation"
+                }
+            ]
+        },
+        "snippets": [
+            {
+                "language": "markdown",
+                "path": "./snippets/devbase.code-snippets"
+            }
+        ],
+        "configuration": {
+            "title": "DevBase",
+            "properties": {
+                "devbase.pythonPath": {
+                    "type": "string",
+                    "default": "python",
+                    "description": "Path to Python executable"
+                },
+                "devbase.cliPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to devbase.py (auto-detected if empty)"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "lint": "eslint src --ext ts",
+        "pretest": "npm run compile && npm run lint",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.85.0",
+        "@types/node": "18.x",
+        "@typescript-eslint/eslint-plugin": "^6.13.0",
+        "@typescript-eslint/parser": "^6.13.0",
+        "eslint": "^8.54.0",
+        "typescript": "^5.3.2"
+    }
+}

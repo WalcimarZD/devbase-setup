@@ -1,0 +1,136 @@
+# DevBase Ignore File
+# ====================
+# Patterns in this file exclude directories from 'devbase audit'.
+# Similar to .gitignore, but only affects the audit command.
+# Supports glob patterns: *, **
+
+# ===================================
+# Diretórios de Build/Output
+# ===================================
+**/bin/
+**/obj/
+**/out/
+**/build/
+**/dist/
+**/target/
+**/output/
+**/publish/
+**/Release/
+**/Debug/
+
+# ===================================
+# Diretórios de Pacotes/Dependências
+# ===================================
+**/node_modules/
+**/packages/
+**/vendor/
+**/bower_components/
+**/.nuget/
+**/jspm_packages/
+
+# ===================================
+# Frameworks / Targets (.NET)
+# ===================================
+net*/
+netstandard*/
+netcoreapp*/
+
+# ===================================
+# IDEs e Editores
+# ===================================
+**/.vs/
+**/.vscode/
+**/.idea/
+**/.gradle/
+**/.settings/
+**/.project/
+**/.classpath/
+
+# ===================================
+# Git e VCS
+# ===================================
+**/.git/
+**/.svn/
+**/.hg/
+**/.github/
+**/ISSUE_TEMPLATE/
+
+# ===================================
+# Cache e Temporários
+# ===================================
+**/__pycache__/
+**/.cache/
+**/.tmp/
+**/.temp/
+**/coverage/
+**/.nyc_output/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.tox/
+
+# ===================================
+# Worktrees e Projetos Legados
+# ===================================
+23_worktrees
+
+# ===================================
+# Estruturas .NET (PascalCase é padrão)
+# ===================================
+**/MedSempreMVC*
+**/Classes/
+**/Models/
+**/Views/
+**/Controllers/
+**/Services/
+**/Repositories/
+**/Properties/
+**/Migrations/
+**/wwwroot/
+**/Interfaces/
+**/DTOs/
+**/Enums/
+**/Helpers/
+**/Extensions/
+**/Data/
+**/Config/
+**/Areas/
+**/Application/
+**/Domain/
+**/Infrastructure/
+**/WebApi/
+**/Presentation/
+**/Core/
+
+# ===================================
+# Estruturas de Teste (.NET)
+# ===================================
+**/Unit/
+**/Integration/
+**/*.Tests/
+**/*.Test/
+**/TestResults/
+
+# ===================================
+# Source folders (padrão comum)
+# ===================================
+**/src/
+**/tests/
+**/lib/
+**/libs/
+**/spec/
+**/specs/
+**/Src/
+**/Tests/
+
+# ===================================
+# Documentação e Assets
+# ===================================
+**/docs/
+**/Docs/
+**/Documentation/
+**/assets/
+**/Assets/
+**/images/
+**/Images/
+**/resources/
+**/Resources/

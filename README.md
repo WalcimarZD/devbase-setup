@@ -15,7 +15,7 @@
 ╚═══════════════════════════════════════════════════════════╝
 ```
 
-**Versão 3.1.0 (Python Edition)** | [🤝 Contribuição](CONTRIBUTING.md)
+**Versão 3.2.0 (Python Edition)** | [🤝 Contribuição](CONTRIBUTING.md) | [📖 Docs](https://walcimarzd.github.io/devbase-setup/)
 
 > **📖 Documentação:** Após instalar via `devbase.py`, consulte `00-09_SYSTEM/07_documentation/USAGE-GUIDE.md` e `ARCHITECTURE.md` no seu workspace
 
@@ -56,8 +56,10 @@ O **DevBase** é um **Sistema Operacional de Engenharia Pessoal** — uma estrut
 - **🛡️ Segurança Air-Gap**: Vault privado nunca sincroniza com nuvem
 - **🎣 Git Hooks**: Validação automática de commits e código
 - **🤖 Módulo de IA**: Estrutura para modelos locais e contextos
+- **📊 Dashboard**: Visualização de telemetria com Chart.js
 - **💾 Backup 3-2-1**: Estratégia de backup automatizada
 - **🔀 Multi-plataforma**: Windows (PowerShell) + Linux/macOS (Python/Bash)
+- **🧩 VS Code Extension**: Integração com o editor
 
 ---
 
