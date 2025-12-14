@@ -41,23 +41,38 @@ O DevBase é um sistema operacional de engenharia pessoal - uma estrutura padron
 git clone https://github.com/WalcimarZD/devbase-setup.git
 cd devbase-setup
 
-# Execute o setup
-python devbase.py setup
+# Execute o setup interativo
+python devbase.py setup --interactive
 
 # Verifique a instalação
 python devbase.py doctor
+
+# Veja seu progresso de onboarding
+python devbase.py onboarding
 ```
 
 ## 📚 Documentação
 
-- [**Getting Started**](getting-started/installation.md) - Instalação e configuração inicial
+### Tutoriais (Aprendizado prático)
+- [**Primeiro Projeto em 5 min**](tutorials/first-project.md) - Hello World com DevBase
+
+### How-To (Guias de tarefa)
+- [**Configurar Git Hooks**](how-to/setup-git-hooks.md) - Validação de commits
+- [**Backup do Workspace**](how-to/backup-workspace.md) - Estratégia 3-2-1
+
+### Explicação (Conceitos)
+- [**Johnny.Decimal**](explanation/johnny-decimal.md) - Sistema de organização
+- [**Clean Architecture**](explanation/clean-architecture.md) - Template de projeto
+- [**Air-Gap Security**](explanation/air-gap-security.md) - Proteção do vault
+
+### Referência
 - [**CLI Reference**](cli/overview.md) - Todos os comandos disponíveis
-- [**Architecture**](architecture.md) - Como o DevBase funciona internamente
+- [**Architecture**](ARCHITECTURE.md) - Como o DevBase funciona internamente
 
 ## 🎯 Por que DevBase?
 
 | Problema | Solução DevBase |
-|----------|-----------------|
+|----------|-----------------| 
 | 🗂️ Arquivos espalhados sem organização | Estrutura Johnny.Decimal para tudo |
 | 🔄 Configurações inconsistentes | Templates padronizados e dotfiles centralizados |
 | 📝 Falta de documentação estruturada | Sistema PKM integrado |
@@ -69,6 +84,8 @@ python devbase.py doctor
 **v3.2.0** (Python Edition)
 
 - ✅ CLI Python unificado
+- ✅ Wizard interativo (`--interactive`)
+- ✅ Onboarding checklist
 - ✅ Autocompletion para bash/zsh/PowerShell
 - ✅ Progress bars com tqdm
 - ✅ Dry-run mode
