@@ -65,9 +65,9 @@ def run_setup_pkm(fs: FileSystem, ui: UI, policy_version: str = "3.1"):
     # ================================================
     # FASE 2: PUBLICAÇÃO DE TEMPLATES
     # ================================================
-    # ../templates/pkm
+    # ../../shared/templates/pkm
     current_dir = Path(__file__).resolve().parent
-    templates_root = current_dir.parent / "templates" / "pkm"
+    templates_root = current_dir.parent.parent / "shared" / "templates" / "pkm"
 
     # Preparar replacements adicionais
     now = datetime.now()

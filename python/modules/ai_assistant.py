@@ -80,7 +80,7 @@ class OllamaClient:
         )
         
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            with urllib.request.urlopen(req, timeout=300) as resp:
                 if stream:
                     return self._stream_response(resp)
                 else:
@@ -125,7 +125,7 @@ class OllamaClient:
         )
         
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            with urllib.request.urlopen(req, timeout=300) as resp:
                 result = json.loads(resp.read().decode())
                 return result.get("message", {}).get("content", "")
         except urllib.error.URLError as e:

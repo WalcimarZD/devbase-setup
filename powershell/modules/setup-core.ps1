@@ -76,8 +76,9 @@ function Setup-Core {
     param([string]$RootPath)
 
     # Define o caminho onde os templates deste módulo estão localizados
-    # $PSScriptRoot é o diretório onde este script está (modules/)
-    $templateSourceRoot = Join-Path $PSScriptRoot "templates/core"
+    # Updated to point to shared templates directory (../../shared/templates/core)
+    $scriptRootParent = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $templateSourceRoot = Join-Path $scriptRootParent "shared/templates/core"
 
     # ================================================
     # FASE 1: CRIAÇÃO DA ESTRUTURA DE DIRETÓRIOS

@@ -74,7 +74,10 @@ function Setup-PKM {
 
     # Define os caminhos principais
     $Area10 = Join-Path $RootPath "10-19_KNOWLEDGE"
-    $templateSourceRoot = Join-Path $PSScriptRoot "templates/pkm"
+    $Area10 = Join-Path $RootPath "10-19_KNOWLEDGE"
+    # Updated to point to shared templates directory (../../shared/templates/pkm)
+    $scriptRootParent = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $templateSourceRoot = Join-Path $scriptRootParent "shared/templates/pkm"
 
     # ================================================
     # FASE 1: CRIAÇÃO DA ESTRUTURA DE DIRETÓRIOS

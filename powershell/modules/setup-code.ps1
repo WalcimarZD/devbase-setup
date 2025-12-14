@@ -79,7 +79,10 @@ function Setup-Code {
 
     # Define os caminhos principais
     $Area20 = Join-Path $RootPath "20-29_CODE"
-    $templateSourceRoot = Join-Path $PSScriptRoot "templates/code"
+    $Area20 = Join-Path $RootPath "20-29_CODE"
+    # Updated to point to shared templates directory (../../shared/templates/code)
+    $scriptRootParent = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $templateSourceRoot = Join-Path $scriptRootParent "shared/templates/code"
 
     # ================================================
     # FASE 1: ESTRUTURA PRINCIPAL

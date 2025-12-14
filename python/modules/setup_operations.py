@@ -55,7 +55,9 @@ def run_setup_operations(fs: FileSystem, ui: UI, policy_version: str = "3.1"):
     # ================================================
     # ../templates/operations
     current_dir = Path(__file__).resolve().parent
-    templates_root = current_dir.parent / "templates" / "operations"
+    # ../../shared/templates/operations
+    current_dir = Path(__file__).resolve().parent
+    templates_root = current_dir.parent.parent / "shared" / "templates" / "operations"
 
     process_templates(
         fs, 

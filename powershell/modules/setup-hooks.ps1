@@ -88,7 +88,9 @@ function Setup-Hooks {
 
     # Define caminhos
     $templateSubDir = "hooks"
-    $templateSourceRoot = Join-Path $PSScriptRoot "templates"
+    # Updated to point to shared templates directory (../../shared/templates)
+    $scriptRootParent = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $templateSourceRoot = Join-Path $scriptRootParent "shared/templates"
     $templatesDir = Join-Path $templateSourceRoot $templateSubDir
 
     # ================================================

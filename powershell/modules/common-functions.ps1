@@ -247,7 +247,13 @@ function Assert-NoBOM {
 
     try {
         # Lê os primeiros 3 bytes do arquivo (tamanho do BOM UTF-8)
-        $bytes = Get-Content -Path $Path -Encoding Byte -TotalCount 3 -ErrorAction SilentlyContinue
+        # Helper to support both Windows PowerShell (5.1) and PowerShell Core (6+)
+        if ($PSVersionTable.PSVersion.Major -ge 6) {
+            $bytes = Get-Content -Path $Path -AsByteStream -TotalCount 3 -ErrorAction SilentlyContinue
+        }
+        else {
+            $bytes = Get-Content -Path $Path -Encoding Byte -TotalCount 3 -ErrorAction SilentlyContinue
+        }
 
         # Verifica se os bytes são o BOM UTF-8: EF BB BF
         if ($null -ne $bytes -and $bytes.Count -eq 3 -and

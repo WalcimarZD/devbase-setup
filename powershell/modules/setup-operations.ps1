@@ -6,7 +6,7 @@
 #>
 
 function Setup-Operations {
-<#
+    <#
 .SYNOPSIS
     Sets up the operations directory structure, CLI, and automation scripts.
 .PARAMETER RootPath
@@ -15,7 +15,10 @@ function Setup-Operations {
     param([string]$RootPath)
 
     $Area30 = Join-Path $RootPath "30-39_OPERATIONS"
-    $templateSourceRoot = Join-Path $PSScriptRoot "templates/operations"
+    $Area30 = Join-Path $RootPath "30-39_OPERATIONS"
+    # Updated to point to shared templates directory (../../shared/templates/operations)
+    $scriptRootParent = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $templateSourceRoot = Join-Path $scriptRootParent "shared/templates/operations"
 
     # Main structure
     New-DirSafe -Path $Area30
@@ -67,28 +70,30 @@ function Setup-Operations {
         if (Test-Path $assetPath) {
             $toolContent = Get-Content $assetPath -Raw
             New-FileSafe -Path (Join-Path $cliPath $tool) -Content $toolContent -UpdateIfExists
-        } else {
+        }
+        else {
             # Opcional: Avisar se um asset esperado não for encontrado
             # Write-Step "Asset não encontrado: $assetPath" "WARN"
         }
     }
 
-	$libsToCopy = @(
-			"common-functions.ps1",
-			"cli-functions.ps1",
-			"detect-language.ps1"
-		)
+    $libsToCopy = @(
+        "common-functions.ps1",
+        "cli-functions.ps1",
+        "detect-language.ps1"
+    )
 
-		foreach ($lib in $libsToCopy) {
-			# Procura na mesma pasta do script (modules)
-			$srcPath = Join-Path $PSScriptRoot $lib
-			$destPath = Join-Path $cliPath $lib
+    foreach ($lib in $libsToCopy) {
+        # Procura na mesma pasta do script (modules)
+        $srcPath = Join-Path $PSScriptRoot $lib
+        $destPath = Join-Path $cliPath $lib
 
-			if (Test-Path $srcPath) {
-				Copy-Item -Path $srcPath -Destination $destPath -Force
-				Write-Step "Biblioteca instalada: $lib" "OK"
-			} else {
-				Write-Step "ERRO CRÍTICO: Biblioteca '$lib' não encontrada na origem!" "ERROR"
-			}
-		}
-	}
+        if (Test-Path $srcPath) {
+            Copy-Item -Path $srcPath -Destination $destPath -Force
+            Write-Step "Biblioteca instalada: $lib" "OK"
+        }
+        else {
+            Write-Step "ERRO CRÍTICO: Biblioteca '$lib' não encontrada na origem!" "ERROR"
+        }
+    }
+}

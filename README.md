@@ -1,5 +1,7 @@
 # 🚀 DevBase - Personal Engineering Operating System
 
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Codecov](https://img.shields.io/codecov/c/gh/WalcimarZD/devbase-setup.svg?logo=codecov)](https://codecov.io/gh/WalcimarZD/devbase-setup)
 
 <div align="center">
@@ -15,418 +17,249 @@
 ╚═══════════════════════════════════════════════════════════╝
 ```
 
-**Versão 3.2.0 (Python Edition)** | [🤝 Contribuição](CONTRIBUTING.md) | [📖 Docs](https://walcimarzd.github.io/devbase-setup/)
-
-> **📖 Documentação:** Após instalar via `devbase.py`, consulte `00-09_SYSTEM/07_documentation/USAGE-GUIDE.md` e `ARCHITECTURE.md` no seu workspace
+**Versão 3.2.0** | [📖 Docs](https://walcimarzd.github.io/devbase-setup/) | [🤝 Contribuição](CONTRIBUTING.md)
 
 </div>
 
 ---
 
-## 📋 Sumário
+## 📋 Índice
 
 - [O que é o DevBase?](#-o-que-é-o-devbase)
-- [Início Rápido](#-início-rápido)
+- [Instalação](#-instalação)
+- [Comandos](#-comandos)
 - [Estrutura do Workspace](#-estrutura-do-workspace)
-- [Comandos da CLI](#-comandos-da-cli)
-- [Configuração Avançada](#-configuração-avançada)
-- [Perguntas Frequentes](#-perguntas-frequentes)
-- [Recursos Adicionais](#-recursos-adicionais)
+- [Versão PowerShell (Legacy)](#-versão-powershell-legacy)
 
 ---
 
 ## 🎯 O que é o DevBase?
 
-O **DevBase** é um **Sistema Operacional de Engenharia Pessoal** — uma estrutura padronizada para organizar, automatizar e gerenciar todo o seu ambiente de desenvolvimento. Ele resolve problemas comuns de desenvolvedores:
+O **DevBase** é um **Sistema Operacional de Engenharia Pessoal** — uma estrutura padronizada para organizar seu ambiente de desenvolvimento usando a metodologia **Johnny.Decimal**.
 
 | Problema | Solução DevBase |
 |----------|-----------------|
-| 🗂️ Arquivos espalhados sem organização | Estrutura Johnny.Decimal para tudo |
-| 🔄 Configurações inconsistentes entre projetos | Templates padronizados e dotfiles centralizados |
-| 📝 Falta de documentação estruturada | Sistema PKM (Personal Knowledge Management) integrado |
-| 🔒 Dados sensíveis sem proteção | Air-Gap Security para vault privado |
-| ⏰ Tarefas manuais repetitivas | Automação via CLI e hooks |
-| 🤖 IA local desorganizada | Módulo dedicado para modelos e contextos |
+| 🗂️ Arquivos espalhados | Estrutura Johnny.Decimal organizada |
+| 🔄 Configurações inconsistentes | Templates padronizados |
+| 📝 Falta de documentação | Sistema PKM integrado |
+| 🔒 Dados sensíveis expostos | Vault privado com Air-Gap |
+| ⏰ Tarefas manuais repetitivas | CLI automatizada |
+| 🤖 IA local desorganizada | Módulo dedicado (Ollama) |
 
-### ✨ Características Principais
+### ✨ Características
 
-- **📁 Estrutura Johnny.Decimal**: Organização hierárquica e intuitiva de arquivos
-- **🔧 CLI Integrada**: Comandos `devbase` para todas as operações
-- **📚 PKM (Personal Knowledge Management)**: Sistema para documentação, ADRs, e notas
-- **🛡️ Segurança Air-Gap**: Vault privado nunca sincroniza com nuvem
-- **🎣 Git Hooks**: Validação automática de commits e código
-- **🤖 Módulo de IA**: Estrutura para modelos locais e contextos
-- **📊 Dashboard**: Visualização de telemetria com Chart.js
-- **💾 Backup 3-2-1**: Estratégia de backup automatizada
-- **🔀 Multi-plataforma**: Windows (PowerShell) + Linux/macOS (Python/Bash)
-- **🧩 VS Code Extension**: Integração com o editor
+- **📁 Johnny.Decimal** - Organização hierárquica de arquivos
+- **🔧 CLI Python** - Cross-platform (Windows/Linux/macOS)
+- **📚 PKM** - Personal Knowledge Management integrado
+- **🛡️ Air-Gap** - Vault privado nunca sincroniza
+- **🎣 Git Hooks** - Conventional Commits automático
+- **🤖 AI Local** - Integração com Ollama
+- **📊 Dashboard** - Visualização de telemetria
+- **🧩 VS Code Extension** - Integração com editor
 
 ---
 
-## 🚀 Início Rápido
+## 🚀 Instalação
 
-### Pré-requisitos
+### Requisitos
 
-| Requisito | Versão Mínima | Verificar |
-|-----------|---------------|-----------|
-| **PowerShell** (Windows) | 5.1+ ou Core 7+ | `$PSVersionTable.PSVersion` |
-| **Python** (Linux/macOS) | 3.8+ | `python3 --version` |
-| **Git** | 2.25+ | `git --version` |
+| Requisito | Versão | Verificar |
+|-----------|--------|-----------|
+| Python | 3.8+ | `python --version` |
+| Git | 2.9+ | `git --version` |
 
-### Instalação (Cross-Platform)
-
-#### **Opção 1: Python CLI (Recomendado - Windows/Linux/macOS)**
+### Quick Start
 
 ```bash
 # 1. Clone o repositório
-git clone https://github.com/seu-usuario/devbase-setup-v3.git
-cd devbase-setup-v3
+git clone https://github.com/WalcimarZD/devbase-setup.git
+cd devbase-setup
 
-# 2. Execute o setup
-python devbase.py
+# 2. Instale dependências (opcional, para dashboard e AI)
+pip install -r requirements.txt
 
-# 3. (Opcional) Especifique um caminho personalizado
-python devbase.py --root ~/MeuWorkspace
+# 3. Execute o setup
+python devbase.py setup
+
+# 4. Verifique a instalação
+python devbase.py doctor
 ```
 
-#### **Opção 2: PowerShell (Legacy - Windows)**
+### Instalação Customizada
 
-```powershell
-# Execute o bootstrap antigo
-.\bootstrap.ps1
+```bash
+# Especificar diretório
+python devbase.py setup --root ~/MeuWorkspace
+
+# Modo dry-run (apenas mostra o que faria)
+python devbase.py setup --dry-run
+
+# Forçar atualização de todos os templates
+python devbase.py setup --force
 ```
 
-### Verificação da Instalação
+### Shell Completions
 
-```powershell
-# Navegue até o workspace criado
-cd ~/Dev_Workspace
+```bash
+# Bash (adicione ao ~/.bashrc)
+eval "$(python completions/devbase_complete.py bash)"
 
-# Execute o diagnóstico de saúde
-.\30-39_OPERATIONS\35_devbase_cli\devbase.ps1 doctor
+# Zsh (adicione ao ~/.zshrc)
+source <(python completions/devbase_complete.py zsh)
+
+# Fish
+python completions/devbase_complete.py fish > ~/.config/fish/completions/devbase.fish
+
+# PowerShell (adicione ao $PROFILE)
+python completions/devbase_complete.py powershell >> $PROFILE
 ```
 
-Se tudo estiver correto, você verá:
-```
-DevBase está SAUDÁVEL
+---
+
+## 🖥️ Comandos
+
+### Gestão do Workspace
+
+| Comando | Descrição |
+|---------|-----------|
+| `setup` | Inicializa/atualiza workspace |
+| `doctor` | Verifica integridade |
+| `audit` | Audita nomenclatura (kebab-case) |
+| `hydrate` | Atualiza templates |
+| `new <nome>` | Cria projeto do template |
+| `clean` | Remove arquivos temporários |
+| `backup` | Executa backup 3-2-1 |
+
+### Telemetria
+
+| Comando | Descrição |
+|---------|-----------|
+| `track -m "msg"` | Registra atividade |
+| `stats` | Mostra estatísticas |
+| `weekly` | Gera relatório semanal |
+| `dashboard` | Abre dashboard web |
+
+### AI Local (requer Ollama)
+
+| Comando | Descrição |
+|---------|-----------|
+| `ai chat` | Chat interativo |
+| `ai summarize <file>` | Resume documento |
+| `ai explain <topic>` | Explica conceito |
+| `ai adr <decision>` | Gera ADR |
+| `ai til <topic>` | Gera TIL |
+
+### Exemplos
+
+```bash
+# Fluxo típico de trabalho
+python devbase.py doctor              # Verificar saúde
+python devbase.py new meu-projeto     # Criar projeto
+python devbase.py track -m "Feature X implementada"
+python devbase.py weekly              # Relatório semanal
+python devbase.py backup              # Backup
 ```
 
 ---
 
 ## 📂 Estrutura do Workspace
 
-O DevBase usa a metodologia **Johnny.Decimal** para organização. Cada área tem um propósito específico:
-
 ```
 Dev_Workspace/
 │
-├── 📁 00-09_SYSTEM/              # ⚙️ Configurações do sistema
-│   ├── 00_inbox/                 # Entrada temporária de arquivos
-│   ├── 01_dotfiles/              # Seus arquivos de configuração
-│   │   └── links/                # Dotfiles a sincronizar com $HOME
+├── 📁 00-09_SYSTEM/              # ⚙️ Sistema
+│   ├── 00_inbox/                 # Entrada temporária
+│   ├── 01_dotfiles/              # Configurações
 │   ├── 05_templates/             # Templates técnicos
-│   └── 06_git_hooks/             # Git hooks do workspace
+│   └── 06_git_hooks/             # Git hooks
 │
-├── 📁 10-19_KNOWLEDGE/           # 📚 Conhecimento e documentação
-│   ├── 11_public_garden/         # Notas públicas, blog, TIL
-│   │   ├── posts/                # Posts de blog
-│   │   ├── notes/                # Notas avulsas
-│   │   └── til/                  # Today I Learned
-│   ├── 12_private_vault/         # 🔒 VAULT PRIVADO (Air-Gap)
-│   │   ├── journal/              # Diário pessoal
-│   │   ├── finances/             # Dados financeiros
-│   │   ├── credentials/          # Credenciais (não sincronizar!)
-│   │   └── brag-docs/            # Conquistas profissionais
-│   ├── 15_references/            # Referências e padrões
-│   │   ├── patterns/             # Padrões técnicos (SQL, Git)
-│   │   ├── checklists/           # Checklists reutilizáveis
-│   │   └── papers/               # Papers e artigos
-│   └── 18_adr-decisions/         # Architectural Decision Records
+├── 📁 10-19_KNOWLEDGE/           # 📚 Conhecimento
+│   ├── 11_public_garden/         # Notas públicas, TIL
+│   ├── 12_private_vault/         # 🔒 VAULT PRIVADO
+│   ├── 15_references/            # Referências técnicas
+│   └── 18_adr-decisions/         # ADRs
 │
-├── 📁 20-29_CODE/                # 💻 Código fonte
-│   ├── 21_monorepo_apps/         # Aplicações principais
-│   ├── 22_monorepo_packages/     # Bibliotecas compartilhadas
-│   │   ├── shared-types/         # Tipos TypeScript compartilhados
-│   │   └── shared-utils/         # Utilitários comuns
-│   ├── 23_worktrees/             # Git worktrees
-│   └── __template-clean-arch/    # 📐 Template Clean Architecture
+├── 📁 20-29_CODE/                # 💻 Código
+│   ├── 21_monorepo_apps/         # Aplicações
+│   ├── 22_monorepo_packages/     # Bibliotecas
+│   └── 23_worktrees/             # Git worktrees
 │
-├── 📁 30-39_OPERATIONS/          # 🔧 Operações e automação
-│   ├── 30_ai/                    # 🤖 Módulo de IA local
-│   │   ├── 31_ai_local/          # Runtime e logs
-│   │   ├── 32_ai_models/         # Modelos e benchmarks
-│   │   └── 33_ai_config/         # Configurações e segurança
-│   ├── 31_backups/               # Backups (local + cloud)
-│   ├── 32_automation/            # Scripts de automação
-│   ├── 33_monitoring/            # Telemetria pessoal
-│   ├── 34_credentials/           # Credenciais de ops (cuidado!)
-│   └── 35_devbase_cli/           # 🖥️ CLI do DevBase
+├── 📁 30-39_OPERATIONS/          # 🔧 Operações
+│   ├── 30_ai/                    # 🤖 IA local
+│   ├── 31_backups/               # Backups
+│   └── 32_automation/            # Scripts
 │
-├── 📁 40-49_MEDIA_ASSETS/        # 🎨 Mídia e assets
-│   ├── 41_raw_images/            # Imagens brutas
-│   ├── 42_videos_render/         # Vídeos e renderizações
-│   └── 43_exports/               # Exportações finais
+├── 📁 40-49_MEDIA_ASSETS/        # 🎨 Mídia
 │
-└── 📁 90-99_ARCHIVE_COLD/        # ❄️ Arquivo frio
-    ├── 91_archived_projects/     # Projetos arquivados
-    └── 92_archived_data/         # Dados arquivados
+└── 📁 90-99_ARCHIVE_COLD/        # ❄️ Arquivo
 ```
 
 ### 🔒 Segurança Air-Gap
 
-A pasta `12_private_vault` **NUNCA** deve ser sincronizada com serviços de nuvem:
-
-| Pasta | Sync Cloud? | Git? | Descrição |
-|-------|:-----------:|:----:|-----------|
-| `11_public_garden` | ✅ | ✅ | Conteúdo público |
-| `12_private_vault` | ❌ | ❌ | **NUNCA SINCRONIZAR** |
-| `15_references` | ✅ | ✅ | Referências técnicas |
-| `18_adr-decisions` | ✅ | ✅ | Decisões arquiteturais |
+| Pasta | Sync Cloud? | Git? |
+|-------|:-----------:|:----:|
+| `11_public_garden` | ✅ | ✅ |
+| `12_private_vault` | ❌ | ❌ |
+| `15_references` | ✅ | ✅ |
 
 ---
 
-## 🖥️ Comandos da CLI
+## 🔷 Versão PowerShell (Legacy)
 
-A CLI do DevBase (`devbase.ps1`) oferece comandos para gerenciar seu workspace:
-
-### Comandos de Gestão
+> **Nota**: A versão PowerShell é mantida para compatibilidade. Novos recursos são desenvolvidos apenas na versão Python.
 
 ```powershell
-# Verificar saúde do workspace
-devbase doctor
-
-# Auditar nomenclatura (kebab-case)
-devbase audit
-
-# Corrigir nomenclatura automaticamente
-devbase audit -Fix
-
-# Atualizar todos os templates
-devbase hydrate
-
-# Forçar atualização de templates
-devbase hydrate -Force
-
-# Criar novo projeto usando template Clean Architecture
-devbase new -Name "meu-projeto"
-
-# Sincronizar dotfiles para $HOME
-devbase link-dotfiles
-
-# Executar backup 3-2-1
-devbase backup
-
-# Limpar arquivos temporários
-devbase clean
-```
-
-### Comandos de Telemetria (v3.2)
-
-```powershell
-# Registrar uma atividade
-devbase track -Message "Implementei feature X"
-
-# Ver estatísticas de uso
-devbase stats
-
-# Gerar relatório semanal
-devbase weekly
-
-# Gerar relatório semanal em arquivo
-devbase weekly -Output ./weeknotes.md
-
-# Gerar Brag Document (conquistas)
-devbase brag -Output ./brag-2024.md
-```
-
-### Exemplos Práticos
-
-```powershell
-# === Fluxo de trabalho típico ===
-
-# 1. Verificar se o workspace está saudável
-devbase doctor
-
-# 2. Criar um novo projeto
-devbase new -Name "api-usuarios"
-
-# 3. Trabalhar no projeto...
-# 4. Ao final do dia, registrar o que foi feito
-devbase track -Message "Finalizei autenticação OAuth2"
-
-# 5. Ao final da semana, gerar relatório
-devbase weekly -Output ~/weeknotes/semana-49.md
-
-# 6. Fazer backup
-devbase backup
-```
-
----
-
-## ⚙️ Configuração Avançada
-
-### Parâmetros da CLI Python
-
-```bash
-python devbase.py [parâmetros]
-```
-
-| Parâmetro | Descrição | Valor Padrão |
-|-----------|-----------|--------------|
-| `--root` | Diretório raiz do workspace | `~/Dev_Workspace` |
-| `--force` | Sobrescreve todos os templates | `False` |
-| `--no-color` | Desabilita cores no output | `False` |
-
-### Parâmetros do Bootstrap (Legacy PowerShell)
-
-```powershell
-.\bootstrap.ps1 [parâmetros]
-```
-
-| Parâmetro | Descrição | Valor Padrão |
-|-----------|-----------|--------------|
-| `-RootPath` | Diretório raiz do workspace | `$HOME\Dev_Workspace` |
-| `-SkipStorageValidation` | Pula verificação de SSD/NVMe | `$false` |
-| `-Force` | Sobrescreve todos os templates | `$false` |
-| `-SkipHooks` | Não instala git hooks | `$false` |
-
-### Exemplos de Instalação
-
-```powershell
-# Instalação básica (padrão)
+# Instalação PowerShell
 .\bootstrap.ps1
 
-# Instalação em disco específico
-.\bootstrap.ps1 -RootPath "D:\DevBase"
-
-# Instalação forçada (atualiza tudo)
-.\bootstrap.ps1 -Force
-
-# Instalação sem hooks (ex: em VM)
-.\bootstrap.ps1 -SkipHooks
-
-# Combinação de parâmetros
-.\bootstrap.ps1 -RootPath "E:\Work" -Force -SkipStorageValidation
+# Com parâmetros
+.\bootstrap.ps1 -RootPath "D:\DevBase" -Force
 ```
 
-### Arquivo de Estado
-
-O arquivo `.devbase_state.json` na raiz do workspace rastreia:
-- Versão instalada
-- Data de instalação
-- Histórico de migrações
-- Módulos instalados
-
-```json
-{
-  "version": "3.1.0",
-  "policyVersion": "3.1",
-  "installedAt": "2024-01-15T10:30:00Z",
-  "lastUpdate": "2024-12-07T14:25:00Z",
-  "migrations": ["v3.0.0-20240115", "v3.1.0-20241207"],
-  "modules": ["setup-core.ps1", "setup-pkm.ps1", "..."]
-}
-```
+Para documentação completa do PowerShell, veja [powershell/README.md](powershell/README.md).
 
 ---
 
-## ❓ Perguntas Frequentes
+## 📚 Módulos
 
-### **P: Posso usar o DevBase em mais de uma máquina?**
-
-**R:** Sim! A estrutura é portável. Recomendamos:
-1. Sincronize tudo **exceto** `12_private_vault` via Git ou cloud storage
-2. Mantenha credenciais no vault local de cada máquina
-3. Use `devbase hydrate` após clonar para atualizar templates
-
-### **P: Como faço backup do vault privado?**
-
-**R:** Use backup local criptografado:
-```powershell
-# Exemplo com 7-Zip
-7z a -p -mhe=on vault-backup.7z ".\12_private_vault"
-```
-
-### **P: Como adicionar meus dotfiles?**
-
-**R:**
-1. Copie seus dotfiles para `00-09_SYSTEM/01_dotfiles/links/`
-2. Execute `devbase link-dotfiles`
-3. O DevBase criará symlinks em `$HOME`
-
-### **P: O que acontece se eu rodar `bootstrap.ps1` novamente?**
-
-**R:** O script é **idempotente**:
-- Não sobrescreve arquivos existentes (exceto com `-Force`)
-- Cria apenas o que está faltando
-- Atualiza o arquivo de estado
-
-### **P: Como atualizar para uma nova versão do DevBase?**
-
-**R:**
-```powershell
-# 1. No diretório do repositório DevBase
-git pull origin main
-
-# 2. No seu workspace
-.\bootstrap.ps1 -Force
-```
-
-### **P: Posso personalizar os templates?**
-
-**R:** Sim! Os templates estão em `modules/templates/`. Modifique-os e rode:
-```powershell
-devbase hydrate -Force
-```
+| Módulo | Descrição |
+|--------|-----------|
+| `setup_core.py` | Estrutura base e governança |
+| `setup_pkm.py` | Knowledge Management |
+| `setup_code.py` | Templates de código |
+| `setup_operations.py` | CLI e automação |
+| `setup_ai.py` | Módulo de IA |
+| `setup_hooks.py` | Git hooks |
+| `setup_templates.py` | Templates técnicos |
+| `detect_language.py` | Detecção de stack |
 
 ---
 
-## 📚 Recursos Adicionais
+## ❓ FAQ
 
-### Documentação Completa
+**P: Posso usar em múltiplas máquinas?**
+R: Sim! Sincronize via Git (exceto `12_private_vault`).
 
-**Após instalar o DevBase**, a documentação estará disponível em seu workspace:
+**P: Como atualizar?**
+R: `git pull && python devbase.py setup --force`
 
-```
-Dev_Workspace/00-09_SYSTEM/07_documentation/
-├── ARCHITECTURE.md        # 🏗️ Arquitetura interna do DevBase
-└── USAGE-GUIDE.md         # 📖 Guia de uso completo
-```
-
-Referências técnicas também incluídas:
-
-| Documento | Localização | Descrição |
-|-----------|-------------|-----------|
-| Clean Architecture Template | `modules/templates/code/__template-clean-arch/README.md.template` | Como usar o template de projeto |
-| Padrões Git | `modules/templates/patterns/git-patterns.md.template` | Conventional Commits, branching, etc. |
-| ADR Template | `modules/templates/pkm/18_adr-decisions/template-madr.md.template` | Como documentar decisões |
-
-### Estrutura dos Módulos
-
-| Módulo | Arquivo Python | Arquivo Legacy | Responsabilidade |
-|--------|----------------|----------------|------------------|
-| Core | `setup_core.py` | `setup-core.ps1` | Estrutura base e governança |
-| PKM | `setup_pkm.py` | `setup-pkm.ps1` | Knowledge Management |
-| Code | `setup_code.py` | `setup-code.ps1` | Templates de código |
-| Operations | `setup_operations.py` | `setup-operations.ps1` | CLI e automação |
-| AI | `setup_ai.py` | `setup-ai.ps1` | Módulo de IA local |
+**P: Como backup do vault privado?**
+R: Use backup local criptografado (7z, VeraCrypt).
 
 ---
 
 ## 🤝 Contribuição
 
-Contribuições são bem-vindas! Veja [CONTRIBUTING.md](CONTRIBUTING.md) para guidelines.
+Contribuições são bem-vindas! Veja [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 📄 Licença
 
-MIT License - veja [LICENSE](LICENSE) para detalhes.
+MIT License - veja [LICENSE](LICENSE).
 
 ---
 
 <div align="center">
 
 **DevBase** - Seu sistema operacional de engenharia pessoal 🚀
-
-[⬆️ Voltar ao topo](#-devbase---personal-engineering-operating-system)
 
 </div>

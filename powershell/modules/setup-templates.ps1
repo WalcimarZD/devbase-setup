@@ -6,7 +6,7 @@
 #>
 
 function Setup-Templates {
-<#
+    <#
 .SYNOPSIS
     Sets up the technical standards and templates directory.
 .PARAMETER RootPath
@@ -16,7 +16,9 @@ function Setup-Templates {
 
     $SystemArea = Join-Path $RootPath "00-09_SYSTEM"
     $TemplatesDestDir = Join-Path $SystemArea "05_templates"
-    $templateSourceRoot = Join-Path $PSScriptRoot "templates"
+    # Updated to point to shared templates directory (../../shared/templates)
+    $scriptRootParent = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $templateSourceRoot = Join-Path $scriptRootParent "shared/templates"
 
     # Main folder structure
     New-DirSafe -Path $TemplatesDestDir
@@ -26,7 +28,7 @@ function Setup-Templates {
 
     # === TEMPLATE PUBLISHING LOGIC ===
 
-   $templateSubDirs = @("patterns", "prompts", "core", "ci")
+    $templateSubDirs = @("patterns", "prompts", "core", "ci")
 
     foreach ($subDir in $templateSubDirs) {
         $subDirSource = Join-Path $templateSourceRoot $subDir

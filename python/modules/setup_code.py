@@ -49,9 +49,9 @@ def run_setup_code(fs: FileSystem, ui: UI, policy_version: str = "3.1"):
     # ================================================
     # FASE 2: PUBLICAÇÃO DE TEMPLATES
     # ================================================
-    # ../templates/code
+    # ../../shared/templates/code
     current_dir = Path(__file__).resolve().parent
-    templates_root = current_dir.parent / "templates" / "code"
+    templates_root = current_dir.parent.parent / "shared" / "templates" / "code"
 
     # Processa templates jogando dentro de 20-29_CODE (preservando estrutura interna do template)
     # Nota: No PS1, o destino era calculado relativo a Area20.

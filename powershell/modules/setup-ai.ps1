@@ -93,7 +93,10 @@ function Setup-AI {
     # Define caminhos principais
     $Area30 = Join-Path $RootPath "30-39_OPERATIONS"
     $AiRoot = Join-Path $Area30 "30_ai"
-    $templateSourceRoot = Join-Path $PSScriptRoot "templates/ai"
+    $AiRoot = Join-Path $Area30 "30_ai"
+    # Updated to point to shared templates directory (../../shared/templates/ai)
+    $scriptRootParent = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $templateSourceRoot = Join-Path $scriptRootParent "shared/templates/ai"
 
     # ================================================
     # FASE 1: ESTRUTURA DE DIRETÓRIOS

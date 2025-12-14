@@ -61,9 +61,9 @@ def run_setup_ai(fs: FileSystem, ui: UI, policy_version: str = "3.1"):
     # ================================================
     # FASE 2: PUBLICAÇÃO DE TEMPLATES
     # ================================================
-    # ../templates/ai
+    # ../../shared/templates/ai
     current_dir = Path(__file__).resolve().parent
-    templates_root = current_dir.parent / "templates" / "ai"
+    templates_root = current_dir.parent.parent / "shared" / "templates" / "ai"
 
     # Processa templates jogando dentro de 30_ai
     # Nota: O template_root mapeia para dentro de 30_ai
