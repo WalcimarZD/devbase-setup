@@ -128,6 +128,26 @@ def get_common_parser():
 
 def cmd_setup(args, ui: UI, root: Path):
     """Comando: setup - Inicializa/atualiza estrutura DevBase."""
+    
+    # Handle interactive wizard mode
+    if getattr(args, 'interactive', False):
+        try:
+            from wizard import run_wizard, apply_wizard_config
+            config = run_wizard()
+            if config is None:
+                print("Setup cancelled.")
+                return
+            apply_wizard_config(config, args)
+            # Update root if changed by wizard
+            if config.get("root"):
+                root = config["root"]
+        except ImportError:
+            ui.print_step("Wizard requires 'questionary'. Installing...", "WARN")
+            import subprocess
+            subprocess.run([sys.executable, "-m", "pip", "install", "questionary", "rich"], check=True)
+            ui.print_step("Please run 'devbase setup --interactive' again", "INFO")
+            return
+    
     ui.print_banner(SCRIPT_VERSION)
     
     fs = FileSystem(str(root), dry_run=getattr(args, 'dry_run', False))
@@ -138,6 +158,7 @@ def cmd_setup(args, ui: UI, root: Path):
     print(f"Mode: {'FORCE' if args.force else 'Normal'}")
     if args.dry_run:
         print("Mode: DRY-RUN (no changes will be made)")
+
 
     # Validações iniciais
     ui.print_header("Initial Validations")
@@ -879,6 +900,28 @@ def cmd_ai(args, ui: UI, root: Path):
             readme_file.write_text(response, encoding="utf-8")
             ui.print_step(f"Saved to: {readme_file}", "OK")
 
+
+def cmd_onboarding(args, ui: UI, root: Path):
+    """Comando: onboarding - Mostra checklist de onboarding."""
+    from onboarding import OnboardingTracker
+    
+    tracker = OnboardingTracker(root)
+    
+    # Handle --complete flag
+    if getattr(args, 'complete', None):
+        tracker.complete(args.complete)
+        ui.print_step(f"Marked '{args.complete}' as complete", "OK")
+    
+    # Handle --reset flag
+    if getattr(args, 'reset', False):
+        tracker.state = {"completed": [], "started_at": None, "last_updated": None}
+        tracker._save()
+        ui.print_step("Onboarding progress reset", "OK")
+    
+    # Show checklist
+    tracker.show_checklist()
+
+
 def main():
     """Entry point principal."""
     common = get_common_parser()
@@ -904,6 +947,8 @@ VERSION: """ + SCRIPT_VERSION
         help="Initialize or update DevBase structure")
     sp_setup.add_argument("--force", action="store_true",
         help="Force overwrite of existing templates")
+    sp_setup.add_argument("--interactive", "-i", action="store_true",
+        help="Run interactive setup wizard")
 
     # === DOCTOR ===
     subparsers.add_parser("doctor", parents=[common],
@@ -982,6 +1027,14 @@ VERSION: """ + SCRIPT_VERSION
     sp_ai.add_argument("--save", "-s", action="store_true",
         help="Save generated output to file")
 
+    # === ONBOARDING ===
+    sp_onboarding = subparsers.add_parser("onboarding", parents=[common],
+        help="Show onboarding progress checklist")
+    sp_onboarding.add_argument("--complete", "-c",
+        help="Mark an item as complete by ID")
+    sp_onboarding.add_argument("--reset", action="store_true",
+        help="Reset onboarding progress")
+
 
     # Enable shell autocompletion if argcomplete is installed
     if HAS_ARGCOMPLETE:
@@ -1021,6 +1074,7 @@ VERSION: """ + SCRIPT_VERSION
         "weekly": cmd_weekly,
         "dashboard": cmd_dashboard,
         "ai": cmd_ai,
+        "onboarding": cmd_onboarding,
     }
 
 
