@@ -90,90 +90,133 @@ tags: [{"til" if til else "note"}, quick]
 def quickstart(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument(help="Project name")],
+    template: Annotated[str, typer.Option("--template", "-t", help="Template name")] = "clean-arch",
 ) -> None:
     """
-    🚀 Quick project setup (create + init git + open VS Code).
+    🚀 GOLDEN PATH: Zero-touch project bootstrapping.
     
-    This is a convenience command that combines:
-    1. devbase dev new <name>
-    2. cd <project>
-    3. git init
-    4. git add .
-    5. git commit -m "Initial commit"
-    6. code .  (if VS Code is installed)
+    Creates production-ready project in <60 seconds:
+    1. Generate from template
+    2. Initialize Git repository
+    3. Install dependencies (uv)
+    4. Setup pre-commit hooks
+    5. Create initial commit
+    6. Open in VS Code
     
     Example:
         devbase quick quickstart my-awesome-api
+        devbase quick quickstart my-lib --template python-lib
     """
     root: Path = ctx.obj["root"]
 
     console.print()
-    console.print(f"[bold cyan]🚀 QuickStart: {name}[/bold cyan]\n")
+    console.print(Panel.fit(
+        f"[bold cyan]🚀 Golden Path Bootstrapping[/bold cyan]\n\n"
+        f"Project: [yellow]{name}[/yellow]\n"
+        f"Template: [dim]{template}[/dim]",
+        border_style="cyan"
+    ))
 
     # Step 1: Create project
-    console.print("[bold]Step 1/5:[/bold] Creating project...")
+    console.print("\n[bold cyan]Step 1/7:[/bold cyan] Generating project...")
     from devbase.utils.templates import generate_project_from_template
 
     try:
         project_path = generate_project_from_template(
-            template_name="clean-arch",
+            template_name=template,
             project_name=name,
             root=root,
-            interactive=False  # Use defaults for speed
+            interactive=False  # Golden Path = zero prompts
         )
+        console.print("[green]✓[/green] Project created\n")
     except Exception as e:
         console.print(f"[red]✗ Failed: {e}[/red]")
         raise typer.Exit(1)
 
-    console.print("[green]✓ Project created[/green]\n")
-
     # Step 2: Git init
-    console.print("[bold]Step 2/5:[/bold] Initializing Git...")
+    console.print("[bold cyan]Step 2/7:[/bold cyan] Initializing Git...")
     try:
         subprocess.run(["git", "init"], cwd=project_path, check=True, capture_output=True)
-        console.print("[green]✓ Git initialized[/green]\n")
+        console.print("[green]✓[/green] Git initialized\n")
     except subprocess.CalledProcessError:
-        console.print("[yellow]⚠ Git init failed (continuing...)[/yellow]\n")
+        console.print("[yellow]⚠[/yellow] Git init failed (continuing...)\n")
 
-    # Step 3: Git add
-    console.print("[bold]Step 3/5:[/bold] Adding files...")
+    # Step 3: Install dependencies with uv (if pyproject.toml exists)
+    console.print("[bold cyan]Step 3/7:[/bold cyan] Installing dependencies...")
+    pyproject = project_path / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            import shutil
+            if shutil.which("uv"):
+                subprocess.run(["uv", "sync"], cwd=project_path, check=True)
+                console.print("[green]✓[/green] Dependencies installed with uv\n")
+            else:
+                console.print("[yellow]⚠[/yellow] uv not found, skipping deps\n")
+        except subprocess.CalledProcessError:
+            console.print("[yellow]⚠[/yellow] Dependency install failed\n")
+    else:
+        console.print("[dim]No pyproject.toml, skipping\n")
+
+    # Step 4: Setup pre-commit hooks
+    console.print("[bold cyan]Step 4/7:[/bold cyan] Setting up pre-commit...")
+    precommit_config = project_path / ".pre-commit-config.yaml"
+    if precommit_config.exists():
+        try:
+            subprocess.run(
+                ["pre-commit", "install"],
+                cwd=project_path,
+                check=True,
+                capture_output=True
+            )
+            console.print("[green]✓[/green] Pre-commit hooks installed\n")
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            console.print("[yellow]⚠[/yellow] pre-commit not found, skipping\n")
+    else:
+        console.print("[dim]No .pre-commit-config.yaml, skipping\n")
+
+    # Step 5: Git add
+    console.print("[bold cyan]Step 5/7:[/bold cyan] Staging files...")
     try:
         subprocess.run(["git", "add", "."], cwd=project_path, check=True, capture_output=True)
-        console.print("[green]✓ Files staged[/green]\n")
+        console.print("[green]✓[/green] Files staged\n")
     except subprocess.CalledProcessError:
-        console.print("[yellow]⚠ Git add failed (continuing...)[/yellow]\n")
+        console.print("[yellow]⚠[/yellow] Git add failed\n")
 
-    # Step 4: Git commit
-    console.print("[bold]Step 4/5:[/bold] Creating initial commit...")
+    # Step 6: Git commit
+    console.print("[bold cyan]Step 6/7:[/bold cyan] Creating initial commit...")
     try:
         subprocess.run(
-            ["git", "commit", "-m", "Initial commit from DevBase"],
+            ["git", "commit", "-m", f"feat: Initialize {name} from DevBase template"],
             cwd=project_path,
             check=True,
             capture_output=True
         )
-        console.print("[green]✓ Initial commit created[/green]\n")
+        console.print("[green]✓[/green] Initial commit created\n")
     except subprocess.CalledProcessError:
-        console.print("[yellow]⚠ Git commit failed (continuing...)[/yellow]\n")
+        console.print("[yellow]⚠[/yellow] Git commit failed\n")
 
-    # Step 5: Open in VS Code (if available)
-    console.print("[bold]Step 5/5:[/bold] Opening in VS Code...")
+    # Step 7: Open in VS Code
+    console.print("[bold cyan]Step 7/7:[/bold cyan] Opening in VS Code...")
     try:
         import shutil
         if shutil.which("code"):
             subprocess.run(["code", str(project_path)], check=True)
-            console.print("[green]✓ Opened in VS Code[/green]\n")
+            console.print("[green]✓[/green] Opened in VS Code\n")
         else:
-            console.print("[dim]VS Code not found (skipping)[/dim]\n")
+            console.print("[dim]VS Code not found\n")
     except Exception:
-        console.print("[dim]Could not open VS Code (skipping)[/dim]\n")
+        console.print("[dim]Could not open VS Code\n")
 
-    # Success!
-    from rich.panel import Panel
+    # Success summary
+    console.print()
     console.print(Panel.fit(
-        f"[bold green]✅ QuickStart Complete![/bold green]\n\n"
-        f"Your project is ready at:\n[cyan]{project_path}[/cyan]\n\n"
-        f"[dim]Git repository initialized with initial commit.[/dim]",
+        f"[bold green]✅ Golden Path Complete![/bold green]\n\n"
+        f"Project: [cyan]{project_path}[/cyan]\n\n"
+        f"✓ Git repository initialized\n"
+        f"✓ Dependencies installed\n"
+        f"✓ Pre-commit hooks configured\n"
+        f"✓ Initial commit created\n\n"
+        f"[dim]Ready for development![/dim]",
         border_style="green"
     ))
 

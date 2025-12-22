@@ -42,6 +42,7 @@ platform = [
 viz = [
     # Knowledge graph visualization
     "pyvis>=0.3.2",
+    "duckdb>=0.10.0",
 ]
 
 [project.scripts]

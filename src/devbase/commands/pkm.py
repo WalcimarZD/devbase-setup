@@ -4,6 +4,7 @@ PKM (Personal Knowledge Management) Commands
 Commands for knowledge graph navigation and analysis.
 """
 from pathlib import Path
+from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -12,6 +13,78 @@ from typing_extensions import Annotated
 
 app = typer.Typer(help="Personal Knowledge Management commands")
 console = Console()
+
+
+@app.command()
+def find(
+    ctx: typer.Context,
+    query: Annotated[Optional[str], typer.Argument(help="Search query")] = None,
+    tag: Annotated[Optional[List[str]], typer.Option("--tag", "-t", help="Filter by tag(s)")] = None,
+    note_type: Annotated[Optional[str], typer.Option("--type", help="Filter by note type")] = None,
+    reindex: Annotated[bool, typer.Option("--reindex", help="Rebuild database before searching")] = False,
+) -> None:
+    """
+    🔍 Fast search across knowledge base (SQLite-powered).
+    
+    Searches notes by title, content, tags, and type.
+    First run will index all notes (~5 sec for 1000 notes).
+    
+    Examples:
+        devbase pkm find python
+        devbase pkm find --tag git --tag cli
+        devbase pkm find --type til
+        devbase pkm find typer --tag python
+    """
+    import sys
+
+    root: Path = ctx.obj["root"]
+    sys.path.insert(0, str(root.parent / "devbase-setup" / "modules" / "python"))
+    
+    from knowledge.database import KnowledgeDB
+    
+    db = KnowledgeDB(root)
+    db.connect()
+    
+    # Index if database is empty or reindex requested
+    if reindex or not db.get_stats()["total_notes"]:
+        console.print("[bold]Indexing knowledge base...[/bold]")
+        with console.status("[green]Scanning files..."):
+            stats = db.index_workspace()
+        
+        console.print(f"[green]✓[/green] Indexed {stats['indexed']} notes")
+        if stats['errors'] > 0:
+            console.print(f"[yellow]⚠[/yellow] {stats['errors']} errors")
+        console.print()
+    
+    # Search
+    results = db.search(query=query, tags=tag, note_type=note_type, limit=50)
+    
+    if not results:
+        console.print("[yellow]No results found[/yellow]")
+        db.close()
+        return
+    
+    console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
+    
+    for result in results:
+        console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
+        console.print(f"  [dim]{result['path']}[/dim]")
+        
+        if result['type']:
+            console.print(f"  Type: [yellow]{result['type']}[/yellow]", end="")
+        if result['word_count']:
+            console.print(f"  | Words: {result['word_count']}", end="")
+        
+        console.print()  # Newline
+        
+        # Preview
+        if result['content_preview']:
+            preview = result['content_preview'][:150].replace("\n", " ")
+            console.print(f"  [dim]{preview}...[/dim]")
+        
+        console.print()
+    
+    db.close()
 
 
 @app.command()

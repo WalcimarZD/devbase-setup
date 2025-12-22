@@ -157,23 +157,33 @@ def setup(
 
 
 @app.command()
-def doctor(ctx: typer.Context) -> None:
+def doctor(
+    ctx: typer.Context,
+    fix: Annotated[bool, typer.Option("--fix", "-f", help="Auto-fix issues without prompting")] = False,
+) -> None:
     """
-    🏥 Check workspace health and integrity.
+    🏥 Check workspace health and offer fixes.
     
-    Verifies:
-    - Johnny.Decimal folder structure
-    - Governance files (.gitignore, .editorconfig)
-    - Air-Gap protection for private vault
-    - State file validity
+    Verifies workspace integrity and offers to fix issues interactively.
+    Use --fix to auto-fix all issues without prompting.
     """
+    from rich.prompt import Confirm
+    
     root: Path = ctx.obj["root"]
 
     console.print()
     console.print("[bold]DevBase Health Check[/bold]")
-    console.print(f"Workspace: [cyan]{root}[/cyan]\n")
+    console.print(f"[dim]Workspace: {root}[/dim]\n")
 
-    issues = 0
+    # Collect issues with fix actions
+    issues = []
+    
+    def add_issue(description: str, fix_action=None, fix_description: str = None):
+        issues.append({
+            "description": description,
+            "fix_action": fix_action,
+            "fix_description": fix_description or "Auto-fix available"
+        })
 
     # Check areas
     console.print("[bold]Checking folder structure...[/bold]")
@@ -187,12 +197,16 @@ def doctor(ctx: typer.Context) -> None:
     ]
 
     for area in required_areas:
-        path = root / area
-        if path.exists():
+        area_path = root / area
+        if area_path.exists():
             console.print(f"  [green]✓[/green] {area}")
         else:
-            console.print(f"  [red]✗[/red] {area} - NOT FOUND")
-            issues += 1
+            console.print(f"  [red]✗[/red] {area} [dim]- NOT FOUND[/dim]")
+            add_issue(
+                f"Missing folder: {area}",
+                fix_action=lambda p=area_path: p.mkdir(parents=True, exist_ok=True),
+                fix_description=f"Create {area}"
+            )
 
     # Check governance files
     console.print("\n[bold]Checking governance files...[/bold]")
@@ -204,12 +218,18 @@ def doctor(ctx: typer.Context) -> None:
     ]
 
     for file in required_files:
-        path = root / file
-        if path.exists():
+        file_path = root / file
+        if file_path.exists():
             console.print(f"  [green]✓[/green] {file}")
         else:
-            console.print(f"  [yellow]⚠[/yellow] {file} - NOT FOUND")
-            issues += 1
+            console.print(f"  [yellow]⚠[/yellow] {file} [dim]- NOT FOUND[/dim]")
+            # Some files can be auto-created
+            if file == '.editorconfig':
+                add_issue(
+                    f"Missing: {file}",
+                    fix_action=lambda p=file_path: p.write_text("root = true\n\n[*]\nindent_style = space\nindent_size = 4\n"),
+                    fix_description="Create default .editorconfig"
+                )
 
     # Check Air-Gap
     console.print("\n[bold]Checking Air-Gap protection...[/bold]")
@@ -223,7 +243,13 @@ def doctor(ctx: typer.Context) -> None:
                 console.print("  [green]✓[/green] Private Vault is protected")
             else:
                 console.print("  [red]✗[/red] Private Vault NOT in .gitignore!")
-                issues += 1
+                add_issue(
+                    "Private Vault exposed to Git",
+                    fix_action=lambda: gitignore.write_text(content + "\n# Private vault (security)\n12_private_vault/\n"),
+                    fix_description="Add 12_private_vault to .gitignore"
+                )
+        else:
+            console.print("  [yellow]⚠[/yellow] No .gitignore found")
 
     # Check state file
     console.print("\n[bold]Checking state file...[/bold]")
@@ -235,8 +261,12 @@ def doctor(ctx: typer.Context) -> None:
             console.print(f"  [green]✓[/green] Version: {state['version']}")
             console.print(f"  [dim]  Installed: {state.get('installedAt', 'Unknown')}[/dim]")
         except Exception as e:
-            console.print(f"  [red]✗[/red] State file corrupted: {e}")
-            issues += 1
+            console.print(f"  [red]✗[/red] State file corrupted")
+            add_issue(
+                "Corrupted state file",
+                fix_action=lambda: state_path.unlink() if state_path.exists() else None,
+                fix_description="Reset state file (will be recreated on next setup)"
+            )
     else:
         console.print("  [yellow]⚠[/yellow] State file not found")
 
@@ -244,16 +274,55 @@ def doctor(ctx: typer.Context) -> None:
     from devbase.commands.security_check import run_security_checks
     security_ok = run_security_checks(root)
     if not security_ok:
-        issues += 1
+        add_issue("Security issues detected", fix_description="Review security audit above")
 
-    # Summary
+    # === FIX-IT FLOW ===
     console.print()
     console.print("=" * 50)
-    if issues == 0:
-        console.print("[bold green]✅ DevBase is HEALTHY[/bold green]")
+    
+    if not issues:
+        console.print("[bold green]✓ DevBase is HEALTHY[/bold green]")
+        return
+    
+    # Report issues
+    console.print(f"[bold yellow]Found {len(issues)} issue(s)[/bold yellow]\n")
+    
+    fixable = [i for i in issues if i["fix_action"]]
+    
+    if not fixable:
+        console.print("[dim]No auto-fixes available. Please fix manually.[/dim]")
+        return
+    
+    # Interactive fix flow
+    if fix:
+        # Auto-fix mode
+        console.print("[bold]Auto-fixing issues...[/bold]\n")
+        for issue in fixable:
+            try:
+                issue["fix_action"]()
+                console.print(f"  [green]✓[/green] {issue['fix_description']}")
+            except Exception as e:
+                console.print(f"  [red]✗[/red] Failed: {issue['fix_description']} ({e})")
+        console.print("\n[green]Done! Run [cyan]devbase doctor[/cyan] again to verify.[/green]")
     else:
-        console.print(f"[bold yellow]⚠️  Found {issues} issue(s)[/bold yellow]")
-        console.print("\nRun [cyan]devbase setup[/cyan] to fix issues.")
+        # Interactive mode
+        console.print(f"[bold]{len(fixable)} issue(s) can be auto-fixed:[/bold]\n")
+        for i, issue in enumerate(fixable, 1):
+            console.print(f"  {i}. {issue['description']}")
+            console.print(f"     [dim]→ {issue['fix_description']}[/dim]")
+        
+        console.print()
+        if Confirm.ask("[bold]Fix all issues now?[/bold]"):
+            for issue in fixable:
+                try:
+                    issue["fix_action"]()
+                    console.print(f"  [green]✓[/green] {issue['fix_description']}")
+                except Exception as e:
+                    console.print(f"  [red]✗[/red] Failed: {e}")
+            console.print("\n[green]Done![/green]")
+        else:
+            console.print("\n[dim]Run [cyan]devbase doctor --fix[/cyan] to auto-fix later.[/dim]")
+
 
 
 
@@ -308,3 +377,45 @@ def hydrate(
                 console.print(f"[red]Error: {e}[/red]")
 
     console.print("\n[bold green]✓ Hydration complete![/bold green]")
+
+
+@app.command(name="hydrate-icons")
+def hydrate_icons_cmd(ctx: typer.Context) -> None:
+    """
+    🎨 Apply custom icons to Johnny.Decimal folders.
+    
+    Uses Neo-Glassmorphism style icons from ./devbase/icons/
+    to make folder navigation more intuitive.
+    
+    Requirements:
+    - Place icon files (00.ico, 10.ico, etc.) in ~/.devbase/icons/
+    - Windows: .ico format
+    - macOS: .icns or .png format
+    - Linux: .png format
+    
+    Example:
+        devbase core hydrate-icons
+    """
+    root: Path = ctx.obj["root"]
+    
+    console.print()
+    console.print("[bold]Applying folder icons...[/bold]\n")
+    
+    from devbase.utils.icons import hydrate_icons, get_icon_dir
+    
+    icon_dir = get_icon_dir()
+    if not icon_dir.exists():
+        console.print(f"[yellow]Icon directory not found:[/yellow] [dim]{icon_dir}[/dim]")
+        console.print("\n[bold]To set up icons:[/bold]")
+        console.print("  1. Create directory: [cyan]mkdir ~/.devbase/icons[/cyan]")
+        console.print("  2. Add icon files: 00.ico, 10.ico, 20.ico, 30.ico, 40.ico, 90.ico")
+        console.print("  3. Run this command again")
+        console.print("\n[dim]Generate icons using the prompts in Style Guide.[/dim]")
+        return
+    
+    results = hydrate_icons(root)
+    
+    applied = sum(1 for v in results.values() if v)
+    console.print()
+    console.print(f"[bold green]✓ Applied {applied}/{len(results)} icons[/bold green]")
+

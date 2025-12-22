@@ -50,6 +50,7 @@ def track(
 
     # Detect context
     from devbase.utils.context import detect_context, infer_activity_type, infer_project_name
+    import uuid
 
     current_dir = Path.cwd()
     context = detect_context(current_dir, root)
@@ -58,29 +59,35 @@ def track(
     if not event_type:
         event_type = infer_activity_type(context)
 
-        # Add project suffix if inside a project
-        project = infer_project_name(context)
-        if project:
-            event_type = f"{event_type}:{project}"
-
     # Ensure telemetry directory
     telemetry_dir = root / ".telemetry"
     telemetry_dir.mkdir(exist_ok=True)
     events_file = telemetry_dir / "events.jsonl"
 
-    # Create event
+    # Schema v2
     event = {
+        "event_id": str(uuid.uuid4()),
         "timestamp": datetime.now().isoformat(),
-        "type": event_type,
+        "session_id": str(uuid.uuid4()),  # Placeholder: In future, get from env var or shell session
+        "duration_ms": 0,  # Default for point-in-time events
+        "category": event_type,
+        "action": "track",
+        "status": "success",
         "message": message,
-        "context": context.get("context_type"),
+        "context": {
+            "type": context.get("context_type"),
+            "project": infer_project_name(context),
+            "area": context.get("area"),
+            "category": context.get("category"),
+            "semantic_location": context.get("semantic_location")
+        }
     }
 
     # Append to file
     with open(events_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event) + "\\n")
+        f.write(json.dumps(event) + "\n")
 
-    console.print(f"[green]✓[/green] Tracked: [[cyan]{event_type}[/cyan]] {message}")
+    console.print(f"[green]✓[/green] Tracked: [[cyan]{event['category']}[/cyan]] {message}")
 
 
 @app.command()

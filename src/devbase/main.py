@@ -14,7 +14,7 @@ import typer
 from rich.console import Console
 from typing_extensions import Annotated
 
-from devbase.commands import core, development, navigation, operations, quick, pkm
+from devbase.commands import core, development, navigation, operations, quick, pkm, study, analytics
 from devbase.utils.workspace import detect_workspace_root
 
 # Initialize Typer app with rich help
@@ -29,13 +29,62 @@ app = typer.Typer(
 # Initialize Rich console
 console = Console()
 
-# Register command groups
-app.add_typer(core.app, name="core", help="Core workspace management")
-app.add_typer(development.app, name="dev", help="Development commands")
-app.add_typer(operations.app, name="ops", help="Operations & automation")
-app.add_typer(navigation.app, name="nav", help="Navigation shortcuts")
-app.add_typer(quick.app, name="quick", help="Quick actions")
-app.add_typer(pkm.app, name="pkm", help="Personal Knowledge Management")
+# Register command groups with Progressive Disclosure panels
+# Panel names create visual grouping in --help output
+
+# 🟢 ESSENTIALS - Start here (Week 1)
+app.add_typer(
+    core.app,
+    name="core",
+    help="🏠 Workspace health & setup",
+    rich_help_panel="🟢 Essentials (Start Here)",
+)
+app.add_typer(
+    development.app,
+    name="dev",
+    help="📦 Create and manage projects",
+    rich_help_panel="🟢 Essentials (Start Here)",
+)
+app.add_typer(
+    navigation.app,
+    name="nav",
+    help="🧭 Navigate folders quickly",
+    rich_help_panel="🟢 Essentials (Start Here)",
+)
+
+# 🟡 DAILY WORKFLOW - After mastering essentials (Week 2-3)
+app.add_typer(
+    operations.app,
+    name="ops",
+    help="📊 Track activities & backup",
+    rich_help_panel="🟡 Daily Workflow",
+)
+app.add_typer(
+    quick.app,
+    name="quick",
+    help="⚡ One-command shortcuts",
+    rich_help_panel="🟡 Daily Workflow",
+)
+
+# 🔵 ADVANCED - For power users (Week 4+)
+app.add_typer(
+    pkm.app,
+    name="pkm",
+    help="🧠 Knowledge graph & linking",
+    rich_help_panel="🔵 Advanced",
+)
+app.add_typer(
+    study.app,
+    name="study",
+    help="📚 Learning & spaced repetition",
+    rich_help_panel="🔵 Advanced",
+)
+app.add_typer(
+    analytics.app,
+    name="analytics",
+    help="📈 Productivity insights",
+    rich_help_panel="🔵 Advanced",
+)
 
 
 @app.callback()

@@ -106,8 +106,33 @@ goto code                  # Jump directly!
 ### Quick Actions
 
 ```bash
-devbase quick quickstart my-app  # Create + Git Init + VS Code 🚀
-devbase quick sync               # Doctor + Hydrate + Backup 🔄
+devbase quick note "Python f-strings support = for debug"  # Instant TIL capture 📝
+devbase quick quickstart my-app   # Create + Git Init + VS Code 🚀
+devbase quick sync                # Doctor + Hydrate + Backup 🔄
+```
+
+### Personal Knowledge Management 🧠
+
+```bash
+# Knowledge graph analysis
+devbase pkm graph              # Visualize connections \u0026 hub notes
+devbase pkm graph --html       # Interactive HTML visualization
+
+# Navigate links
+devbase pkm links til/2025-12-22-mypost.md  # Show backlinks \u0026 outlinks
+
+# Generate index
+devbase pkm index til          # Create _index.md (Map of Content)
+```
+
+### Academic Workflow 📚
+
+```bash
+# See docs/academic-workflow.md for full setup guide
+
+# Build paper with citations (requires Pandoc + Zotero)
+./scripts/build_paper.sh thesis.md abnt pdf
+./scripts/build_paper.sh article.md apa docx
 ```
 
 ## Example Workflow
