@@ -125,7 +125,7 @@ def stats(ctx: typer.Context) -> None:
     console.print(f"Total events: [cyan]{len(events)}[/cyan]\n")
 
     # Count by type
-    type_counts = Counter(e.get("type", "unknown") for e in events)
+    type_counts = Counter(e.get("category", "unknown") for e in events)
 
     table = Table(title="Events by Type")
     table.add_column("Type", style="cyan")
