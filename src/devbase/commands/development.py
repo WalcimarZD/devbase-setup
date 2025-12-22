@@ -113,19 +113,34 @@ def audit(
     console.print(f"Workspace: [cyan]{root}[/cyan]\n")
 
 
-    # Allowed patterns
+    # Allowed patterns - IMPORTANT: Use raw strings (r"") for regex
     allowed_patterns = [
-        r'^\\d{2}(-\\d{2})?_',           # Johnny.Decimal (00-09_SYSTEM)
-        r'^[a-z0-9]+([-.][a-z0-9]+)*$', # kebab-case
-        r'^\\d+(\\.\\d+)*$',             # Versions (4.0.3)
-        r'^\\.',                        # Dotfiles
-        r'^__',                         # Dunder (__pycache__)
+        r'^\d{2}-\d{2}_',                 # Johnny.Decimal areas (00-09_SYSTEM)
+        r'^\d{2}_',                       # Johnny.Decimal categories (00_inbox, 21_monorepo_apps)
+        r'^[a-z0-9]+(-[a-z0-9]+)*$',      # kebab-case (my-project)
+        r'^\d+(\.\d+)*$',                 # Versions (4.0.3)
+        r'^\.',                           # Dotfiles (.git, .vscode)
+        r'^__',                           # Dunder (__pycache__, __template-*)
+        r'^src$',                         # Common code folders
+        r'^tests?$',                      # test or tests
+        r'^docs?$',                       # doc or docs
+        r'^lib$',                         # lib folder
     ]
 
-    # Ignore patterns
+    # Ignore patterns - folders to skip entirely
     default_ignore = [
         'node_modules', '.git', '__pycache__', 'bin', 'obj', '.vs',
         '.vscode', 'packages', 'vendor', 'dist', 'build', 'target',
+        '.telemetry', '.devbase', 'credentials', 'local', 'cloud',
+        # Standard code structure folders
+        'src', 'tests', 'test', 'docs', 'lib', 'scripts',
+        'application', 'domain', 'infrastructure', 'presentation',
+        'entities', 'value-objects', 'repositories', 'services', 'events',
+        'use-cases', 'dtos', 'mappers', 'interfaces',
+        'persistence', 'migrations', 'external', 'messaging',
+        'api', 'cli', 'web', 'unit', 'integration', 'e2e',
+        # Template internals
+        'ISSUE_TEMPLATE',
     ]
 
     violations = []
@@ -139,12 +154,17 @@ def audit(
         # Check if should ignore
         if name in default_ignore:
             continue
+        
+        # Skip anything inside known good structures
+        rel_parts = item.relative_to(root).parts
+        if any(part in default_ignore for part in rel_parts):
+            continue
 
         # Check if name matches allowed patterns
         is_allowed = any(re.match(pattern, name) for pattern in allowed_patterns)
 
         if not is_allowed:
-            suggestion = re.sub(r'([a-z])([A-Z])', r'\\1-\\2', name).lower()
+            suggestion = re.sub(r'([a-z])([A-Z])', r'\1-\2', name).lower()
             suggestion = re.sub(r'[_ ]', '-', suggestion)
             violations.append({
                 'path': item,

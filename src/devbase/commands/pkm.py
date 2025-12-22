@@ -35,12 +35,9 @@ def find(
         devbase pkm find --type til
         devbase pkm find typer --tag python
     """
-    import sys
+    from devbase.legacy.knowledge.database import KnowledgeDB
 
     root: Path = ctx.obj["root"]
-    sys.path.insert(0, str(root.parent / "devbase-setup" / "modules" / "python"))
-    
-    from knowledge.database import KnowledgeDB
     
     db = KnowledgeDB(root)
     db.connect()
@@ -113,14 +110,10 @@ def graph(
         devbase pkm graph --export      # Save as graph.dot
         devbase pkm graph --html        # Interactive visualization
     """
-    import sys
+    import networkx as nx
+    from devbase.legacy.knowledge.graph import KnowledgeGraph
 
     root: Path = ctx.obj["root"]
-    
-    # Add modules to path
-    sys.path.insert(0, str(root.parent / "devbase-setup" / "modules" / "python"))
-    
-    from knowledge.graph import KnowledgeGraph
     
     console.print()
     console.print("[bold]Knowledge Graph Analysis[/bold]")
@@ -202,13 +195,10 @@ def links(
     Example:
         devbase pkm links til/2025-12-22-typer-context.md
     """
-    import sys
     import networkx as nx
+    from devbase.legacy.knowledge.graph import KnowledgeGraph
 
     root: Path = ctx.obj["root"]
-    sys.path.insert(0, str(root.parent / "devbase-setup" / "modules" / "python"))
-    
-    from knowledge.graph import KnowledgeGraph
     
     # Resolve note path
     note_path = root / "10-19_KNOWLEDGE" / note
@@ -268,13 +258,10 @@ def index(
     Example:
         devbase pkm index til
     """
-    import sys
-    from datetime import datetime
+    from datetime import datetime, date
+    import frontmatter
 
     root: Path = ctx.obj["root"]
-    sys.path.insert(0, str(root.parent / "devbase-setup" / "modules" / "python"))
-    
-    import frontmatter
     
     target_dir = root / "10-19_KNOWLEDGE" / "11_public_garden" / folder
     
@@ -302,8 +289,15 @@ def index(
         except Exception:
             continue
     
-    # Sort by date (newest first)
-    notes.sort(key=lambda x: x["date"] if x["date"] else datetime.min, reverse=True)
+    # Sort by date (newest first) - normalize to datetime for comparison
+    def normalize_date(d):
+        if d is None:
+            return datetime.min
+        if isinstance(d, date) and not isinstance(d, datetime):
+            return datetime.combine(d, datetime.min.time())
+        return d
+    
+    notes.sort(key=lambda x: normalize_date(x["date"]), reverse=True)
     
     # Generate index content
     index_content = f"""# {folder.upper()} Index

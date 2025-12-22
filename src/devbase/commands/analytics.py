@@ -94,7 +94,7 @@ REPORT_TEMPLATE = """<!DOCTYPE html>
 @app.command()
 def report(
     ctx: typer.Context,
-    open_browser: Annotated[bool, typer.Option("--open", "-o", help="Open report in browser")] = True,
+    open_browser: Annotated[bool, typer.Option("--open/--no-open", "-o", help="Open report in browser (default: True)")] = True,
 ) -> None:
     """
     📈 Generate graphical analytics report using DuckDB.

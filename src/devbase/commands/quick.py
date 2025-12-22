@@ -22,7 +22,7 @@ def note(
     ctx: typer.Context,
     content: Annotated[str, typer.Argument(help="Note content or TIL")],
     edit: Annotated[bool, typer.Option("--edit", "-e", help="Open in VS Code after creating")] = False,
-    til: Annotated[bool, typer.Option("--til", "-t", help="Save as TIL (default)")] = True,
+    til: Annotated[bool, typer.Option("--til/--no-til", "-t", help="Save as TIL (default: True)")] = True,
 ) -> None:
     """
     📝 Instant note capture to knowledge base.
