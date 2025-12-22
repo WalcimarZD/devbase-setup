@@ -262,8 +262,12 @@ class KnowledgeGraph:
         Args:
             output_path: Path to save .dot file
         """
-        from networkx.drawing.nx_agraph import write_dot
-        
-        write_dot(self.graph, output_path)
-        console.print(f"[green]✓[/green] Graph exported to {output_path}")
-        console.print("[dim]Visualize with: dot -Tpng graph.dot -o graph.png[/dim]")
+        try:
+            from networkx.drawing.nx_agraph import write_dot
+            write_dot(self.graph, output_path)
+            console.print(f"[green]✓[/green] Graph exported to {output_path}")
+            console.print("[dim]Visualize with: dot -Tpng graph.dot -o graph.png[/dim]")
+        except ImportError:
+            console.print("[yellow]⚠️  PyGraphviz not installed[/yellow]")
+            console.print("[dim]Install with: pip install pygraphviz[/dim]")
+            console.print("[dim]Or use --html for browser-based visualization[/dim]")

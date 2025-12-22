@@ -87,6 +87,18 @@ app.add_typer(
 )
 
 
+def version_callback(value: bool) -> None:
+    """Display version and exit."""
+    if value:
+        from importlib.metadata import version as get_version
+        try:
+            ver = get_version("devbase")
+        except Exception:
+            ver = "4.0.5"  # Fallback
+        console.print(f"devbase {ver}")
+        raise typer.Exit()
+
+
 @app.callback()
 def main(
     ctx: typer.Context,
@@ -106,6 +118,10 @@ def main(
     no_color: Annotated[
         bool,
         typer.Option("--no-color", help="Disable colored output"),
+    ] = False,
+    version: Annotated[
+        bool,
+        typer.Option("--version", "-V", help="Show version and exit", callback=version_callback, is_eager=True),
     ] = False,
 ) -> None:
     """

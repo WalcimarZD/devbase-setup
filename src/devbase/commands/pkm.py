@@ -56,6 +56,12 @@ def find(
     # Search
     results = db.search(query=query, tags=tag, note_type=note_type, limit=50)
     
+    # Fallback: if --type returned no results, try searching by tag instead
+    if not results and note_type and not tag:
+        results = db.search(query=query, tags=[note_type], note_type=None, limit=50)
+        if results:
+            console.print(f"[dim](Searching by tag '{note_type}' instead of type)[/dim]")
+    
     if not results:
         console.print("[yellow]No results found[/yellow]")
         db.close()
@@ -200,14 +206,23 @@ def links(
 
     root: Path = ctx.obj["root"]
     
-    # Resolve note path
-    note_path = root / "10-19_KNOWLEDGE" / note
-    if not note_path.exists():
-        # Try with .md extension
-        note_path = root / "10-19_KNOWLEDGE" / f"{note}.md"
+    # Resolve note path - try multiple locations
+    possible_paths = [
+        root / "10-19_KNOWLEDGE" / note,
+        root / "10-19_KNOWLEDGE" / f"{note}.md",
+        root / "10-19_KNOWLEDGE" / "11_public_garden" / note,
+        root / "10-19_KNOWLEDGE" / "11_public_garden" / f"{note}.md",
+    ]
     
-    if not note_path.exists():
+    note_path = None
+    for path in possible_paths:
+        if path.exists():
+            note_path = path
+            break
+    
+    if not note_path:
         console.print(f"[red]✗[/red] Note not found: {note}")
+        console.print("[dim]Tip: Use path relative to 10-19_KNOWLEDGE or 11_public_garden[/dim]")
         raise typer.Exit(1)
     
     console.print()
