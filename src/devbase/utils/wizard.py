@@ -216,6 +216,17 @@ def run_interactive_wizard() -> dict:
     enabled = [name.upper() for name, enabled in modules.items() if enabled]
     console.print(f"[green]✓[/green] Modules: {', '.join(enabled) if enabled else 'Core only'}\n")
 
+    # Step 4: Air-Gap Configuration
+    console.print("[bold]Step 4/6:[/bold] Security configuration\n")
+
+    console.print("[dim]Air-Gap protection prevents private vault from syncing to cloud.[/dim]\n")
+    airgap = Confirm.ask(
+        "🔒 Enable Air-Gap protection for [yellow]12_private_vault[/yellow]?",
+        default=True
+    )
+
+    console.print(f"\n[green]✓[/green] Air-Gap: {'Enabled ✓' if airgap else 'Disabled'}\n")
+
     # Step 5: Development Environment
     console.print("[bold]Step 5/6:[/bold] Development Environment\n")
 
