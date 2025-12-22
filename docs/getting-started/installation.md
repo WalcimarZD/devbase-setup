@@ -40,11 +40,24 @@ uv sync
 uv run devbase core setup
 ```
 
-### Opção 2: Workspace Personalizado
-
+### Configuração do Workspace
+ 
+Por padrão, o DevBase tentará detectar um workspace existente na pasta atual ou criará um novo. Para especificar um local diferente, use a flag global `--root`.
+ 
+#### Padrão (Auto-detect)
 ```bash
-# Especifique um caminho personalizado
-python devbase.py setup --root ~/MeuWorkspace
+# Usa o diretório atual como raiz
+devbase core setup
+```
+ 
+#### Personalizado
+```bash
+# Especifica um caminho absoluto ou relativo
+devbase --root "D:\MeusProjetos\Workspace" core setup
+ 
+# Ou via variável de ambiente
+export DEVBASE_ROOT="D:\MeusProjetos\Workspace"
+devbase core setup
 ```
 
 ### Opção 3: PowerShell (Windows Legacy)
