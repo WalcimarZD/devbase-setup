@@ -162,8 +162,7 @@ def run_interactive_wizard() -> dict:
     ))
     console.print()
 
-    # Step 1: Prerequisites
-    console.print("[bold]Step 1/5:[/bold] Checking prerequisites\n")
+    console.print("[bold]Step 1/6:[/bold] Checking prerequisites\n")
     if not run_prerequisite_checks():
         raise SystemExit(1)
 
@@ -173,7 +172,7 @@ def run_interactive_wizard() -> dict:
 
     # Step 2: Workspace Location
     console.print()
-    console.print("[bold]Step 2/5:[/bold] Choose workspace location\n")
+    console.print("[bold]Step 2/6:[/bold] Choose workspace location\n")
 
     default_path = Path.home() / "Dev_Workspace"
     console.print(f"[dim]Recommended: {default_path}[/dim]\n")
@@ -196,7 +195,7 @@ def run_interactive_wizard() -> dict:
     console.print(f"\n[green]✓[/green] Workspace: [cyan]{workspace_path}[/cyan]\n")
 
     # Step 3: Module Selection
-    console.print("[bold]Step 3/5:[/bold] Select modules to install\n")
+    console.print("[bold]Step 3/6:[/bold] Select modules to install\n")
 
     modules = {
         "pkm": Confirm.ask(
@@ -217,19 +216,23 @@ def run_interactive_wizard() -> dict:
     enabled = [name.upper() for name, enabled in modules.items() if enabled]
     console.print(f"[green]✓[/green] Modules: {', '.join(enabled) if enabled else 'Core only'}\n")
 
-    # Step 4: Air-Gap Configuration
-    console.print("[bold]Step 4/5:[/bold] Security configuration\n")
+    # Step 5: Development Environment
+    console.print("[bold]Step 5/6:[/bold] Development Environment\n")
 
-    console.print("[dim]Air-Gap protection prevents private vault from syncing to cloud.[/dim]\n")
-    airgap = Confirm.ask(
-        "🔒 Enable Air-Gap protection for [yellow]12_private_vault[/yellow]?",
+    git_init = Confirm.ask(
+        "🐙 Initialize [bold]Git[/bold] repository?",
         default=True
     )
 
-    console.print(f"\n[green]✓[/green] Air-Gap: {'Enabled ✓' if airgap else 'Disabled'}\n")
+    vscode_config = Confirm.ask(
+        "📝 Configure [bold]VS Code[/bold] workspace settings?",
+        default=True
+    )
+    
+    console.print(f"\n[green]✓[/green] Environment: {'Git, ' if git_init else ''}{'VS Code' if vscode_config else ''}\n")
 
-    # Step 5: Confirmation
-    console.print("[bold]Step 5/5:[/bold] Review and confirm\n")
+    # Step 6: Confirmation
+    console.print("[bold]Step 6/6:[/bold] Review and confirm\n")
 
     summary = Table(show_header=False, box=None)
     summary.add_column("Setting", style="cyan")
@@ -238,6 +241,8 @@ def run_interactive_wizard() -> dict:
     summary.add_row("Workspace", str(workspace_path))
     summary.add_row("Modules", ", ".join(enabled) if enabled else "Core only")
     summary.add_row("Air-Gap", "Enabled" if airgap else "Disabled")
+    summary.add_row("Git Init", "Yes" if git_init else "No")
+    summary.add_row("VS Code", "Yes" if vscode_config else "No")
 
     console.print(summary)
     console.print()
@@ -250,6 +255,8 @@ def run_interactive_wizard() -> dict:
         "path": workspace_path,
         "modules": modules,
         "airgap": airgap,
+        "git_init": git_init,
+        "vscode_config": vscode_config,
     }
 
 
@@ -322,6 +329,33 @@ def execute_setup_with_config(config: dict) -> None:
     state["lastUpdate"] = state["installedAt"]
     state["modules"] = [name for name, _, enabled in setup_tasks if enabled]
     state_mgr.save_state(state)
+
+    # Git Initialization
+    if config.get("git_init"):
+        console.print("\n[bold]Initializing Git repository...[/bold]")
+        try:
+            subprocess.run(["git", "init", str(root)], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-m", "chore: initial workspace setup"], check=True, capture_output=True)
+            console.print("  [green]✓[/green] Git initialized and initial commit created")
+        except Exception as e:
+            console.print(f"  [red]✗[/red] Git init failed: {e}")
+
+    # VS Code Configuration
+    if config.get("vscode_config"):
+        console.print("\n[bold]Configuring VS Code...[/bold]")
+        vscode_dir = root / ".vscode"
+        vscode_dir.mkdir(exist_ok=True)
+        
+        settings = vscode_dir / "settings.json"
+        if not settings.exists():
+            settings.write_text('{\n    "files.exclude": {\n        "**/__pycache__": true,\n        "**/.DS_Store": true\n    },\n    "editor.formatOnSave": true,\n    "python.analysis.typeCheckingMode": "basic"\n}', encoding="utf-8")
+        
+        extensions = vscode_dir / "extensions.json"
+        if not extensions.exists():
+            extensions.write_text('{\n    "recommendations": [\n        "ms-python.python",\n        "tamasfe.even-better-toml",\n        "yzhang.markdown-all-in-one"\n    ]\n}', encoding="utf-8")
+            
+        console.print("  [green]✓[/green] .vscode settings created")
 
     # Success message
     console.print()
