@@ -1,6 +1,6 @@
 [project]
 name = "devbase"
-version = "4.0.1"
+version = "4.0.2"
 description = "DevBase - Personal Engineering Operating System"
 authors = [
     { name = "DevBase Team", email = "devbase@example.com" }

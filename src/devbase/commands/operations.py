@@ -193,7 +193,7 @@ def weekly(
     for event in events:
         ts = event.get("timestamp", "")[:10]
         msg = event.get("message", "")
-        report += f"- [{ts}] {msg}\\n"
+        report += f"- [{ts}] {msg}\n"
 
     if output:
         output.write_text(report, encoding="utf-8")
