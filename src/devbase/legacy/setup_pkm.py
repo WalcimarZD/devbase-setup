@@ -17,9 +17,9 @@ USO:
 
 from pathlib import Path
 from datetime import datetime, timedelta
-from filesystem import FileSystem
-from ui import UI
-from template_utils import process_templates
+from .filesystem import FileSystem
+from .ui import UI
+from .template_utils import process_templates
 
 
 def run_setup_pkm(fs: FileSystem, ui: UI, policy_version: str = "3.1"):

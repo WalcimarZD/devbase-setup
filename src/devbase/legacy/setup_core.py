@@ -22,8 +22,8 @@ from datetime import datetime
 from typing import Optional
 
 # Imports relativos (assumindo que estão no mesmo pacote)
-from filesystem import FileSystem
-from ui import UI
+from .filesystem import FileSystem
+from .ui import UI
 
 
 def run_setup_core(fs: FileSystem, ui: UI, policy_version: str = "3.1"):

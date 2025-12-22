@@ -14,18 +14,13 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from typing_extensions import Annotated
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "modules" / "python"))
-
-try:
-    from filesystem import FileSystem
-    from setup_ai import run_setup_ai
-    from setup_code import run_setup_code
-    from setup_core import run_setup_core
-    from setup_operations import run_setup_operations
-    from setup_pkm import run_setup_pkm
-    from state import StateManager
-except ImportError as e:
-    print(f"Warning: Could not import legacy modules: {e}")
+from devbase.legacy.filesystem import FileSystem
+from devbase.legacy.setup_ai import run_setup_ai
+from devbase.legacy.setup_code import run_setup_code
+from devbase.legacy.setup_core import run_setup_core
+from devbase.legacy.setup_operations import run_setup_operations
+from devbase.legacy.setup_pkm import run_setup_pkm
+from devbase.legacy.state import StateManager
 
 app = typer.Typer(help="Core workspace commands")
 console = Console()

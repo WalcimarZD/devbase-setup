@@ -19,9 +19,9 @@ USO:
 
 import sys
 from pathlib import Path
-from filesystem import FileSystem
-from ui import UI
-from template_utils import process_templates
+from .filesystem import FileSystem
+from .ui import UI
+from .template_utils import process_templates
 
 
 def run_setup_operations(fs: FileSystem, ui: UI, policy_version: str = "3.1"):
@@ -74,7 +74,7 @@ def run_setup_operations(fs: FileSystem, ui: UI, policy_version: str = "3.1"):
     
     # Root do source (onde estamos rodando)
     # modules/python/setup_operations.py -> .../devbase.py
-    source_root = current_dir.parent.parent
+    source_root = current_dir.parent.parent.parent
     devbase_py = source_root / "devbase.py"
     
     if devbase_py.exists():

@@ -13,8 +13,8 @@ USO:
 
 from pathlib import Path
 from datetime import datetime
-from filesystem import FileSystem
-from ui import UI
+from .filesystem import FileSystem
+from .ui import UI
 
 
 def process_templates(
