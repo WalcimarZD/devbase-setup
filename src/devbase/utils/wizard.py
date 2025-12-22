@@ -263,19 +263,14 @@ def execute_setup_with_config(config: dict) -> None:
     console.print()
     console.print("[bold cyan]Creating workspace...[/bold cyan]\n")
 
-    # Import setup modules
-    import sys
-    from pathlib import Path
-
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "modules" / "python"))
-
-    from filesystem import FileSystem
-    from setup_ai import run_setup_ai
-    from setup_code import run_setup_code
-    from setup_core import run_setup_core
-    from setup_operations import run_setup_operations
-    from setup_pkm import run_setup_pkm
-    from state import StateManager
+    # Import setup modules from legacy package
+    from devbase.legacy.filesystem import FileSystem
+    from devbase.legacy.setup_ai import run_setup_ai
+    from devbase.legacy.setup_code import run_setup_code
+    from devbase.legacy.setup_core import run_setup_core
+    from devbase.legacy.setup_operations import run_setup_operations
+    from devbase.legacy.setup_pkm import run_setup_pkm
+    from devbase.legacy.state import StateManager
 
     root = config["path"]
     fs = FileSystem(str(root), dry_run=False)
