@@ -1,4 +1,4 @@
-# DevBase CLI - Guia de Testes Manuais v4.0.5
+# DevBase CLI - Guia de Testes Manuais v4.0.6
 
 > **Objetivo:** Testar todas as funcionalidades do DevBase CLI de forma sistemática.
 > **Última atualização:** 2025-12-22
@@ -15,7 +15,7 @@ uv tool install --force .
 
 # 2. Verificar instalação
 devbase --version
-# Esperado: devbase 4.0.5
+# Esperado: devbase 4.0.6
 
 # 3. Criar workspace de teste LIMPO
 Remove-Item -Recurse D:\Dev_Test -ErrorAction SilentlyContinue
@@ -33,11 +33,15 @@ cd D:\Dev_Test
 
 ```powershell
 # Teste: Setup interativo completo
-# Responda: y para PKM, y para AI, y para Operations, y para Air-Gap
+# Responda: 
+# - PKM: y, AI: y, Operations: y
+# - Air-Gap: y
+# - Git Init: y (NOVO)
+# - VS Code: y (NOVO)
 
 # Verificar estrutura criada
 ls D:\Dev_Test
-# Esperado: 00-09_SYSTEM, 10-19_KNOWLEDGE, 20-29_CODE, 30-39_OPERATIONS, etc.
+# Esperado: .git, .vscode, 00-09_SYSTEM, etc.
 ```
 
 ### 1.2 `devbase core doctor`
@@ -262,7 +266,7 @@ devbase pkm graph --export
 # Esperado: knowledge_graph.dot criado
 
 devbase pkm graph --html
-# Esperado: knowledge_graph.html criado (requer pyvis)
+# Esperado: knowledge_graph.html criado
 ```
 
 ### 6.3 `devbase pkm links`
@@ -287,12 +291,7 @@ devbase pkm index til
 
 ### 7.1 `devbase analytics report`
 
-> ⚠️ **Requer DuckDB:** `uv pip install duckdb`
-
 ```powershell
-# Instalar dependência opcional
-uv pip install duckdb
-
 devbase analytics report
 # Esperado: Abre analytics_report.html no navegador
 ```
