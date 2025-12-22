@@ -156,7 +156,7 @@ def generate_project_from_template(
         Path: Path to created project
     """
     # Locate template
-    template_dir = root / "00-09_SYSTEM" / "05_templates" / f"__template-{template_name}"
+    template_dir = root / "20-29_CODE" / f"__template-{template_name}"
 
     if not template_dir.exists():
         raise FileNotFoundError(f"Template '{template_name}' not found at {template_dir}")
@@ -216,7 +216,7 @@ def list_available_templates(root: Path) -> list[str]:
     Returns:
         list: Template names (without __template- prefix)
     """
-    templates_dir = root / "00-09_SYSTEM" / "05_templates"
+    templates_dir = root / "20-29_CODE"
 
     if not templates_dir.exists():
         return []
