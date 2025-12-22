@@ -37,15 +37,14 @@ O DevBase é um sistema operacional de engenharia pessoal - uma estrutura padron
 ## 🏃 Quick Start
 
 ```bash
-# Clone o repositório
-git clone https://github.com/WalcimarZD/devbase-setup.git
-cd devbase-setup
+# Instale globalmente (recomendado)
+uv tool install devbase
 
-# Execute o setup
-python devbase.py setup
+# Execute o setup interativo
+devbase core setup
 
 # Verifique a instalação
-python devbase.py doctor
+devbase core doctor
 ```
 
 ## 📚 Documentação
@@ -66,10 +65,10 @@ python devbase.py doctor
 
 ## 📦 Versão Atual
 
-**v3.2.0** (Python Edition)
+**v4.0.0** (Modern Python CLI)
 
-- ✅ CLI Python unificado
+- ✅ Typer CLI com type-safety
+- ✅ Rich terminal output
 - ✅ Autocompletion para bash/zsh/PowerShell
-- ✅ Progress bars com tqdm
+- ✅ uv package management
 - ✅ Dry-run mode
-- ✅ 87%+ test coverage

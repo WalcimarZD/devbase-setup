@@ -67,14 +67,22 @@ nav:
   - "📋 Cheatsheet": cheatsheet.md
   - CLI Reference:
     - Overview: cli/overview.md
-    - Setup: cli/setup.md
-    - Doctor: cli/doctor.md
-    - Audit: cli/audit.md
-    - New: cli/new.md
-    - Hydrate: cli/hydrate.md
-    - Backup: cli/backup.md
-    - Clean: cli/clean.md
-    - Telemetry: cli/telemetry.md
+    - Core:
+      - Setup: cli/setup.md
+      - Doctor: cli/doctor.md
+      - Hydrate: cli/hydrate.md
+    - Development:
+      - New: cli/new.md
+      - Audit: cli/audit.md
+    - Operations:
+      - Backup: cli/backup.md
+      - Clean: cli/clean.md
+      - Telemetry: cli/telemetry.md
+    - Navigation:
+      - Goto: cli/goto.md
+    - Quick Actions:
+      - Note: cli/note.md
+      - Quickstart: cli/quickstart.md
   - Architecture: architecture.md
   - Contributing: contributing.md
 

@@ -22,6 +22,19 @@ devbase <command> [options]
 | [backup](backup.md) | Executa backup 3-2-1 |
 | [clean](clean.md) | Limpa arquivos temporários |
 
+### Navegação
+
+| Comando | Descrição |
+|---------|-----------|
+| [goto](goto.md) | Navega para localizações semânticas (code, vault, ai) |
+
+### Ações Rápidas
+
+| Comando | Descrição |
+|---------|-----------|
+| [note](note.md) | Captura rápida de notas/TILs |
+| [quickstart](quickstart.md) | Cria projeto completo em <60s |
+
 ### Telemetria
 
 | Comando | Descrição |
