@@ -162,7 +162,10 @@ def report(
         html = html.replace("{{ FOCUS_SCORE }}", str(focus_score))
         html = html.replace("{{ DATA_JSON }}", json_data)
 
-        output_path = root / "analytics_report.html"
+        # Save to semantic location (monitoring folder)
+        output_dir = root / "30-39_OPERATIONS" / "33_monitoring"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "analytics_report.html"
         output_path.write_text(html, encoding='utf-8')
 
         console.print(f"[green]✓[/green] Report generated: [bold]{output_path}[/bold]")

@@ -150,14 +150,21 @@ def weekly(
     ctx: typer.Context,
     output: Annotated[
         Optional[Path],
-        typer.Option("--output", "-o", help="Save report to file"),
+        typer.Option("--output", "-o", help="Save report to file (relative to workspace)"),
     ] = None,
 ) -> None:
     """
     📅 Generate weekly activity report.
     
     Creates a markdown report of the last 7 days of activities.
+    
+    Output paths are relative to workspace by default:
+    - No --output: saves to journal/weekly-YYYY-MM-DD.md
+    - --output report.md: saves to journal/report.md
+    - --output C:\\path\\report.md: saves to absolute path (escapes workspace)
     """
+    from devbase.utils.paths import resolve_workspace_path
+    
     root: Path = ctx.obj["root"]
     events_file = root / ".telemetry" / "events.jsonl"
 
@@ -195,11 +202,22 @@ def weekly(
         msg = event.get("message", "")
         report += f"- [{ts}] {msg}\n"
 
-    if output:
-        output.write_text(report, encoding="utf-8")
-        console.print(f"[green]✓[/green] Report saved to: [cyan]{output}[/cyan]")
+    # Determine output path (workspace-relative by default)
+    default_subdir = "10-19_KNOWLEDGE/12_private_vault/journal"
+    
+    if output is None:
+        # Auto-generate filename
+        filename = f"weekly-{datetime.now().strftime('%Y-%m-%d')}.md"
+        final_path = root / default_subdir / filename
     else:
-        console.print(report)
+        final_path = resolve_workspace_path(output, root, default_subdir)
+    
+    # Ensure directory exists
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Save
+    final_path.write_text(report, encoding="utf-8")
+    console.print(f"[green]✓[/green] Report saved to: [cyan]{final_path}[/cyan]")
 
 
 @app.command()
