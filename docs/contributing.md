@@ -9,7 +9,7 @@ Contribuições são bem-vindas! Este guia explica como contribuir para o DevBas
 ```bash
 git clone https://github.com/SEU-USUARIO/devbase-setup.git
 cd devbase-setup
-pip install -r requirements.txt
+uv sync
 ```
 
 ### 2. Crie uma Branch
@@ -27,7 +27,7 @@ git checkout -b feature/minha-feature
 ### 4. Rode os Testes
 
 ```bash
-python -m pytest tests/ -v
+uv run pytest
 ```
 
 ### 5. Commit
@@ -52,9 +52,10 @@ Abra um Pull Request no GitHub.
 
 ```
 devbase-setup/
-├── devbase.py           # CLI principal
-├── modules/
-│   └── python/          # Módulos Python
+├── src/
+│   └── devbase/         # Pacote principal
+│       ├── legacy/      # Módulos legados
+│       └── commands/    # Comandos CLI
 ├── tests/               # Testes unitários
 ├── docs/                # Documentação MkDocs
 └── completions/         # Shell completion scripts

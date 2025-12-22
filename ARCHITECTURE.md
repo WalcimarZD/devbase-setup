@@ -6,24 +6,22 @@ DevBase is a **Personal Engineering Operating System** built on Python with a mo
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      devbase.py (CLI)                       │
-│  ┌─────────┬─────────┬─────────┬─────────┬─────────┐       │
-│  │  setup  │ doctor  │  audit  │  track  │dashboard│       │
-│  └────┬────┴────┬────┴────┬────┴────┬────┴────┬────┘       │
-└───────┼─────────┼─────────┼─────────┼─────────┼─────────────┘
-        │         │         │         │         │
-┌───────▼─────────▼─────────▼─────────▼─────────▼─────────────┐
-│                    modules/python/                          │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐   │
-│  │filesystem│ │    ui    │ │   state  │ │   dashboard  │   │
-│  │  .py     │ │   .py    │ │   .py    │ │   /server.py │   │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────────┘   │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐                    │
-│  │setup_core│ │setup_pkm │ │setup_code│  ...more modules   │
-│  └──────────┘ └──────────┘ └──────────┘                    │
+│                      devbase cli (Typer)                    │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐    │
+│  │   core    │ │    dev    │ │    ops    │ │    nav    │    │
+│  │ (setup+)  │ │ (new+)    │ │ (track+)  │ │ (goto)    │    │
+│  └─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬─────┘    │
+└────────┼─────────────┼─────────────┼─────────────┼──────────┘
+         │             │             │             │
+┌────────▼─────────────▼─────────────▼─────────────▼──────────┐
+│                    src/devbase/                             │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐         │
+│  │   commands/  │ │   legacy/    │ │  templates/  │         │
+│  │ (core, dev+) │ │ (fs, state)  │ │ (jinja2)     │         │
+│  └──────────────┘ └──────────────┘ └──────────────┘         │
 └─────────────────────────────────────────────────────────────┘
-        │                               │
-        ▼                               ▼
+         │                               │
+         ▼                               ▼
 ┌───────────────────┐         ┌───────────────────┐
 │  Dev_Workspace/   │         │   .telemetry/     │
 │  (Johnny.Decimal) │         │   events.jsonl    │
@@ -32,33 +30,29 @@ DevBase is a **Personal Engineering Operating System** built on Python with a mo
 
 ## Components
 
-### CLI Layer (`devbase.py`)
+### CLI Layer (Typer)
 
-The main entry point using `argparse` with subcommands:
+Managed via `src/devbase/main.py` and modular command groups in `src/devbase/commands/`:
 
-| Command | Function | Description |
-|---------|----------|-------------|
-| `setup` | `cmd_setup()` | Initialize workspace |
-| `doctor` | `cmd_doctor()` | Health check |
-| `audit` | `cmd_audit()` | Naming convention check |
-| `new` | `cmd_new()` | Create project from template |
-| `hydrate` | `cmd_hydrate()` | Sync templates |
-| `backup` | `cmd_backup()` | 3-2-1 backup |
-| `clean` | `cmd_clean()` | Remove temp files |
-| `track` | `cmd_track()` | Log activity |
-| `stats` | `cmd_stats()` | Show statistics |
-| `weekly` | `cmd_weekly()` | Weekly report |
-| `dashboard` | `cmd_dashboard()` | Web dashboard |
+| Group | Function | Description |
+|-------|----------|-------------|
+| `core` | `commands/core.py` | Setup, Doctor, Hydrate |
+| `dev` | `commands/dev.py` | New, Audit, Templates |
+| `ops` | `commands/ops.py` | Track, Stats, Weekly, Backup, Clean |
+| `nav` | `commands/nav.py` | Semantic navigation (goto) |
+| `quick` | `commands/quick.py` | Macro commands (sync, quickstart) |
+| `pkm` | `commands/pkm.py` | PKM analysis (graph, links, index) |
 
-### Modules Layer (`modules/python/`)
+### Core Logic (Legacy & Modern)
 
 | Module | Purpose |
 |--------|---------|
-| `filesystem.py` | Atomic file operations with dry-run support |
-| `ui.py` | Console output formatting |
-| `state.py` | State management (`.devbase_state.json`) |
-| `setup_*.py` | Individual setup modules |
-| `dashboard/` | Flask web dashboard |
+| `legacy/filesystem.py` | Atomic file operations with dry-run support |
+| `legacy/ui.py` | Colorized console output helpers |
+| `legacy/state.py` | State management (`.devbase_state.json`) |
+| `utils/wizard.py` | Interactive setup wizard |
+| `utils/icons.py` | Johnny.Decimal folder icon management |
+| `templates/` | Jinja2 templates for projects and knowledge |
 
 ### Data Layer
 

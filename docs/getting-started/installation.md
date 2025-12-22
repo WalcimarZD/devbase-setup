@@ -9,21 +9,35 @@
 
 ## Instalação
 
-### Opção 1: Clone e Execute (Recomendado)
+### Opção 1: Instalação Global (Recomendado)
 
 ```bash
 # 1. Clone o repositório
 git clone https://github.com/WalcimarZD/devbase-setup.git
 cd devbase-setup
 
-# 2. (Opcional) Instale dependências para recursos extras
-pip install -r requirements.txt
+# 2. Instale o CLI globalmente usando uv (ou pip install .)
+uv tool install --force .
 
-# 3. Execute o setup
-python devbase.py setup
+# 3. Execute o setup interativo
+devbase core setup
 
-# 4. Verifique a instalação
-python devbase.py doctor
+# 4. Verifique a saúde do workspace
+devbase core doctor
+```
+
+### Opção 2: Desenvolvimento Local (uv)
+
+```bash
+# 1. Clone o repositório
+git clone https://github.com/WalcimarZD/devbase-setup.git
+cd devbase-setup
+
+# 2. Sincronize dependências
+uv sync
+
+# 3. Execute via uv run
+uv run devbase core setup
 ```
 
 ### Opção 2: Workspace Personalizado
@@ -45,7 +59,7 @@ python devbase.py setup --root ~/MeuWorkspace
 Após a instalação, execute o diagnóstico:
 
 ```bash
-python devbase.py doctor
+devbase core doctor
 ```
 
 Se tudo estiver correto, você verá:

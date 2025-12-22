@@ -146,8 +146,8 @@ from state import StateManager
 **v4.0:**
 ```python
 # Proper package imports
-from devbase.utils.filesystem import FileSystem
-from devbase.utils.state import StateManager
+from devbase.legacy.filesystem import FileSystem
+from devbase.legacy.state import StateManager
 ```
 
 ### Configuration

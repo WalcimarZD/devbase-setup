@@ -7,7 +7,7 @@ Este guia mostra os comandos mais comuns do DevBase para você começar rapidame
 ### 1. Verificar Saúde do Workspace
 
 ```bash
-devbase doctor
+devbase core doctor
 ```
 
 Isso verifica se todas as áreas e arquivos de governança existem.
@@ -15,7 +15,7 @@ Isso verifica se todas as áreas e arquivos de governança existem.
 ### 2. Criar um Novo Projeto
 
 ```bash
-devbase new meu-projeto
+devbase dev new meu-projeto
 ```
 
 Cria um novo projeto em `20-29_CODE/21_monorepo_apps/meu-projeto` usando o template Clean Architecture.
@@ -31,43 +31,43 @@ cd 20-29_CODE/21_monorepo_apps/meu-projeto
 
 ```bash
 # Ao terminar uma tarefa
-devbase track "Implementei autenticação OAuth2"
+devbase ops track "Implementei autenticação OAuth2"
 
 # Com tipo personalizado
-devbase track "Corrigi bug de login" --type bugfix
+devbase ops track "Corrigi bug de login" --type bugfix
 ```
 
 ### 5. Ver Estatísticas
 
 ```bash
-devbase stats
+devbase ops stats
 ```
 
 ### 6. Gerar Relatório Semanal
 
 ```bash
-devbase weekly
+devbase ops weekly
 
 # Ou salvar em arquivo
-devbase weekly --output ~/weeknotes.md
+devbase ops weekly --output ~/weeknotes.md
 ```
 
 ### 7. Fazer Backup
 
 ```bash
-devbase backup
+devbase ops backup
 ```
 
 ## Comandos Mais Usados
 
 | Comando | Descrição |
 |---------|-----------|
-| `devbase doctor` | Verifica integridade do workspace |
-| `devbase new <nome>` | Cria novo projeto |
-| `devbase track "msg"` | Registra atividade |
-| `devbase stats` | Mostra estatísticas |
-| `devbase backup` | Executa backup 3-2-1 |
-| `devbase clean` | Limpa temporários |
+| `devbase core doctor` | Verifica integridade do workspace |
+| `devbase dev new <nome>` | Cria novo projeto |
+| `devbase ops track "msg"` | Registra atividade |
+| `devbase ops stats` | Mostra estatísticas |
+| `devbase ops backup` | Executa backup 3-2-1 |
+| `devbase ops clean` | Limpa temporários |
 
 ## Dicas Pro
 
@@ -76,8 +76,8 @@ devbase backup
 Veja o que seria feito sem executar:
 
 ```bash
-devbase clean --dry-run
-devbase setup --dry-run
+devbase ops clean --dry-run
+devbase core setup --dry-run
 ```
 
 ### Force Mode
@@ -85,7 +85,7 @@ devbase setup --dry-run
 Force atualização de templates:
 
 ```bash
-devbase hydrate --force
+devbase core hydrate --force
 ```
 
 ### Audit e Fix
@@ -93,8 +93,8 @@ devbase hydrate --force
 Verifique e corrija nomenclatura automaticamente:
 
 ```bash
-devbase audit        # Apenas verifica
-devbase audit --fix  # Corrige automaticamente
+devbase dev audit        # Apenas verifica
+devbase dev audit --fix  # Corrige automaticamente
 ```
 
 ## Próximos Passos

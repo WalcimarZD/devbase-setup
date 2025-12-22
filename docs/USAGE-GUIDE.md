@@ -86,43 +86,32 @@ git --version
 cd C:\Projetos  # ou ~/Projetos no Linux/macOS
 
 # Clone o repositório
-git clone https://github.com/seu-usuario/devbase-setup-v3.git
+git clone https://github.com/seu-usuario/devbase-setup.git
 
 # Entre no diretório
-cd devbase-setup-v3
+cd devbase-setup
 ```
 
-#### **Passo 2: Execute o Bootstrap**
+#### **Passo 2: Instale o CLI**
 
 ```powershell
-# Windows - Execução básica
-.\bootstrap.ps1
+# Instale via uv (Recomendado)
+uv tool install --force .
 
-# Windows - Em local personalizado
-.\bootstrap.ps1 -RootPath "D:\MeuWorkspace"
+# Ou via pip
+pip install .
 ```
 
-```bash
-# Linux/macOS
-chmod +x install.sh
-./install.sh
-
-# Ou, se tiver PowerShell Core instalado
-pwsh bootstrap.ps1
-```
-
-#### **Passo 3: Navegue até o Workspace**
+#### **Passo 3: Execute o Setup Interativo**
 
 ```powershell
-# O workspace foi criado em:
-cd ~/Dev_Workspace  # ou o caminho que você especificou
+devbase core setup
 ```
 
 #### **Passo 4: Verifique a Instalação**
 
 ```powershell
-# Execute o comando doctor
-.\30-39_OPERATIONS\35_devbase_cli\devbase.ps1 doctor
+devbase core doctor
 ```
 
 Saída esperada:
@@ -142,32 +131,14 @@ Verificando integridade do DevBase em: C:\Users\Seu\Dev_Workspace
 DevBase está SAUDÁVEL
 ```
 
-### 2.3 Configurando um Alias (Recomendado)
+### 2.3 Utilidade do Comando Global
 
-Para usar `devbase` de qualquer lugar, adicione um alias:
+Ao instalar via `uv tool install`, o comando `devbase` fica disponível globalmente no seu terminal (Bash, Zsh ou PowerShell). Não é mais necessário configurar aliases manuais para o script principal.
 
-**Windows (PowerShell Profile):**
+Você pode usar:
 ```powershell
-# Abra seu perfil
-notepad $PROFILE
-
-# Adicione esta linha (ajuste o caminho conforme necessário)
-Set-Alias -Name devbase -Value "$HOME\Dev_Workspace\30-39_OPERATIONS\35_devbase_cli\devbase.ps1"
-
-# Salve e recarregue
-. $PROFILE
-```
-
-**Linux/macOS (.bashrc ou .zshrc):**
-```bash
-# Adicione ao seu .bashrc ou .zshrc
-alias devbase="pwsh ~/Dev_Workspace/30-39_OPERATIONS/35_devbase_cli/devbase.ps1"
-```
-
-Agora você pode usar:
-```powershell
-devbase doctor
-devbase new -Name "meu-projeto"
+devbase core doctor
+devbase dev new "meu-projeto"
 ```
 
 ---
@@ -225,17 +196,18 @@ Use o comando `devbase audit` para verificar violações.
 ### 4.1 Visão Geral dos Comandos
 
 ```powershell
-devbase help  # Exibe todos os comandos disponíveis
+devbase help  # Exibe todos os grupos de comandos
+devbase core --help # Ajuda para o grupo core
 ```
 
 ### 4.2 Comandos de Diagnóstico
 
-#### `devbase doctor`
+#### `devbase core doctor`
 
 Verifica a saúde do workspace:
 
 ```powershell
-devbase doctor
+devbase core doctor
 ```
 
 **O que verifica:**
@@ -250,19 +222,19 @@ devbase doctor
  [X] 20-29_CODE - NÃO ENCONTRADO
  [!] .editorconfig - NÃO ENCONTRADO
 Encontrados 2 problemas
-Execute 'devbase doctor -Fix' para tentar corrigir
+Execute 'devbase core doctor --fix' para tentar corrigir
 ```
 
-#### `devbase audit`
+#### `devbase dev audit`
 
 Audita a nomenclatura de pastas:
 
 ```powershell
 # Apenas verificar
-devbase audit
+devbase dev audit
 
 # Verificar e corrigir automaticamente
-devbase audit -Fix
+devbase dev audit --fix
 ```
 
 **Exemplo de saída:**
@@ -280,16 +252,16 @@ Encontradas 3 violações:
 
 ### 4.3 Comandos de Criação
 
-#### `devbase new`
+#### `devbase dev new`
 
-Cria um novo projeto a partir do template Clean Architecture:
+Cria um novo projeto a partir de um template:
 
 ```powershell
 # Com nome especificado
-devbase new -Name "api-usuarios"
+devbase dev new "api-usuarios"
 
-# Interativo (solicita o nome)
-devbase new
+# Interativo (através do wizard)
+devbase dev new
 ```
 
 **O que acontece:**
@@ -297,16 +269,16 @@ devbase new
 2. Cria toda a estrutura de pastas DDD/Clean Architecture
 3. (Futuro) Substitui placeholders nos arquivos
 
-#### `devbase hydrate`
+#### `devbase core hydrate`
 
 Atualiza o workspace com os templates mais recentes:
 
 ```powershell
 # Atualizar apenas arquivos ausentes
-devbase hydrate
+devbase core hydrate
 
 # Forçar atualização de todos os templates
-devbase hydrate -Force
+devbase core hydrate --force
 ```
 
 **Quando usar:**
@@ -316,12 +288,12 @@ devbase hydrate -Force
 
 ### 4.4 Comandos de Dotfiles
 
-#### `devbase link-dotfiles`
+#### `devbase dev link-dotfiles`
 
 Cria symlinks dos seus dotfiles para `$HOME`:
 
 ```powershell
-devbase link-dotfiles
+devbase dev link-dotfiles
 ```
 
 **Como usar:**
@@ -336,7 +308,7 @@ devbase link-dotfiles
 .vimrc
 .zshrc
 
-# Após devbase link-dotfiles, em $HOME:
+# Após devbase dev link-dotfiles, em $HOME:
 .gitconfig -> C:\...\01_dotfiles\links\.gitconfig
 .vimrc -> C:\...\01_dotfiles\links\.vimrc
 .zshrc -> C:\...\01_dotfiles\links\.zshrc
@@ -344,12 +316,12 @@ devbase link-dotfiles
 
 ### 4.5 Comandos de Manutenção
 
-#### `devbase backup`
+#### `devbase ops backup`
 
 Executa backup usando estratégia 3-2-1:
 
 ```powershell
-devbase backup
+devbase ops backup
 ```
 
 **O que faz:**
@@ -357,12 +329,12 @@ devbase backup
 2. Exclui `node_modules`, `.git`, logs
 3. Mantém últimos 5 backups (limpa antigos automaticamente)
 
-#### `devbase clean`
+#### `devbase ops clean`
 
 Remove arquivos temporários:
 
 ```powershell
-devbase clean
+devbase ops clean
 ```
 
 **O que remove:**
@@ -538,10 +510,11 @@ __template-clean-arch/
 
 ```powershell
 # 1. Criar projeto
-devbase new -Name "api-pedidos"
+devbase dev new "api-pedidos"
 
 # 2. Navegar até o projeto
-cd .\20-29_CODE\21_monorepo_apps\api-pedidos\
+devbase nav goto code
+cd api-pedidos
 
 # 3. Inicializar Git (se desejar repositório separado)
 git init
@@ -717,7 +690,7 @@ O DevBase recomenda a estratégia 3-2-1:
 
 ```powershell
 # Executar backup
-devbase backup
+devbase ops backup
 ```
 
 **O que acontece:**
@@ -787,15 +760,15 @@ devbase doctor
 
 ```powershell
 # Registrar atividade
-devbase track -Message "Implementei autenticação OAuth2"
-devbase track -Message "Code review do PR #123" -Type review
+devbase ops track "Implementei autenticação OAuth2"
+devbase ops track "Code review do PR #123" --type review
 
 # Ver estatísticas
-devbase stats
+devbase ops stats
 
 # Gerar relatório semanal
-devbase weekly
-devbase weekly -Output ./weeknotes/semana-49.md
+devbase ops weekly
+devbase ops weekly --output ./weeknotes/semana-49.md
 
 # Gerar brag document
 devbase brag
@@ -806,15 +779,15 @@ devbase brag -Output ./brag-2024.md
 
 ```powershell
 # Início do dia
-devbase doctor  # Verificar ambiente
+devbase core doctor  # Verificar ambiente
 
 # Durante o dia, registrar trabalho significativo
-devbase track -Message "Corrigido bug de timeout na API"
-devbase track -Message "Reunião de planning - Sprint 23"
-devbase track -Message "PR #456 aprovado e merged"
+devbase ops track "Corrigido bug de timeout na API"
+devbase ops track "Reunião de planning - Sprint 23"
+devbase ops track "PR #456 aprovado e merged"
 
 # Final do dia
-devbase stats  # Ver resumo
+devbase ops stats  # Ver resumo
 ```
 
 ### 10.4 Exemplo de Relatório Semanal
@@ -918,19 +891,19 @@ O arquivo `33_ai_config/security/policy.md` define políticas:
 
 ### 12.1 Personalizando Templates
 
-Os templates estão em `modules/templates/`. Para personalizar:
+Os templates estão em `src/devbase/templates/`. Para personalizar:
 
 ```powershell
 # 1. Edite o template desejado
-notepad .\modules\templates\code\__template-clean-arch\README.md.template
+notepad .\src\devbase\templates\code\__template-clean-arch\README.md.template
 
 # 2. Aplique as mudanças
-devbase hydrate -Force
+devbase core hydrate --force
 ```
 
 ### 12.2 Adicionando Novos Hooks
 
-Crie um novo hook em `modules/templates/hooks/`:
+Crie um novo hook em `src/devbase/templates/hooks/`:
 
 ```powershell
 # modules/templates/hooks/post-merge.ps1.template
@@ -948,24 +921,18 @@ if (git diff HEAD@{1} --name-only | Select-String "package.json") {
 
 ### 12.3 Criando Comandos CLI Personalizados
 
-Edite `modules/assets/devbase.ps1.asset`:
+O DevBase v4.0 é baseado em Typer. Para adicionar um comando, crie um novo arquivo em `src/devbase/commands/` ou adicione a um existente:
 
-```powershell
-# Adicione no param()
-[ValidateSet(
-    'doctor', 'audit', 'backup', 'clean', 'new', 'link-dotfiles', 'hydrate', 'help',
-    'track', 'stats', 'weekly', 'brag',
-    'meu-comando'  # Novo comando
-)]
+```python
+# src/devbase/commands/custom.py
+import typer
 
-# Adicione a função
-function Invoke-MeuComando {
-    Write-Header "Meu Comando Personalizado"
-    # Sua lógica aqui
-}
+app = typer.Typer()
 
-# Adicione no switch
-'meu-comando' { Invoke-MeuComando }
+@app.command()
+def meu_comando():
+    """Meu comando personalizado"""
+    print("Olá do DevBase!")
 ```
 
 ### 12.4 Estrutura de Pastas Personalizada
@@ -983,22 +950,15 @@ New-DirSafe -Path (Join-Path $RootPath "50-59_CUSTOM/51_minha-categoria")
 
 ### 13.1 Problemas Comuns
 
-#### **Erro: "PowerShell não reconhece o comando"**
+#### **Erro: "Comando não encontrado"**
 
-```powershell
-# Verifique se está no diretório correto
-cd C:\Dev_Workspace
-
-# Execute com caminho completo
-.\30-39_OPERATIONS\35_devbase_cli\devbase.ps1 doctor
-```
+Certifique-se de que o `uv` adicionou o binário ao seu PATH (geralmente automático). Tente reiniciar o terminal.
 
 #### **Erro: "Permission denied" (Linux/macOS)**
 
 ```bash
-# Torne os scripts executáveis
-chmod +x ./bootstrap.ps1
-chmod +x ./install.sh
+# Se estiver rodando do código fonte
+chmod +x src/devbase/main.py
 ```
 
 #### **Erro: "Execution Policy" no Windows**
@@ -1026,15 +986,15 @@ git config core.hooksPath "00-09_SYSTEM/06_git_hooks"
 # Remova o arquivo de estado
 Remove-Item .\.devbase_state.json
 
-# Reexecute o bootstrap
-.\bootstrap.ps1 -Force
+# Reexecute o setup
+devbase core setup
 ```
 
 ### 13.2 Comandos de Diagnóstico
 
 ```powershell
 # Verificação completa
-devbase doctor
+devbase core doctor
 
 # Ver estado atual
 Get-Content .\.devbase_state.json | ConvertFrom-Json | Format-List
@@ -1062,7 +1022,7 @@ Copy-Item -Recurse .\20-29_CODE\ C:\Temp\code-backup\
 
 # 2. Limpe e reinstale
 Remove-Item -Recurse -Force C:\Dev_Workspace
-.\bootstrap.ps1 -RootPath "C:\Dev_Workspace" -Force
+devbase core setup
 
 # 3. Restaure seus arquivos
 Copy-Item -Recurse C:\Temp\knowledge-backup\* .\10-19_KNOWLEDGE\
@@ -1082,12 +1042,11 @@ Copy-Item -Recurse C:\Temp\code-backup\* .\20-29_CODE\
 
 Agora que você conhece o DevBase, sugerimos:
 
-1. ✅ Execute `devbase doctor` para verificar a instalação
+1. ✅ Execute `devbase core doctor` para verificar a instalação
 2. ✅ Configure seus dotfiles em `01_dotfiles/links/`
-3. ✅ Crie seu primeiro projeto com `devbase new`
+3. ✅ Crie seu primeiro projeto com `devbase dev new`
 4. ✅ Escreva seu primeiro ADR em `18_adr-decisions/`
-5. ✅ Configure o alias `devbase` no seu terminal
-6. ✅ Agende backups semanais
+5. ✅ Agende backups semanais
 
 ---
 
