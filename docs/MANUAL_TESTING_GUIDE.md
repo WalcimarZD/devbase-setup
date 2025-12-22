@@ -1,4 +1,4 @@
-# DevBase CLI - Guia de Testes Manuais v4.0.4
+# DevBase CLI - Guia de Testes Manuais v4.0.5
 
 > **Objetivo:** Testar todas as funcionalidades do DevBase CLI de forma sistemática.
 > **Última atualização:** 2025-12-22
@@ -15,7 +15,7 @@ uv tool install --force .
 
 # 2. Verificar instalação
 devbase --version
-# Esperado: devbase 4.0.4
+# Esperado: devbase 4.0.5
 
 # 3. Criar workspace de teste LIMPO
 Remove-Item -Recurse D:\Dev_Test -ErrorAction SilentlyContinue
