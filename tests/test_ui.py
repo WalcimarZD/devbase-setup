@@ -1,14 +1,8 @@
 
-import sys
-from pathlib import Path
 import pytest
 from io import StringIO
 
-# Ensure local modules/python is importable
-root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(root / "modules" / "python"))
-
-from ui import UI  # noqa: E402
+from devbase.legacy.ui import UI
 
 
 def test_ui_print_header(capsys):

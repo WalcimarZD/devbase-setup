@@ -1,15 +1,11 @@
 
-import sys
 from pathlib import Path
+from datetime import datetime
 import pytest
 
-# Ensure local modules/python is importable
-root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(root / "modules" / "python"))
-
-from filesystem import FileSystem  # noqa: E402
-from ui import UI  # noqa: E402
-from setup_pkm import run_setup_pkm  # noqa: E402
+from devbase.legacy.filesystem import FileSystem
+from devbase.legacy.ui import UI
+from devbase.legacy.setup_pkm import run_setup_pkm
 
 
 def test_setup_pkm_creates_structure(tmp_path):
@@ -44,7 +40,7 @@ def test_setup_pkm_replacements(tmp_path, monkeypatch):
     # let's call process_templates directly to test ONLY the replacement logic 
     # instead of full run_setup_pkm which hardcodes the path.
     
-    from template_utils import process_templates
+    from devbase.legacy.template_utils import process_templates
     
     fs = FileSystem(str(tmp_path))
     ui = UI(no_color=True)

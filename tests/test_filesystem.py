@@ -1,12 +1,7 @@
-import sys
 from pathlib import Path
 import pytest
 
-# Ensure local modules/python is importable during tests
-root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(root / "modules" / "python"))
-
-from filesystem import FileSystem  # noqa: E402
+from devbase.legacy.filesystem import FileSystem
 
 
 def test_assert_safe_path_ok(tmp_path):

@@ -1,14 +1,9 @@
 
-import sys
 import json
 from pathlib import Path
 import pytest
 
-# Ensure local modules/python is importable
-root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(root / "modules" / "python"))
-
-from state import StateManager  # noqa: E402
+from devbase.legacy.state import StateManager
 
 
 def test_get_initial_state(tmp_path):

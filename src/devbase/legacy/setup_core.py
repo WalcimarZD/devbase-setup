@@ -58,7 +58,7 @@ def run_setup_core(fs: FileSystem, ui: UI, policy_version: str = "3.1"):
     # ================================================
     # FASE 2: PUBLICAÇÃO DE TEMPLATES
     # ================================================
-    from template_utils import process_templates
+    from .template_utils import process_templates
 
     # Localiza o diretório de templates relativo a este arquivo
     # ../templates/core

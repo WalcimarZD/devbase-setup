@@ -3,13 +3,9 @@ import sys
 from pathlib import Path
 import pytest
 
-# Ensure local modules/python is importable
-root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(root / "modules" / "python"))
-
-from filesystem import FileSystem  # noqa: E402
-from ui import UI  # noqa: E402
-from setup_core import run_setup_core  # noqa: E402
+from devbase.legacy.filesystem import FileSystem
+from devbase.legacy.ui import UI
+from devbase.legacy.setup_core import run_setup_core
 
 
 def test_setup_core_creates_directories(tmp_path):
