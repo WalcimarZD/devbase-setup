@@ -1,29 +1,24 @@
 #!/usr/bin/env python3
 """
-DEPRECATED: Legacy DevBase CLI
-================================
-This file is deprecated. The project has migrated to a modern src-layout structure.
-
-Please use one of the following instead:
-  - Installed command: `devbase` (after uv tool install or pipx install)
-  - Development mode: `uv run devbase` or `python -m devbase`
-  - Direct execution: `python src/devbase/main.py`
-
-For migration details, see: MIGRATION.md
+DevBase CLI Shim
+================
+This script ensures the CLI can be run directly from the root directory
+without installation, mirroring the behavior of the installed `devbase` command.
 """
 import sys
+from pathlib import Path
 
-print("⚠️  WARNING: This is the LEGACY CLI (deprecated)")
-print("")
-print("The DevBase project has been modernized with:")
-print("  • Modern packaging (PEP 621 + uv)")
-print("  • Typer-based CLI framework")
-print("  • Rich terminal UI")
-print("")
-print("Please use instead:")
-print("  devbase          # If installed via 'uv tool install' or 'pipx install'")
-print("  uv run devbase   # For development")
-print("")
-print("For details, see: README.md or MIGRATION.md")
-print("")
-sys.exit(1)
+# Add src to python path to allow direct import
+PROCESS_ROOT = Path(__file__).parent.resolve()
+SRC_PATH = PROCESS_ROOT / "src"
+sys.path.insert(0, str(SRC_PATH))
+
+try:
+    from devbase.main import cli_main
+except ImportError as e:
+    print(f"CRITICAL ERROR: Failed to import DevBase CLI: {e}")
+    print(f"Python path: {sys.path}")
+    sys.exit(1)
+
+if __name__ == "__main__":
+    cli_main()

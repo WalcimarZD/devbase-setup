@@ -145,9 +145,12 @@ from state import StateManager
 
 **v4.0:**
 ```python
-# Proper package imports
-from devbase.legacy.filesystem import FileSystem
-from devbase.legacy.state import StateManager
+# Use adapters (Preferred)
+from devbase.adapters import get_filesystem
+
+# Or direct deprecated import (Not recommended)
+from devbase._deprecated.filesystem import FileSystem
+from devbase._deprecated.state import StateManager
 ```
 
 ### Configuration

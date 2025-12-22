@@ -281,17 +281,19 @@ def execute_setup_with_config(config: dict) -> None:
     console.print()
     console.print("[bold cyan]Creating workspace...[/bold cyan]\n")
 
-    # Import setup modules from legacy package
-    from devbase.legacy.filesystem import FileSystem
-    from devbase.legacy.setup_ai import run_setup_ai
-    from devbase.legacy.setup_code import run_setup_code
-    from devbase.legacy.setup_core import run_setup_core
-    from devbase.legacy.setup_operations import run_setup_operations
-    from devbase.legacy.setup_pkm import run_setup_pkm
-    from devbase.legacy.state import StateManager
+    # Import setup modules via Anti-Corruption Layer adapters
+    from devbase.adapters.filesystem_adapter import get_filesystem
+    from devbase.adapters.state_adapter import get_state_manager
+    from devbase.adapters.setup_adapter import (
+        run_setup_ai,
+        run_setup_code,
+        run_setup_core,
+        run_setup_operations,
+        run_setup_pkm,
+    )
 
     root = config["path"]
-    fs = FileSystem(str(root), dry_run=False)
+    fs = get_filesystem(str(root), dry_run=False)
 
     # Minimal UI for legacy modules
     class MinimalUI:
@@ -329,8 +331,8 @@ def execute_setup_with_config(config: dict) -> None:
                 console.print(f"[red]Error: {e}[/red]")
                 raise
 
-    # Update state
-    state_mgr = StateManager(root)
+    # Update state via adapter
+    state_mgr = get_state_manager(root)
     from datetime import datetime
 
     state = state_mgr.get_state()

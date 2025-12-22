@@ -35,11 +35,11 @@ def find(
         devbase pkm find --type til
         devbase pkm find typer --tag python
     """
-    from devbase.legacy.knowledge.database import KnowledgeDB
+    from devbase.adapters.knowledge_adapter import get_knowledge_db
 
     root: Path = ctx.obj["root"]
     
-    db = KnowledgeDB(root)
+    db = get_knowledge_db(root)
     db.connect()
     
     # Index if database is empty or reindex requested
@@ -117,7 +117,7 @@ def graph(
         devbase pkm graph --html        # Interactive visualization
     """
     import networkx as nx
-    from devbase.legacy.knowledge.graph import KnowledgeGraph
+    from devbase.adapters.knowledge_adapter import get_knowledge_graph
 
     root: Path = ctx.obj["root"]
     
@@ -126,7 +126,7 @@ def graph(
     console.print(f"Workspace: [cyan]{root}[/cyan]\n")
     
     # Build graph
-    kg = KnowledgeGraph(root)
+    kg = get_knowledge_graph(root)
     
     with console.status("[bold green]Scanning knowledge base..."):
         stats = kg.scan()
@@ -202,7 +202,7 @@ def links(
         devbase pkm links til/2025-12-22-typer-context.md
     """
     import networkx as nx
-    from devbase.legacy.knowledge.graph import KnowledgeGraph
+    from devbase.adapters.knowledge_adapter import get_knowledge_graph
 
     root: Path = ctx.obj["root"]
     
@@ -229,7 +229,7 @@ def links(
     console.print(f"[bold]Links for:[/bold] [cyan]{note_path.name}[/cyan]\n")
     
     # Build graph
-    kg = KnowledgeGraph(root)
+    kg = get_knowledge_graph(root)
     kg.scan()
     
     # Get connections

@@ -27,25 +27,24 @@ def new(
         bool,
         typer.Option("--interactive/--no-interactive", help="Customize project details"),
     ] = True,
+    setup: Annotated[
+        bool,
+        typer.Option("--setup/--no-setup", help="Run full project setup (git, deps, VS Code)"),
+    ] = True,
 ) -> None:
     """
     📦 Create a new project from template.
     
     Creates a customized project in 21_monorepo_apps/ using the specified template.
-    In interactive mode, prompts for description, license, and author.
     
-    Templates support variable substitution:
-    - {{project_name}} - Original name (kebab-case)
-    - {{project_name_pascal}} - PascalCase version
-    - {{project_name_snake}} - snake_case version
-    - {{author}} - Author name (from git config)
-    - {{year}} - Current year
-    - {{description}} - Project description
-    - {{license}} - License type
+    Golden Path (Default):
+    - Generates files
+    - Initializes Git repo
+    - Installs dependencies (uv/pip)
+    - Sets up pre-commit hooks
+    - Opens in VS Code
     
-    Example:
-        devbase dev new my-api              # Interactive prompts
-        devbase dev new my-lib --no-interactive  # Use defaults
+    Use --no-setup to only generate files.
     """
     root: Path = ctx.obj["root"]
 
@@ -56,40 +55,210 @@ def new(
 
     # Use template engine
     from devbase.utils.templates import generate_project_from_template, list_available_templates
+    from devbase.services.project_setup import get_project_setup
+    from devbase.utils.telemetry import get_telemetry
+
+    telemetry = get_telemetry(root)
+    setup_service = get_project_setup(root)
+
+    # Start tracking
+    telemetry.track(
+        f"Creating project {name}",
+        category="scaffolding",
+        action="create_project_start",
+        metadata={"template": template, "interactive": interactive}
+    )
 
     try:
         console.print()
         console.print(f"[bold]Creating project '{name}'...[/bold]\n")
 
+        # 1. Generate Files
         dest_path = generate_project_from_template(
             template_name=template,
             project_name=name,
             root=root,
             interactive=interactive
         )
+        console.print(f"[green]✓[/green] Files generated at {dest_path}")
 
-        console.print()
+        # 2. Golden Path Setup
+        if setup:
+            setup_service.run_golden_path(dest_path, name)
+        else:
+            console.print("\n[dim]Skipping setup steps (--no-setup)[/dim]")
+            console.print(f"\nNext steps:\n  cd {dest_path}\n  git init\n  code .")
+
         console.print(Panel.fit(
-            f"[bold green]✅ Project created![/bold green]\n\n"
-            f"Location: [cyan]{dest_path}[/cyan]\n\n"
-            f"Next steps:\n"
-            f"  1. [dim]cd {dest_path}[/dim]\n"
-            f"  2. [dim]git init[/dim]\n"
-            f"  3. [dim]code .[/dim]",
+            f"[bold green]✅ Project Ready![/bold green]\n\n"
+            f"Location: [cyan]{dest_path}[/cyan]",
             border_style="green"
         ))
+        
+        # Success telemetry
+        telemetry.track(
+            f"Created project {name}",
+            category="scaffolding",
+            action="create_project_success",
+            metadata={"path": str(dest_path), "setup_run": setup}
+        )
+
     except FileNotFoundError:
+        telemetry.track(f"Template not found: {template}", action="create_project_error", status="error")
         console.print(f"[red]✗ Template '{template}' not found[/red]\n")
         console.print("Available templates:")
         for tmpl in list_available_templates(root):
             console.print(f"  [cyan]• {tmpl}[/cyan]")
         raise typer.Exit(1)
     except FileExistsError:
+        telemetry.track(f"Project exists: {name}", action="create_project_error", status="error")
         console.print(f"[red]✗ Project '{name}' already exists[/red]")
         raise typer.Exit(1)
     except Exception as e:
+        telemetry.track(f"Create failed: {e}", action="create_project_error", status="error")
         console.print(f"[red]✗ Failed to create project: {e}[/red]")
         raise typer.Exit(1)
+
+
+@app.command()
+def archive(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Project name to archive")],
+    confirm: Annotated[bool, typer.Option("--confirm", "-y", help="Skip confirmation")] = False,
+) -> None:
+    """
+    📦 Archive a project.
+    
+    Moves the project from 21_monorepo_apps to 90-99_ARCHIVE_COLD/92_archived_projects/{year}.
+    """
+    import shutil
+    from datetime import datetime
+    from rich.prompt import Confirm
+    from devbase.utils.telemetry import get_telemetry
+
+    root: Path = ctx.obj["root"]
+    telemetry = get_telemetry(root)
+
+    project_path = root / "20-29_CODE" / "21_monorepo_apps" / name
+    
+    if not project_path.exists():
+        console.print(f"[red]✗ Project '{name}' not found at {project_path}[/red]")
+        raise typer.Exit(1)
+
+    # Determine archive destination
+    year = str(datetime.now().year)
+    archive_root = root / "90-99_ARCHIVE_COLD" / "92_archived_projects" / year
+    archive_path = archive_root / name
+
+    console.print()
+    console.print(Panel.fit(
+        f"[bold red]Archive Project[/bold red]\n\n"
+        f"Project: [cyan]{name}[/cyan]\n"
+        f"Source: [dim]{project_path}[/dim]\n"
+        f"Destination: [yellow]{archive_path}[/yellow]",
+        border_style="red"
+    ))
+
+    if not confirm:
+        if not Confirm.ask("Are you sure you want to archive this project?"):
+            console.print("[dim]Aborted.[/dim]")
+            raise typer.Exit(0)
+
+    try:
+        archive_root.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(project_path), str(archive_path))
+        
+        console.print(f"\n[green]✓[/green] Project archived to: {archive_path}")
+        
+        telemetry.track(
+            f"Archived project {name}",
+            category="lifecycle",
+            action="archive_project",
+            metadata={"src": str(project_path), "dst": str(archive_path)}
+        )
+
+    except Exception as e:
+        console.print(f"[red]✗ Failed to archive: {e}[/red]")
+        raise typer.Exit(1)
+
+
+    except Exception as e:
+        console.print(f"[red]✗ Failed to archive: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def update(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Project name to update")],
+) -> None:
+    """
+    🔄 Update a project from its template.
+    
+    Supports:
+    - Copier (preferred): Runs 'copier update'
+    - Legacy: Checks if hydration is possible (warns mainly)
+    """
+    import shutil
+    import subprocess
+    from devbase.utils.telemetry import get_telemetry
+
+    root: Path = ctx.obj["root"]
+    telemetry = get_telemetry(root)
+    
+    project_path = root / "20-29_CODE" / "21_monorepo_apps" / name
+    
+    if not project_path.exists():
+        console.print(f"[red]✗ Project '{name}' not found[/red]")
+        raise typer.Exit(1)
+
+    console.print()
+    console.print(Panel.fit(
+        f"[bold blue]Update Project[/bold blue]\n\n"
+        f"Project: [cyan]{name}[/cyan]",
+        border_style="blue"
+    ))
+
+    # check for copier
+    copier_answers = project_path / ".copier-answers.yml"
+    copier_answers_alt = project_path / ".copier-answers.yaml"
+    
+    if copier_answers.exists() or copier_answers_alt.exists():
+        console.print("[dim]Detected Copier project. Running update...[/dim]")
+        
+        try:
+             # Using subprocess to leverage copier CLI or we could import copier
+             # importing copier is safer for python usage if installed
+             import copier
+             
+             # Copier update typically needs to run inside the project root or specify it
+             # copier.run_update(project_path) is not exactly the API, usually it's run_update(src_path, dst_path...)
+             # But for update, we just need the destination if answers file exists.
+             # API: copier.run_update(dst_path=..., ...)
+             
+             copier.run_update(
+                 dst_path=str(project_path),
+                 unsafe=True, # We trust our templates
+                 overwrite=True,
+                 quiet=False
+             )
+             
+             console.print(f"[green]✓[/green] Project updated successfully!")
+             telemetry.track(f"Updated project {name}", category="lifecycle", action="update_project", status="success")
+
+        except ImportError:
+             console.print("[red]✗ Copier not installed.[/red]")
+             telemetry.track(f"Update failed {name}: copier missing", category="lifecycle", action="update_project", status="error")
+        except Exception as e:
+             console.print(f"[red]✗ Update failed: {e}[/red]")
+             telemetry.track(f"Update failed {name}: {e}", category="lifecycle", action="update_project", status="error")
+             
+    else:
+        # Legacy/Unknown
+        console.print("[yellow]⚠ Not a Copier project.[/yellow]")
+        console.print("Legacy template hydration is strongly discouraged for manual updates.")
+        console.print("Recommendation: Migrate to Copier for update capabilities.")
+        telemetry.track(f"Update skipped {name}", category="lifecycle", action="update_project", status="skipped")
 
 
 @app.command()

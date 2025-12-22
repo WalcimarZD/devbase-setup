@@ -32,6 +32,23 @@ class Config:
             "default_template": "clean-arch",
         },
         "aliases": {},
+        # Migration feature flags (Strangler Fig pattern)
+        # Set to False to use modern implementations when available
+        "migration": {
+            # Module-specific flags
+            "use_legacy_filesystem": True,      # FileSystem class
+            "use_legacy_state": True,           # StateManager class
+            "use_legacy_setup_core": True,      # run_setup_core()
+            "use_legacy_setup_code": True,      # run_setup_code()
+            "use_legacy_setup_ai": True,        # run_setup_ai()
+            "use_legacy_setup_ops": True,       # run_setup_operations()
+            "use_legacy_setup_pkm": True,       # run_setup_pkm()
+            "use_legacy_knowledge": True,       # KnowledgeDB/Graph
+            # Master switch (when False, all legacy is disabled)
+            "legacy_enabled": True,
+            # Debugging (logs warning on each legacy call)
+            "log_legacy_calls": False,
+        },
     }
 
     def __init__(self, config_path: Optional[Path] = None):

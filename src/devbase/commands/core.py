@@ -3,7 +3,7 @@ Core Commands: setup, doctor, hydrate
 ======================================
 Essential workspace management commands.
 """
-# Import legacy modules (will be refactored)
+# Import via Anti-Corruption Layer adapters (Strangler Fig pattern)
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -14,13 +14,15 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from typing_extensions import Annotated
 
-from devbase.legacy.filesystem import FileSystem
-from devbase.legacy.setup_ai import run_setup_ai
-from devbase.legacy.setup_code import run_setup_code
-from devbase.legacy.setup_core import run_setup_core
-from devbase.legacy.setup_operations import run_setup_operations
-from devbase.legacy.setup_pkm import run_setup_pkm
-from devbase.legacy.state import StateManager
+from devbase.adapters.filesystem_adapter import get_filesystem
+from devbase.adapters.state_adapter import get_state_manager
+from devbase.adapters.setup_adapter import (
+    run_setup_ai,
+    run_setup_code,
+    run_setup_core,
+    run_setup_operations,
+    run_setup_pkm,
+)
 
 app = typer.Typer(help="Core workspace commands")
 console = Console()
@@ -83,9 +85,9 @@ def setup(
     if dry_run:
         console.print("[yellow]⚠️  DRY-RUN MODE: No changes will be made[/yellow]\n")
 
-    # Initialize filesystem
-    fs = FileSystem(str(root), dry_run=dry_run)
-    state_mgr = StateManager(root)
+    # Initialize filesystem via adapter
+    fs = get_filesystem(str(root), dry_run=dry_run)
+    state_mgr = get_state_manager(root)
 
     # Check existing state
     current_state = state_mgr.get_state()
@@ -251,7 +253,7 @@ def doctor(
     state_path = root / ".devbase_state.json"
     if state_path.exists():
         try:
-            state_mgr = StateManager(root)
+            state_mgr = get_state_manager(root)
             state = state_mgr.get_state()
             console.print(f"  [green]✓[/green] Version: {state['version']}")
             console.print(f"  [dim]  Installed: {state.get('installedAt', 'Unknown')}[/dim]")
@@ -270,6 +272,30 @@ def doctor(
     security_ok = run_security_checks(root)
     if not security_ok:
         add_issue("Security issues detected", fix_description="Review security audit above")
+
+    # Check Projects (New Governance Check)
+    console.print("\n[bold]Checking Projects health (Governance)...[/bold]")
+    apps_dir = root / "20-29_CODE" / "21_monorepo_apps"
+    if apps_dir.exists():
+        projects = [p for p in apps_dir.iterdir() if p.is_dir()]
+        console.print(f"  Found {len(projects)} projects.")
+        
+        for proj in projects:
+            issues_found = False
+            # Check Git
+            if not (proj / ".git").exists():
+                console.print(f"  [red]✗[/red] {proj.name}: Missing .git")
+                issues_found = True
+                add_issue(f"Project {proj.name} not initialized", fix_description="Run 'git init' manually")
+            
+            # Check Pre-commit (soft check)
+            if not (proj / ".pre-commit-config.yaml").exists():
+                # Not necessarily an error, but a warning for governance
+                # console.print(f"  [yellow]⚠[/yellow] {proj.name}: No pre-commit config")
+                pass
+
+            if not issues_found:
+                 console.print(f"  [green]✓[/green] {proj.name}")
 
     # === FIX-IT FLOW ===
     console.print()
@@ -343,8 +369,8 @@ def hydrate(
     if force:
         console.print("[yellow]⚠️  Force mode: All templates will be overwritten[/yellow]\n")
 
-    # Execute hydration (reusing setup modules)
-    fs = FileSystem(str(root), dry_run=False)
+    # Execute hydration via adapters
+    fs = get_filesystem(str(root), dry_run=False)
 
     modules_to_run = [
         ("Core", run_setup_core),

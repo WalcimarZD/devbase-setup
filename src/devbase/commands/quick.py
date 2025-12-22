@@ -117,10 +117,15 @@ def quickstart(
         border_style="cyan"
     ))
 
-    # Step 1: Create project
-    console.print("\n[bold cyan]Step 1/7:[/bold cyan] Generating project...")
+    # Use shared logic
     from devbase.utils.templates import generate_project_from_template
+    from devbase.services.project_setup import get_project_setup
+    
+    setup_service = get_project_setup(root)
 
+    # Step 1: Create project
+    console.print("\n[bold cyan]Step 1/2:[/bold cyan] Generating project...")
+    
     try:
         project_path = generate_project_from_template(
             template_name=template,
@@ -133,89 +138,15 @@ def quickstart(
         console.print(f"[red]✗ Failed: {e}[/red]")
         raise typer.Exit(1)
 
-    # Step 2: Git init
-    console.print("[bold cyan]Step 2/7:[/bold cyan] Initializing Git...")
-    try:
-        subprocess.run(["git", "init"], cwd=project_path, check=True, capture_output=True)
-        console.print("[green]✓[/green] Git initialized\n")
-    except subprocess.CalledProcessError:
-        console.print("[yellow]⚠[/yellow] Git init failed (continuing...)\n")
-
-    # Step 3: Install dependencies with uv (if pyproject.toml exists)
-    console.print("[bold cyan]Step 3/7:[/bold cyan] Installing dependencies...")
-    pyproject = project_path / "pyproject.toml"
-    if pyproject.exists():
-        try:
-            import shutil
-            if shutil.which("uv"):
-                subprocess.run(["uv", "sync"], cwd=project_path, check=True)
-                console.print("[green]✓[/green] Dependencies installed with uv\n")
-            else:
-                console.print("[yellow]⚠[/yellow] uv not found, skipping deps\n")
-        except subprocess.CalledProcessError:
-            console.print("[yellow]⚠[/yellow] Dependency install failed\n")
-    else:
-        console.print("[dim]No pyproject.toml, skipping\n")
-
-    # Step 4: Setup pre-commit hooks
-    console.print("[bold cyan]Step 4/7:[/bold cyan] Setting up pre-commit...")
-    precommit_config = project_path / ".pre-commit-config.yaml"
-    if precommit_config.exists():
-        try:
-            subprocess.run(
-                ["pre-commit", "install"],
-                cwd=project_path,
-                check=True,
-                capture_output=True
-            )
-            console.print("[green]✓[/green] Pre-commit hooks installed\n")
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            console.print("[yellow]⚠[/yellow] pre-commit not found, skipping\n")
-    else:
-        console.print("[dim]No .pre-commit-config.yaml, skipping\n")
-
-    # Step 5: Git add
-    console.print("[bold cyan]Step 5/7:[/bold cyan] Staging files...")
-    try:
-        subprocess.run(["git", "add", "."], cwd=project_path, check=True, capture_output=True)
-        console.print("[green]✓[/green] Files staged\n")
-    except subprocess.CalledProcessError:
-        console.print("[yellow]⚠[/yellow] Git add failed\n")
-
-    # Step 6: Git commit
-    console.print("[bold cyan]Step 6/7:[/bold cyan] Creating initial commit...")
-    try:
-        subprocess.run(
-            ["git", "commit", "-m", f"feat: Initialize {name} from DevBase template"],
-            cwd=project_path,
-            check=True,
-            capture_output=True
-        )
-        console.print("[green]✓[/green] Initial commit created\n")
-    except subprocess.CalledProcessError:
-        console.print("[yellow]⚠[/yellow] Git commit failed\n")
-
-    # Step 7: Open in VS Code
-    console.print("[bold cyan]Step 7/7:[/bold cyan] Opening in VS Code...")
-    try:
-        import shutil
-        if shutil.which("code"):
-            subprocess.run(["code", str(project_path)], check=True)
-            console.print("[green]✓[/green] Opened in VS Code\n")
-        else:
-            console.print("[dim]VS Code not found\n")
-    except Exception:
-        console.print("[dim]Could not open VS Code\n")
+    # Step 2: Run Golden Path Setup (encapsulated)
+    console.print("[bold cyan]Step 2/2:[/bold cyan] Running setup...")
+    setup_service.run_golden_path(project_path, name)
 
     # Success summary
     console.print()
     console.print(Panel.fit(
         f"[bold green]✅ Golden Path Complete![/bold green]\n\n"
         f"Project: [cyan]{project_path}[/cyan]\n\n"
-        f"✓ Git repository initialized\n"
-        f"✓ Dependencies installed\n"
-        f"✓ Pre-commit hooks configured\n"
-        f"✓ Initial commit created\n\n"
         f"[dim]Ready for development![/dim]",
         border_style="green"
     ))

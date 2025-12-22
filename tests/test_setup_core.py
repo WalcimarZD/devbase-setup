@@ -3,9 +3,9 @@ import sys
 from pathlib import Path
 import pytest
 
-from devbase.legacy.filesystem import FileSystem
-from devbase.legacy.ui import UI
-from devbase.legacy.setup_core import run_setup_core
+from devbase._deprecated.filesystem import FileSystem
+from devbase._deprecated.ui import UI
+from devbase._deprecated.setup_core import run_setup_core
 
 
 def test_setup_core_creates_directories(tmp_path):

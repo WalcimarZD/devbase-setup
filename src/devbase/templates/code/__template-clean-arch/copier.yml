@@ -1,0 +1,40 @@
+# copier.yml
+_min_copier_version: "9.1.0"
+
+# Questions for the user
+project_name:
+  type: str
+  help: What is your project name?
+  validator: "^[a-z0-9]+([-.][a-z0-9]+)*$"
+
+description:
+  type: str
+  help: Short description of the project
+  default: "A clean architecture project"
+
+author:
+  type: str
+  help: Project author
+  default: "DevBase User"
+
+license:
+  type: str
+  help: License type
+  choices:
+    - MIT
+    - Apache-2.0
+    - GPL-3.0
+    - UNLICENSED
+  default: MIT
+
+# File exclusion
+_exclude:
+  - "copier.yml"
+  - ".git"
+  - ".vscode"
+  - "__pycache__"
+
+# Tasks (optional - allow post-install scripts)
+_tasks:
+  # - "git init" (Handled by devbase dev new)
+  # - "uv sync" (Handled by devbase dev new)

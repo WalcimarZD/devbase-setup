@@ -48,44 +48,13 @@ def track(
     """
     root: Path = ctx.obj["root"]
 
-    # Detect context
-    from devbase.utils.context import detect_context, infer_activity_type, infer_project_name
-    import uuid
-
-    current_dir = Path.cwd()
-    context = detect_context(current_dir, root)
-
-    # Auto-infer type if not specified
-    if not event_type:
-        event_type = infer_activity_type(context)
-
-    # Ensure telemetry directory
-    telemetry_dir = root / ".telemetry"
-    telemetry_dir.mkdir(exist_ok=True)
-    events_file = telemetry_dir / "events.jsonl"
-
-    # Schema v2
-    event = {
-        "event_id": str(uuid.uuid4()),
-        "timestamp": datetime.now().isoformat(),
-        "session_id": str(uuid.uuid4()),  # Placeholder: In future, get from env var or shell session
-        "duration_ms": 0,  # Default for point-in-time events
-        "category": event_type,
-        "action": "track",
-        "status": "success",
-        "message": message,
-        "context": {
-            "type": context.get("context_type"),
-            "project": infer_project_name(context),
-            "area": context.get("area"),
-            "category": context.get("category"),
-            "semantic_location": context.get("semantic_location")
-        }
-    }
-
-    # Append to file
-    with open(events_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event) + "\n")
+    from devbase.utils.telemetry import get_telemetry
+    
+    telemetry = get_telemetry(root)
+    event = telemetry.track(
+        message=message,
+        category=event_type
+    )
 
     console.print(f"[green]✓[/green] Tracked: [[cyan]{event['category']}[/cyan]] {message}")
 
@@ -125,9 +94,63 @@ def stats(ctx: typer.Context) -> None:
     console.print(f"Total events: [cyan]{len(events)}[/cyan]\n")
 
     # Count by type
-    type_counts = Counter(e.get("category", "unknown") for e in events)
+    today = datetime.now()
+    week_start = today - timedelta(days=today.weekday())
+    
+    # 1. Analyze Telemetry (New)
+    # from collections import Counter # Already imported
+    # import json # Already imported
+    
+    telemetry_file = root / ".telemetry" / "events.jsonl"
+    
+    project_creates = 0
+    templates_used = Counter()
+    
+    if telemetry_file.exists():
+        try:
+            with open(telemetry_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        event = json.loads(line)
+                        if event.get("action") == "create_project_success":
+                            project_creates += 1
+                            # Try to extract template from metadata if present
+                            # We might need to look back at the start event for template info
+                            # or update success event to include it. 
+                            # For simplicity, let's assume metadata has it or we just count generic success
+                            # If metadata has path, we can't infer template easily without looking detailed
+                            pass
+                        
+                        # Better approach: check create_project_start for template popularity
+                        if event.get("action") == "create_project_start":
+                            tmpl = event.get("metadata", {}).get("template", "unknown")
+                            templates_used[tmpl] += 1
+                            
+                    except json.JSONDecodeError:
+                        pass
+        except Exception:
+            pass
 
-    table = Table(title="Events by Type")
+    # Display Metrics
+    grid = Table.grid(expand=True)
+    grid.add_column()
+    grid.add_column(justify="right")
+    
+    grid.add_row("[bold]Weekly Activity[/bold]", "")
+    grid.add_row("Projects Created (Total)", f"[cyan]{project_creates}[/cyan]")
+    
+    if templates_used:
+        grid.add_row("", "")
+        grid.add_row("[bold]Popular Templates[/bold]", "")
+        for tmpl, count in templates_used.most_common(3):
+            grid.add_row(f"  {tmpl}",str(count))
+
+    console.print(Panel(grid, title="DevBase Stats", border_style="blue"))
+    console.print()
+
+    # Original "Count by type" logic, adapted to be "Weekly Log"
+    type_counts = Counter(e.get("category") or e.get("type", "unknown") for e in events)
+    table = Table(title="Events by Type") # Changed title to "Events by Type" to match original intent
     table.add_column("Type", style="cyan")
     table.add_column("Count", justify="right", style="green")
 
@@ -200,7 +223,14 @@ def weekly(
     for event in events:
         ts = event.get("timestamp", "")[:10]
         msg = event.get("message", "")
-        report += f"- [{ts}] {msg}\n"
+        # v2 uses 'category', v1 uses 'type'
+        cat = event.get("category") or event.get("type", "unknown")
+        # Ensure project is shown if available (v2 context)
+        ctx_data = event.get("context", {})
+        if isinstance(ctx_data, dict) and ctx_data.get("project"):
+            cat = f"{cat}:{ctx_data['project']}"
+            
+        report += f"- [{ts}] **{cat}**: {msg}\n"
 
     # Determine output path (workspace-relative by default)
     default_subdir = "10-19_KNOWLEDGE/12_private_vault/journal"

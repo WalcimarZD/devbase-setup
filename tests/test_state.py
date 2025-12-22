@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import pytest
 
-from devbase.legacy.state import StateManager
+from devbase._deprecated.state import StateManager
 
 
 def test_get_initial_state(tmp_path):

@@ -130,12 +130,20 @@ def report(
         has_type = 'type' in columns
         
         # Normalize to 'category'
-        if has_category:
-            cat_expr = "category"
-        elif has_type:
-            cat_expr = "type as category"
-        else:
+        # We want to select "category" if available, else "type", but handle mixed rows where one might be null.
+        # Construct a COALESCE clause based on available columns.
+        
+        cols_to_check = []
+        if has_category: cols_to_check.append("category")
+        if has_type: cols_to_check.append("type")
+        
+        if not cols_to_check:
+            # Neither exists
             cat_expr = "'unknown' as category"
+        else:
+            # coalesce(category, type, 'unknown')
+            cols_str = ", ".join(cols_to_check)
+            cat_expr = f"coalesce({cols_str}, 'unknown') as category"
 
         # Safe Select
         df = con.execute(f"""

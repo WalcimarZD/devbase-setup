@@ -2,9 +2,9 @@
 from pathlib import Path
 import pytest
 
-from devbase.legacy.filesystem import FileSystem
-from devbase.legacy.ui import UI
-from devbase.legacy.setup_code import run_setup_code
+from devbase._deprecated.filesystem import FileSystem
+from devbase._deprecated.ui import UI
+from devbase._deprecated.setup_code import run_setup_code
 
 
 def test_setup_code_creates_structure(tmp_path):

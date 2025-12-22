@@ -25,6 +25,11 @@ devbase --root D:\Dev_Test core setup
 cd D:\Dev_Test
 ```
 
+> **Developer Note (Fast Loop):**
+> You can also run the CLI directly without installing, using the shim script:
+> `uv run python devbase.py [command]`
+> Example: `uv run python devbase.py core doctor`
+
 ---
 
 ## 📋 1. CORE - Comandos Essenciais

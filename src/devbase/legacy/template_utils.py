@@ -6,7 +6,7 @@ PROPÓSITO:
     Extraído para evitar duplicação entre setup_core e setup_code.
 
 USO:
-    from devbase.legacy.template_utils import process_templates
+    from devbase._deprecated.template_utils import process_templates
     
     process_templates(fs, ui, templates_root, dest_root, policy_version)
 """

@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
 
-from devbase.legacy.filesystem import FileSystem
+from devbase._deprecated.filesystem import FileSystem
 
 
 def test_assert_safe_path_ok(tmp_path):

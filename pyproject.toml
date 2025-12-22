@@ -6,7 +6,7 @@ authors = [
     { name = "DevBase Team", email = "devbase@example.com" }
 ]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 keywords = ["devops", "workspace", "cli", "johnny-decimal"]
 classifiers = [
@@ -29,16 +29,13 @@ dependencies = [
     # Template Engine
     "jinja2>=3.1.6",
     "toml>=0.10.2",
+    "copier>=9.1.0",
     # Knowledge Management (Fase 4)
     "networkx>=3.2",
     "python-frontmatter>=1.1.0",
 ]
 
 [project.optional-dependencies]
-platform = [
-    # Template engine replacement (Fase 7)
-    "copier>=9.1.0",
-]
 viz = [
     # Knowledge graph visualization
     "pyvis>=0.3.2",

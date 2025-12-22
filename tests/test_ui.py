@@ -2,7 +2,7 @@
 import pytest
 from io import StringIO
 
-from devbase.legacy.ui import UI
+from devbase._deprecated.ui import UI
 
 
 def test_ui_print_header(capsys):

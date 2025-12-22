@@ -107,6 +107,25 @@
     • Se storage validation falhar: Use -SkipStorageValidation
 #>
 
+# ============================================
+# ⚠️  DEPRECATION WARNING
+# ============================================
+# This PowerShell bootstrap is DEPRECATED.
+# Please use the modern Python CLI instead:
+#
+#   pip install devbase
+#   devbase core setup
+#
+# This script will be removed in v5.0.0.
+# See MIGRATION.md for details.
+# ============================================
+Write-Host ""
+Write-Host "╔═══════════════════════════════════════════════════════════════════╗" -ForegroundColor Yellow
+Write-Host "║  ⚠️  DEPRECATED: Use 'devbase core setup' (Python CLI) instead   ║" -ForegroundColor Yellow
+Write-Host "║  This PowerShell bootstrap will be removed in v5.0.0              ║" -ForegroundColor Yellow
+Write-Host "╚═══════════════════════════════════════════════════════════════════╝" -ForegroundColor Yellow
+Write-Host ""
+
 param (
     [string]$RootPath = "$HOME\Dev_Workspace",
     [switch]$SkipStorageValidation,
@@ -172,7 +191,7 @@ $script:StateFile = Join-Path $RootPath ".devbase_state.json"
 # • New-DirSafe, New-FileSafe (operações de filesystem)
 # • Assert-SafePath, Assert-NoBOM (segurança)
 # ============================================
-. (Join-Path $PSScriptRoot "modules/common-functions.ps1")
+. (Join-Path $PSScriptRoot "_deprecated_ps1/common-functions.ps1")
 
 # ============================================
 # FUNÇÕES ESPECÍFICAS DO BOOTSTRAP
@@ -385,7 +404,7 @@ if ($currentState.version -ne "0.0.0") {
 # Ex: setup-core.ps1 cria a estrutura base necessária para os outros.
 # ============================================
 
-$modulesPath = Join-Path $PSScriptRoot "modules"
+$modulesPath = Join-Path $PSScriptRoot "_deprecated_ps1"
 
 # Lista ordenada de módulos a serem carregados
 # IMPORTANTE: Manter ordem correta de dependências!

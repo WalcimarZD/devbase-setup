@@ -3,9 +3,9 @@ from pathlib import Path
 from datetime import datetime
 import pytest
 
-from devbase.legacy.filesystem import FileSystem
-from devbase.legacy.ui import UI
-from devbase.legacy.setup_pkm import run_setup_pkm
+from devbase._deprecated.filesystem import FileSystem
+from devbase._deprecated.ui import UI
+from devbase._deprecated.setup_pkm import run_setup_pkm
 
 
 def test_setup_pkm_creates_structure(tmp_path):
@@ -40,7 +40,7 @@ def test_setup_pkm_replacements(tmp_path, monkeypatch):
     # let's call process_templates directly to test ONLY the replacement logic 
     # instead of full run_setup_pkm which hardcodes the path.
     
-    from devbase.legacy.template_utils import process_templates
+    from devbase._deprecated.template_utils import process_templates
     
     fs = FileSystem(str(tmp_path))
     ui = UI(no_color=True)
