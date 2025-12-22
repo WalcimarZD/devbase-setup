@@ -14,7 +14,7 @@ import typer
 from rich.console import Console
 from typing_extensions import Annotated
 
-from devbase.commands import core, development, navigation, operations, quick
+from devbase.commands import core, development, navigation, operations, quick, pkm
 from devbase.utils.workspace import detect_workspace_root
 
 # Initialize Typer app with rich help
@@ -35,6 +35,7 @@ app.add_typer(development.app, name="dev", help="Development commands")
 app.add_typer(operations.app, name="ops", help="Operations & automation")
 app.add_typer(navigation.app, name="nav", help="Navigation shortcuts")
 app.add_typer(quick.app, name="quick", help="Quick actions")
+app.add_typer(pkm.app, name="pkm", help="Personal Knowledge Management")
 
 
 @app.callback()

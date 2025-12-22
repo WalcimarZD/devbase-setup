@@ -1,17 +1,89 @@
 """
-Quick Action Commands: quickstart, sync
-========================================
-Composite commands for common workflows.
+Quick Action Commands: quickstart, sync, note
+==============================================
+Composite commands for common workflows and instant knowledge capture.
 """
+import re
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from typing_extensions import Annotated
 
 app = typer.Typer(help="Quick action commands")
 console = Console()
+
+
+@app.command()
+def note(
+    ctx: typer.Context,
+    content: Annotated[str, typer.Argument(help="Note content or TIL")],
+    edit: Annotated[bool, typer.Option("--edit", "-e", help="Open in VS Code after creating")] = False,
+    til: Annotated[bool, typer.Option("--til", "-t", help="Save as TIL (default)")] = True,
+) -> None:
+    """
+    📝 Instant note capture to knowledge base.
+    
+    Creates a note with minimal friction (7-line template vs 27-line full template).
+    Perfect for quick TILs, ideas, or snippets during flow state.
+    
+    Examples:
+        devbase quick note "Python f-strings support = for debug"
+        devbase quick note "OAuth2 PKCE flow prevents token interception" --edit
+        devbase quick note "Meeting notes with team" --no-til
+    """
+    root: Path = ctx.obj["root"]
+    
+    # Generate slug from content
+    slug = re.sub(r'[^\w\s-]', '', content.lower())[:50]
+    slug = re.sub(r'[-\s]+', '-', slug).strip('-')
+    
+    # Determine save location
+    date = datetime.now()
+    if til:
+        base_dir = root / "10-19_KNOWLEDGE" / "11_public_garden" / "til"
+        # Temporal organization (Fase 4 prep)
+        year_dir = base_dir / str(date.year)
+        month_dir = year_dir / f"{date.month:02d}-{date.strftime('%B').lower()}"
+        save_dir = month_dir
+    else:
+        save_dir = root / "10-19_KNOWLEDGE" / "11_public_garden" / "notes"
+    
+    save_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create filename
+    filename = f"{date.strftime('%Y-%m-%d')}-{slug}.md"
+    filepath = save_dir / filename
+    
+    # Minimal template (7 lines vs 27)
+    note_content = f"""---
+title: "{content}"
+date: {date.strftime('%Y-%m-%d')}
+tags: [{"til" if til else "note"}, quick]
+---
+
+{content}
+"""
+    
+    # Save
+    filepath.write_text(note_content, encoding="utf-8")
+    
+    console.print()
+    console.print(f"[green]✓[/green] Note saved: [cyan]{filepath.relative_to(root)}[/cyan]")
+    
+    if edit:
+        try:
+            import shutil
+            if shutil.which("code"):
+                subprocess.run(["code", str(filepath)], check=False)
+                console.print("[dim]Opened in VS Code[/dim]")
+        except Exception:
+            pass
+    
+    console.print()
 
 
 @app.command()

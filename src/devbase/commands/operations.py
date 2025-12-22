@@ -213,11 +213,32 @@ def backup(ctx: typer.Context) -> None:
     console.print("[bold]Creating backup...[/bold]")
     console.print(f"Location: [cyan]{backup_path}[/cyan]\n")
 
-    # Exclusions
-    exclude = {'node_modules', '.git', '31_backups', '__pycache__', '.vs', 'bin', 'obj'}
+    # Exclusions (build artifacts + SECURITY: secrets/credentials)
+    exclude = {
+        # Build artifacts
+        'node_modules', '.git', '31_backups', '__pycache__', '.vs', 'bin', 'obj',
+        '.venv', 'venv', 'dist', 'build', '.pytest_cache', '.mypy_cache',
+        '.ruff_cache', '.coverage', 'htmlcov',
+        # SECURITY: Secret files (prevent credential leakage)
+        '.env', '.env.local', '.env.production', '.env.development',
+        '.pypirc', '.npmrc', '.aws', '.ssh', '.gnupg',
+        # Note: Individual secret files with extensions are handled by pattern matching below
+    }
+    
+    # Additional patterns for secret files
+    secret_patterns = {'.pem', '.key', '.p12', '.pfx', 'id_rsa', 'id_ed25519', '.crt'}
 
     def ignore_patterns(dir, files):
-        return [f for f in files if f in exclude]
+        ignored = []
+        for f in files:
+            # Directory-level exclusions
+            if f in exclude:
+                ignored.append(f)
+                continue
+            # File extension patterns (secrets)
+            if any(f.endswith(pattern) or f == pattern for pattern in secret_patterns):
+                ignored.append(f)
+        return ignored
 
     try:
         backup_dir.mkdir(parents=True, exist_ok=True)

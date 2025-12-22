@@ -121,8 +121,16 @@ def render_template_file(template_path: Path, context: Dict[str, str]) -> str:
     # Read template
     content = template_path.read_text(encoding="utf-8")
 
-    # Create Jinja2 environment
-    env = Environment(autoescape=False)
+    # Create Jinja2 environment with security hardening
+    # SECURITY: autoescape=True prevents XSS/injection in templates
+    # While markdown doesn't need HTML escaping, this prevents
+    # malicious code execution if templates are compromised
+    env = Environment(
+        autoescape=True,
+        # Note: Full sandboxing via jinja2.sandbox.SandboxedEnvironment
+        # is not used as it limits legitimate template functionality.
+        # Template sources should be trusted (controlled by devbase-setup repo).
+    )
     template = env.from_string(content)
 
     # Render

@@ -240,6 +240,12 @@ def doctor(ctx: typer.Context) -> None:
     else:
         console.print("  [yellow]⚠[/yellow] State file not found")
 
+    # Run security checks
+    from devbase.commands.security_check import run_security_checks
+    security_ok = run_security_checks(root)
+    if not security_ok:
+        issues += 1
+
     # Summary
     console.print()
     console.print("=" * 50)
@@ -248,6 +254,7 @@ def doctor(ctx: typer.Context) -> None:
     else:
         console.print(f"[bold yellow]⚠️  Found {issues} issue(s)[/bold yellow]")
         console.print("\nRun [cyan]devbase setup[/cyan] to fix issues.")
+
 
 
 @app.command()
