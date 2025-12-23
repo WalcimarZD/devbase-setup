@@ -1,11 +1,11 @@
 # copier.yml
 _min_copier_version: "9.1.0"
+_templates_suffix: ".template"
 
 # Questions for the user
 project_name:
   type: str
-  help: What is your project name?
-  validator: "^[a-z0-9]+([-.][a-z0-9]+)*$"
+  help: What is your project name? (kebab-case)
 
 description:
   type: str
@@ -34,7 +34,4 @@ _exclude:
   - ".vscode"
   - "__pycache__"
 
-# Tasks (optional - allow post-install scripts)
-_tasks:
-  # - "git init" (Handled by devbase dev new)
-  # - "uv sync" (Handled by devbase dev new)
+# Template files use Jinja2 syntax with .template extension

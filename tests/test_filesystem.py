@@ -19,6 +19,7 @@ def test_assert_safe_path_outside_raises(tmp_path):
         fs.assert_safe_path(outside)
 
 
+
 def test_ensure_dir_and_write_atomic(tmp_path):
     fs = FileSystem(str(tmp_path))
     # ensure nested dir is created
@@ -31,4 +32,23 @@ def test_ensure_dir_and_write_atomic(tmp_path):
     assert target.exists()
     content = target.read_text(encoding="utf-8")
     assert "hello world" in content
+
+
+class TestFileSystemDryRun:
+    """Tests for FileSystem dry_run mode."""
+
+    def test_ensure_dir_dry_run(self, tmp_path):
+        """ensure_dir with dry_run should not create directories."""
+        fs = FileSystem(str(tmp_path), dry_run=True)
+        fs.ensure_dir("test-dir")
+        
+        assert not (tmp_path / "test-dir").exists()
+
+    def test_write_atomic_dry_run(self, tmp_path):
+        """write_atomic with dry_run should not create files."""
+        fs = FileSystem(str(tmp_path), dry_run=True)
+        fs.write_atomic("test.txt", "content")
+        
+        assert not (tmp_path / "test.txt").exists()
+
 
