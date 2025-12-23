@@ -27,6 +27,7 @@ alias db='devbase'
 alias db-doctor='devbase core doctor'
 alias db-track='devbase ops track'
 alias db-stats='devbase ops stats'
+alias db-note='devbase quick note'  # Ultra-quick TIL capture
 
 # Quick project creation
 db-new() {
@@ -39,4 +40,4 @@ t() {
 }
 
 echo "✨ DevBase shell integration loaded!"
-echo "   Try: goto code, goto vault, t \"your message\""
+echo "   Try: goto code, db-note \"TIL...\", t \"your message\""

@@ -1,199 +1,77 @@
-# DevBase v5.0.0-alpha - Migration Guide
+# Migration Guide: Moving to DevBase v5.0.0
 
-## Overview
+> [!WARNING]
+> **PowerShell Decommissioned**: v5.0.0 removes all support for PowerShell runtimes (`bootstrap.ps1`, `profile.ps1`). The system now runs entirely on Python 3.13 via `uv`.
 
-DevBase v4.0 is a **complete rewrite** using modern Python tooling for significantly improved developer experience.
+## 📦 Major Changes
 
-## Key Changes
-
-### 1. Installation Method
-
-**v3.x:**
-```bash
-git clone https://github.com/walcimarzd/devbase-setup
-python devbase.py --help
-```
-
-**v4.0:**
-```bash
-uv tool install devbase
-devbase --help
-```
+### 1. Installation & Runtime
+- **Old (v4)**: Relied on system Python + PowerShell scripts. Fragile dependency management.
+- **New (v5)**: Uses `uv` to create a strictly isolated, high-performance environment.
 
 ### 2. Command Structure
+The CLI has been reorganized into logical groups for better discoverability.
 
-Commands are now organized into **groups** for better discoverability:
+| Legacy (v4) | Modern (v5) |
+| :--- | :--- |
+| `python devbase.py doctor` | `devbase core doctor` |
+| `devbase.py new <name>` | `devbase dev new <name>` |
+| `devbase.py track <msg>` | `devbase ops track <msg>` |
+| `devbase.py stats` | `devbase ops stats` |
+| `devbase.py backup` | `devbase ops backup` |
 
-**v3.x:**
+### 3. Usage from Anywhere
+- **Old (v4)**: Often required `cd ~/devbase-setup` or setting `--root` explicitly.
+- **New (v5)**: Auto-detects workspace root from any subdirectory. Just type `devbase <cmd>`.
+
+---
+
+## 🛠️ Step-by-Step Migration
+
+### Step 1: Uninstall Legacy Integations
+If you added aliases to your shell profile (`.bashrc`, `.zshrc`, `Microsoft.PowerShell_profile.ps1`), remove them:
+
 ```bash
-python devbase.py doctor
-python devbase.py new my-app
-python devbase.py track "message"
+# REMOVE lines like this:
+alias db="python ~/devbase-setup/devbase.py"
 ```
 
-**v4.0:**
+### Step 2: Install v5.0.0
+Install the new global CLI tool:
+```bash
+uv tool install devbase
+```
+*Note: If you don't use `uv`, run the one-line installer:*
+```bash
+curl -Ls https://raw.githubusercontent.com/walcimarzd/devbase-setup/main/install.sh | bash
+```
+
+### Step 3: Verify Data
+Your `Dev_Workspace` data **remains untouched**. v5.0.0 reads the existing `.devbase_state.json` file.
+
+Run `doctor` to verify permissions and structure:
 ```bash
 devbase core doctor
-devbase dev new my-app
-devbase ops track "message"
 ```
 
-### 3. Workspace Detection
-
-**v3.x:** Required `--root` flag on every command
-```bash
-cd ~/somewhere
-python devbase.py doctor --root ~/Dev_Workspace
-```
-
-**v4.0:** Auto-detects workspace
-```bash
-cd ~/Dev_Workspace/20-29_CODE/my-project
-devbase core doctor  # Works from any subdirectory!
-```
-
-### 4. Global Availability
-
-**v3.x:** Must run from repository directory
-```bash
-cd ~/devbase-setup
-python devbase.py new my-app
-```
-
-**v4.0:** Works from anywhere
-```bash
-cd ~
-devbase dev new my-app  # Just works ✨
-```
-
-## Complete Command Mapping
-
-| v3.x | v4.0 | Notes |
-|------|------|-------|
-| `setup` | `core setup` | Now has interactive wizard |
-| `doctor` | `core doctor` | Displays Rich tables |
-| `hydrate` | `core hydrate` | Unchanged |
-| `new -Name <name>` | `dev new <name>` | Positional argument |
-| `audit` | `dev audit` | Same |
-| `audit -Fix` | `dev audit --fix` | Flag renamed |
-| `track -Message "x"` | `ops track "x"` | Positional message |
-| `stats` | `ops stats` | Now uses Rich tables |
-| `weekly` | `ops weekly` | Same |
-| `weekly -Output file` | `ops weekly --output file` | Flag renamed |
-| `backup` | `ops backup` | Same |
-| `clean` | `ops clean` | Same |
-
-## Migration Steps
-
-### Step 1: Install v4.0
+### Step 4: Update Aliases (Optional)
+If you want short aliases, add these to your shell config:
 
 ```bash
-# Uninstall old scripts (if applicable)
-# No action needed if you were running from source
-
-# Install v4.0 globally
-uv tool install devbase
-
-# Verify
-devbase --help
+# New v5 aliases
+alias db="devbase"
+alias nav="devbase nav goto"
 ```
 
-### Step 2: Update Scripts/Aliases
+---
 
-If you have shell scripts or aliases referencing DevBase:
+## ❓ FAQ
 
-**Before:**
-```bash
-alias db-doctor="cd ~/devbase-setup && python devbase.py doctor --root ~/Dev_Workspace"
-```
+**Q: Do I need to move my project files?**
+A: No. DevBase v5 respects your existing Johnny.Decimal structure (e.g., `20-29_CODE`).
 
-**After:**
-```bash
-alias db-doctor="devbase core doctor"
-```
+**Q: What happened to `bootstrap.ps1`?**
+A: It was deleted. `devbase core setup` now handles all initialization logic with a richer, safer interactive wizard.
 
-### Step 3: Update CI/CD Pipelines
-
-**GitHub Actions Example:**
-
-**v3.x:**
-```yaml
-- name: Setup DevBase
-  run: |
-    git clone https://github.com/walcimarzd/devbase-setup
-    python devbase-setup/devbase.py setup --root ./workspace
-```
-
-**v4.0:**
-```yaml
-- name: Setup DevBase
-  run: |
-    uv tool install devbase
-    devbase core setup  # Auto-creates at ~/Dev_Workspace
-```
-
-> [!CAUTION]
-> **PowerShell Decommissioned**: As of v5.0.0, PowerShell is no longer a supported runtime. All legacy `.ps1` files in the root and `_deprecated_ps1/` have been removed.
-```
-
-## Breaking Changes
-
-### Python Module Imports
-
-**v3.x:**
-```python
-# Direct imports from modules/python/
-from filesystem import FileSystem
-from state import StateManager
-```
-
-**v4.0:**
-```python
-# Use adapters (Preferred)
-from devbase.adapters import get_filesystem
-
-# Or direct deprecated import (Not recommended)
-from devbase._deprecated.filesystem import FileSystem
-from devbase._deprecated.state import StateManager
-```
-
-### Configuration
-
-- `.devbase_state.json` format unchanged
-- `pyproject.toml` replaces `requirements.txt`
-- Ruff replaces flake8/black/isort
-
-## Compatibility
-
-### What Still Works
-
-✅ Existing workspaces (no migration needed)
-✅ `.devbase_state.json` format
-✅ Johnny.Decimal structure
-✅ Templates
-✅ Telemetry data (`.telemetry/events.jsonl`)
-
-### What's Removed
-
-❌ All PowerShell legacy scripts (`bootstrap.ps1`, `_deprecated_ps1/`)
-❌ `argparse`-based CLI
-❌ `requirements.txt`
-
-## Rollback Plan
-
-If you need to revert to v3.x:
-
-```bash
-# Uninstall v4.0
-uv tool uninstall devbase
-
-# Use v3.x from source
-git clone https://github.com/walcimarzd/devbase-setup --branch v3.2
-cd devbase-setup
-python devbase.py --help
-```
-
-## Support
-
-- Report issues: https://github.com/walcimarzd/devbase-setup/issues
-- Tag with `migration` label
+**Q: I have custom templates. Will they break?**
+A: Most Jinja2 templates will work as-is. If you used custom PowerShell hooks in your templates, you will need to migrate them to Python or standard shell scripts.

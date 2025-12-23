@@ -58,9 +58,46 @@ def run_setup_module(fs, module_name: str, policy_version=None) -> None:
         fs.ensure_dir(folder)
 
 
+
+def create_governance_files(fs) -> None:
+    """Create default governance files if they don't exist."""
+    # .editorconfig
+    if not fs.exists(".editorconfig"):
+        fs.write_atomic(".editorconfig", 
+            "root = true\n\n"
+            "[*]\n"
+            "indent_style = space\n"
+            "indent_size = 4\n"
+            "charset = utf-8\n"
+            "trim_trailing_whitespace = true\n"
+            "insert_final_newline = true\n"
+        )
+
+    # .gitignore
+    if not fs.exists(".gitignore"):
+        fs.write_atomic(".gitignore",
+            "# DevBase\n"
+            ".devbase_state.json\n"
+            "__pycache__/\n"
+            "*.pyc\n"
+            ".DS_Store\n\n"
+            "# Security\n"
+            "12_private_vault/\n"
+            "*.env\n"
+        )
+
+    # 00.00_index.md
+    if not fs.exists("00-09_SYSTEM/00.00_index.md"):
+        fs.write_atomic("00-09_SYSTEM/00.00_index.md",
+            "# Johnny.Decimal Index\n\n"
+            "Master index of the workspace.\n"
+        )
+
+
 # Legacy API compatibility wrappers (for wizard.py imports)
 def run_setup_core(fs, policy_version=None):
     run_setup_module(fs, "Core Structure", policy_version)
+    create_governance_files(fs)
 
 
 def run_setup_pkm(fs, policy_version=None):
@@ -92,7 +129,7 @@ def setup(
     ] = False,
     interactive: Annotated[
         bool,
-        typer.Option("--interactive", "-i", help="Run interactive setup wizard"),
+        typer.Option("--interactive/--no-interactive", "-i", help="Run interactive setup wizard"),
     ] = True,
 ) -> None:
     """

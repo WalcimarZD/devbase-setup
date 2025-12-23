@@ -49,7 +49,14 @@ class StateManager:
             except (json.JSONDecodeError, OSError):
                 self._state = self.DEFAULT_STATE.copy()
         else:
-            self._state = self.DEFAULT_STATE.copy()
+            # Create fresh copy to avoid shared mutable state (list)
+            self._state = {
+                "version": "0.0.0",
+                "policyVersion": "4.0",
+                "installedAt": None,
+                "lastUpdate": None,
+                "migrations": [],
+            }
     
     def get_state(self) -> Dict[str, Any]:
         """Return current state dictionary."""

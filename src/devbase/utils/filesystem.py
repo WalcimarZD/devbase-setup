@@ -102,6 +102,19 @@ class FileSystem:
         except ValueError:
             raise ValueError(f"Path traversal detected: {target_path} is outside {self.root}")
     
+    def exists(self, path: str) -> bool:
+        """
+        Check if path exists.
+        
+        Args:
+            path: Relative path from root
+            
+        Returns:
+            True if exists
+        """
+        target = self.root / path
+        return target.exists()
+    
     def copy_atomic(self, source_path: str, dest_path: str) -> None:
         """
         Copy file atomically.
