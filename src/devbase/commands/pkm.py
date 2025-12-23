@@ -35,12 +35,12 @@ def find(
         devbase pkm find --type til
         devbase pkm find typer --tag python
     """
-    from devbase.adapters.knowledge_adapter import get_knowledge_db
+    # TODO: Knowledge DB requires implementation (was phantom _deprecated dependency)
+    console.print("[yellow]⚠ Knowledge search not yet implemented[/yellow]")
+    console.print("[dim]This command will be available in a future version.[/dim]")
+    return
 
     root: Path = ctx.obj["root"]
-    
-    db = get_knowledge_db(root)
-    db.connect()
     
     # Index if database is empty or reindex requested
     if reindex or not db.get_stats()["total_notes"]:
@@ -117,16 +117,13 @@ def graph(
         devbase pkm graph --html        # Interactive visualization
     """
     import networkx as nx
-    from devbase.adapters.knowledge_adapter import get_knowledge_graph
+    
+    # TODO: Knowledge Graph requires implementation (was phantom _deprecated dependency)
+    console.print("[yellow]⚠ Knowledge graph not yet implemented[/yellow]")
+    console.print("[dim]This command will be available in a future version.[/dim]")
+    return
 
     root: Path = ctx.obj["root"]
-    
-    console.print()
-    console.print("[bold]Knowledge Graph Analysis[/bold]")
-    console.print(f"Workspace: [cyan]{root}[/cyan]\n")
-    
-    # Build graph
-    kg = get_knowledge_graph(root)
     
     with console.status("[bold green]Scanning knowledge base..."):
         stats = kg.scan()
@@ -202,34 +199,13 @@ def links(
         devbase pkm links til/2025-12-22-typer-context.md
     """
     import networkx as nx
-    from devbase.adapters.knowledge_adapter import get_knowledge_graph
+    
+    # TODO: Knowledge Graph requires implementation (was phantom _deprecated dependency)
+    console.print("[yellow]⚠ Link analysis not yet implemented[/yellow]")
+    console.print("[dim]This command will be available in a future version.[/dim]")
+    return
 
     root: Path = ctx.obj["root"]
-    
-    # Resolve note path - try multiple locations
-    possible_paths = [
-        root / "10-19_KNOWLEDGE" / note,
-        root / "10-19_KNOWLEDGE" / f"{note}.md",
-        root / "10-19_KNOWLEDGE" / "11_public_garden" / note,
-        root / "10-19_KNOWLEDGE" / "11_public_garden" / f"{note}.md",
-    ]
-    
-    note_path = None
-    for path in possible_paths:
-        if path.exists():
-            note_path = path
-            break
-    
-    if not note_path:
-        console.print(f"[red]✗[/red] Note not found: {note}")
-        console.print("[dim]Tip: Use path relative to 10-19_KNOWLEDGE or 11_public_garden[/dim]")
-        raise typer.Exit(1)
-    
-    console.print()
-    console.print(f"[bold]Links for:[/bold] [cyan]{note_path.name}[/cyan]\n")
-    
-    # Build graph
-    kg = get_knowledge_graph(root)
     kg.scan()
     
     # Get connections

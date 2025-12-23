@@ -185,7 +185,7 @@ wheels = [
 
 [[package]]
 name = "devbase"
-version = "4.0.7"
+version = "5.0.0a0"
 source = { editable = "." }
 dependencies = [
     { name = "copier" },

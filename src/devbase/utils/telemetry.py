@@ -16,6 +16,7 @@ class TelemetryService:
         self.root = root
         self.telemetry_dir = root / ".telemetry"
         self.events_file = self.telemetry_dir / "events.jsonl"
+        self._session_id = str(uuid.uuid4())  # Cache per-instance (session)
         self._ensure_dir()
 
     def _ensure_dir(self):
@@ -52,7 +53,7 @@ class TelemetryService:
         event = {
             "event_id": str(uuid.uuid4()),
             "timestamp": datetime.now().isoformat(),
-            "session_id": str(uuid.uuid4()), # TODO: session persistence
+            "session_id": self._session_id,  # Use cached session ID
             "duration_ms": 0,
             "category": category,
             "action": action,

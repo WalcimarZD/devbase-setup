@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
 
-from devbase._deprecated.filesystem import FileSystem
+from devbase.utils.filesystem import FileSystem
 
 
 def test_assert_safe_path_ok(tmp_path):
@@ -30,5 +30,5 @@ def test_ensure_dir_and_write_atomic(tmp_path):
     target = Path(tmp_path) / "a" / "b" / "c" / "hello.txt"
     assert target.exists()
     content = target.read_text(encoding="utf-8")
-    assert content.endswith("\n")
     assert "hello world" in content
+

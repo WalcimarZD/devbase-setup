@@ -182,11 +182,6 @@ def archive(
         raise typer.Exit(1)
 
 
-    except Exception as e:
-        console.print(f"[red]✗ Failed to archive: {e}[/red]")
-        raise typer.Exit(1)
-
-
 @app.command()
 def update(
     ctx: typer.Context,

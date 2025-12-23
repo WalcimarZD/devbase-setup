@@ -281,10 +281,10 @@ def execute_setup_with_config(config: dict) -> None:
     console.print()
     console.print("[bold cyan]Creating workspace...[/bold cyan]\n")
 
-    # Import setup modules via Anti-Corruption Layer adapters
-    from devbase.adapters.filesystem_adapter import get_filesystem
-    from devbase.adapters.state_adapter import get_state_manager
-    from devbase.adapters.setup_adapter import (
+    # Import setup modules from core (where stubs are defined)
+    from devbase.utils.filesystem import get_filesystem
+    from devbase.utils.state import get_state_manager
+    from devbase.commands.core import (
         run_setup_ai,
         run_setup_code,
         run_setup_core,
@@ -294,15 +294,6 @@ def execute_setup_with_config(config: dict) -> None:
 
     root = config["path"]
     fs = get_filesystem(str(root), dry_run=False)
-
-    # Minimal UI for legacy modules
-    class MinimalUI:
-        def print_header(self, msg): pass
-        def print_step(self, msg, status):
-            if status == "ERROR":
-                console.print(f"[red]✗ {msg}[/red]")
-
-    ui = MinimalUI()
 
     # Setup modules based on selection
     setup_tasks = [
@@ -324,7 +315,7 @@ def execute_setup_with_config(config: dict) -> None:
 
             task = progress.add_task(f"Setting up {name}...", total=None)
             try:
-                run_func(fs, ui, policy_version="4.0")
+                run_func(fs, policy_version="4.0")
                 progress.update(task, description=f"[green]✓[/green] {name}")
             except Exception as e:
                 progress.update(task, description=f"[red]✗[/red] {name}")
