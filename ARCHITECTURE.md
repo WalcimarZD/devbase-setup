@@ -1,134 +1,111 @@
-# DevBase Architecture
+# Architecture Guide: DevBase v5.0.0
 
-## Overview
+This document explains the internal design of DevBase, intended for contributors and maintainers.
 
-DevBase is a **Personal Engineering Operating System** built on Python with a modular architecture.
+## 🏗️ High-Level Design
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      devbase cli (Typer)                    │
-│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐    │
-│  │   core    │ │    dev    │ │    ops    │ │    nav    │    │
-│  │ (setup+)  │ │ (new+)    │ │ (track+)  │ │ (goto)    │    │
-│  └─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬─────┘    │
-└────────┼─────────────┼─────────────┼─────────────┼──────────┘
-         │             │             │             │
-┌────────▼─────────────▼─────────────▼─────────────▼──────────┐
-│                    src/devbase/                             │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐         │
-│  │   commands/  │ │   legacy/    │ │  templates/  │         │
-│  │ (core, dev+) │ │ (fs, state)  │ │ (jinja2)     │         │
-│  └──────────────┘ └──────────────┘ └──────────────┘         │
-└─────────────────────────────────────────────────────────────┘
-         │                               │
-         ▼                               ▼
-┌───────────────────┐         ┌───────────────────┐
-│  Dev_Workspace/   │         │   .telemetry/     │
-│  (Johnny.Decimal) │         │   events.jsonl    │
-└───────────────────┘         └───────────────────┘
+DevBase v5.0.0 follows a strict **Command-Service-Adapter** pattern to ensure testability, separation of concerns, and modularity.
+
+```mermaid
+graph TD
+    CLI[CLI Layer (Typer)] -->|Context| Service[Service Layer]
+    Service -->|DTO| Adapter[Adapter Layer]
+    Adapter -->|IO| FS[Filesystem / OS]
+    Adapter -->|SQL| DB[DuckDB / SQLite]
 ```
 
-## Components
+### 1. CLI Layer (`src/devbase/commands`)
+- **Technology**: `typer` + `rich`
+- **Role**: Entry point. Handles argument parsing, validation, and UI output.
+- **Rules**:
+    - NO business logic.
+    - MUST catch exceptions and print friendly errors.
+    - MUST use `rich` for all output.
 
-### CLI Layer (Typer)
+### 2. Service Layer (`src/devbase/services`)
+- **Technology**: Pure Python
+- **Role**: Orchestrates business logic.
+- **Rules**:
+    - Platform-agnostic.
+    - Does NOT print to console (returns data/objects).
+    - Can be imported by other services.
 
-Managed via `src/devbase/main.py` and modular command groups in `src/devbase/commands/`:
+### 3. Adapter Layer (`src/devbase/utils` & `src/devbase/adapters`)
+- **Technology**: `pathlib`, `json`, `duckdb`
+- **Role**: Interfaces with the outside world.
+- **Rules**:
+    - Handles low-level I/O.
+    - Implements "Dry Run" logic.
+    - Manages state persistence (`.devbase_state.json`).
 
-| Group | Function | Description |
-|-------|----------|-------------|
-| `core` | `commands/core.py` | Setup, Doctor, Hydrate |
-| `dev` | `commands/dev.py` | New, Audit, Templates |
-| `ops` | `commands/ops.py` | Track, Stats, Weekly, Backup, Clean |
-| `nav` | `commands/nav.py` | Semantic navigation (goto) |
-| `quick` | `commands/quick.py` | Macro commands (sync, quickstart) |
-| `pkm` | `commands/pkm.py` | PKM analysis (graph, links, index) |
+---
 
-### Core Logic (Legacy & Modern)
+## 🛠️ Technology Stack
 
-| Module | Purpose |
-|--------|---------|
-| `legacy/filesystem.py` | Atomic file operations with dry-run support |
-| `legacy/ui.py` | Colorized console output helpers |
-| `legacy/state.py` | State management (`.devbase_state.json`) |
-| `utils/wizard.py` | Interactive setup wizard |
-| `utils/icons.py` | Johnny.Decimal folder icon management |
-| `templates/` | Jinja2 templates for projects and knowledge |
+| Component | Library | Reason |
+| :--- | :--- | :--- |
+| **CLI Framework** | `typer` | Modern, type-safe, practically zero boilerplate. |
+| **Terminal UI** | `rich` | Beautiful output, tables, and progress bars are essential for DX. |
+| **Packaging** | `uv` | Orders of magnitude faster than Pip/Poetry. Simplifies venv management. |
+| **Analytics** | `duckdb` | Embedded OLAP database for fast querying of telemetry logs. |
+| **Templating** | `jinja2` | Industry standard, flexible, sandboxed. |
 
-### Data Layer
+---
 
-| File/Folder | Purpose |
-|-------------|---------|
-| `.devbase_state.json` | Installation state and version |
-| `.telemetry/events.jsonl` | Activity tracking (JSON Lines) |
-| `30-39_OPERATIONS/31_backups/` | Backup storage |
+## 📂 Project Structure
 
-## Key Patterns
-
-### 1. Atomic File Operations
-
-```python
-# filesystem.py uses write-replace pattern
-with open(tmp_path, 'w') as f:
-    f.write(content)
-    f.flush()
-    os.fsync(f.fileno())
-tmp_path.replace(target)  # Atomic on POSIX/Windows
+```text
+src/devbase/
+├── main.py              # Application Entry Point
+├── commands/            # CLI Groups
+│   ├── core.py          # Setup, Doctor
+│   ├── dev.py           # Project Management
+│   ├── ops.py           # Operations & Telemetry
+│   └── pkm.py           # Knowledge Graph
+├── services/            # Business Logic
+│   └── project_setup.py # Project scaffolding service
+├── utils/               # Shared Utilities
+│   ├── filesystem.py    # Atomic file operations
+│   ├── wizard.py        # Interactive prompts
+│   └── telemetry.py     # Event logging
+└── templates/           # Jinja2 Templates
 ```
 
-### 2. Dry-Run Mode
+---
 
-```python
-class FileSystem:
-    def __init__(self, root, dry_run=False):
-        self.dry_run = dry_run
-    
-    def ensure_dir(self, path):
-        if self.dry_run:
-            print(f" [DRY-RUN] Would create: {path}")
-        else:
-            path.mkdir(parents=True, exist_ok=True)
-```
+## 🔄 Data Flow: "Creating a Project"
 
-### 3. Johnny.Decimal Structure
+When a user runs `devbase dev new my-api`:
 
-```
-XX-YY_AREA/
-  XX_category/
-    item/
-```
+1.  **CLI (`commands/dev.py`)**:
+    - Parses `my-api`.
+    - Detects `--interactive` flag.
+    - Instantiates `Console` and `Context`.
 
-Areas: 00-09, 10-19, 20-29, 30-39, 40-49, 90-99
+2.  **Service (`services/project_setup.py`)**:
+    - Receives request.
+    - Calls `utils/wizard.py` if interactive questions are needed.
+    - Determines target path in `20-29_CODE`.
 
-### 4. Telemetry (JSON Lines)
+3.  **Adapter (`utils/templates.py`)**:
+    - Loads `clean-arch` template.
+    - Renders Jinja2 files with context variables.
+    - Writes files to disk using `utils/filesystem.py` (Atomic Write).
 
-```json
-{"timestamp": "2025-12-11T10:00:00", "type": "work", "message": "Feature X"}
-{"timestamp": "2025-12-11T11:00:00", "type": "meeting", "message": "Standup"}
-```
+4.  **Side Effect**:
+    - `devbase ops track` is called internally to log the "Project Created" event.
 
-## Dashboard Architecture
+---
 
-```
-dashboard/
-├── server.py          # Flask routes (/api/stats, /api/activity)
-├── templates/
-│   └── index.html     # Main dashboard page
-└── static/
-    ├── style.css      # Dark theme styling
-    └── charts.js      # Chart.js integration
-```
+## 🧪 Testing Strategy
 
-## VS Code Extension
+We prioritize **Integration Tests** over Unit Tests for the CLI.
 
-```
-vscode-devbase/
-├── src/
-│   ├── extension.ts           # Entry point
-│   ├── commands/index.ts      # Command implementations
-│   └── providers/
-│       ├── structureProvider.ts    # Johnny.Decimal tree
-│       └── recentActivityProvider.ts
-├── snippets/
-│   └── devbase.code-snippets  # ADR, TIL, Journal
-└── package.json               # Extension manifest
+- **Tools**: `pytest`, `pytest-cov`
+- **Pattern**: Invoke CLI commands against a temporary directory.
+- **Coverage Goal**: >80% for `commands/` and `services/`.
+
+```bash
+# Run tests
+uv run pytest
 ```

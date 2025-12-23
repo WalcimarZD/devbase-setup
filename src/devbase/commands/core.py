@@ -3,7 +3,6 @@ Core Commands: setup, doctor, hydrate
 ======================================
 Essential workspace management commands.
 """
-# Import via Anti-Corruption Layer adapters (Strangler Fig pattern)
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -14,21 +13,107 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from typing_extensions import Annotated
 
-from devbase.adapters.filesystem_adapter import get_filesystem
-from devbase.adapters.state_adapter import get_state_manager
-from devbase.adapters.setup_adapter import (
-    run_setup_ai,
-    run_setup_code,
-    run_setup_core,
-    run_setup_operations,
-    run_setup_pkm,
-)
+from devbase.utils.filesystem import get_filesystem
+from devbase.utils.state import get_state_manager
 
 app = typer.Typer(help="Core workspace commands")
 console = Console()
 
 SCRIPT_VERSION = "4.0.0"
 POLICY_VERSION = "4.0"
+
+
+# Data-driven folder structure (replaces 5 stub functions)
+FOLDER_STRUCTURE = {
+    "Core Structure": [
+        "00-09_SYSTEM",
+        "10-19_KNOWLEDGE",
+        "20-29_CODE",
+        "30-39_OPERATIONS",
+        "40-49_MEDIA_ASSETS",
+        "90-99_ARCHIVE_COLD",
+    ],
+    "Knowledge Management": [
+        "10-19_KNOWLEDGE/11_public_garden",
+        "10-19_KNOWLEDGE/12_private_vault",
+    ],
+    "Code Templates": [
+        "20-29_CODE/21_monorepo_apps",
+        "20-29_CODE/22_playground",
+    ],
+    "AI Integration": [
+        "00-09_SYSTEM/05_templates",
+    ],
+    "Operations": [
+        "30-39_OPERATIONS/31_backup",
+        "30-39_OPERATIONS/32_automation",
+    ],
+}
+
+
+def run_setup_module(fs, module_name: str, policy_version=None) -> None:
+    """Create folders for a module from FOLDER_STRUCTURE."""
+    folders = FOLDER_STRUCTURE.get(module_name, [])
+    for folder in folders:
+        fs.ensure_dir(folder)
+
+
+
+def create_governance_files(fs) -> None:
+    """Create default governance files if they don't exist."""
+    # .editorconfig
+    if not fs.exists(".editorconfig"):
+        fs.write_atomic(".editorconfig", 
+            "root = true\n\n"
+            "[*]\n"
+            "indent_style = space\n"
+            "indent_size = 4\n"
+            "charset = utf-8\n"
+            "trim_trailing_whitespace = true\n"
+            "insert_final_newline = true\n"
+        )
+
+    # .gitignore
+    if not fs.exists(".gitignore"):
+        fs.write_atomic(".gitignore",
+            "# DevBase\n"
+            ".devbase_state.json\n"
+            "__pycache__/\n"
+            "*.pyc\n"
+            ".DS_Store\n\n"
+            "# Security\n"
+            "12_private_vault/\n"
+            "*.env\n"
+        )
+
+    # 00.00_index.md
+    if not fs.exists("00-09_SYSTEM/00.00_index.md"):
+        fs.write_atomic("00-09_SYSTEM/00.00_index.md",
+            "# Johnny.Decimal Index\n\n"
+            "Master index of the workspace.\n"
+        )
+
+
+# Legacy API compatibility wrappers (for wizard.py imports)
+def run_setup_core(fs, policy_version=None):
+    run_setup_module(fs, "Core Structure", policy_version)
+    create_governance_files(fs)
+
+
+def run_setup_pkm(fs, policy_version=None):
+    run_setup_module(fs, "Knowledge Management", policy_version)
+
+
+def run_setup_code(fs, policy_version=None):
+    run_setup_module(fs, "Code Templates", policy_version)
+
+
+def run_setup_ai(fs, policy_version=None):
+    run_setup_module(fs, "AI Integration", policy_version)
+
+
+def run_setup_operations(fs, policy_version=None):
+    run_setup_module(fs, "Operations", policy_version)
 
 
 @app.command()
@@ -44,7 +129,7 @@ def setup(
     ] = False,
     interactive: Annotated[
         bool,
-        typer.Option("--interactive", "-i", help="Run interactive setup wizard"),
+        typer.Option("--interactive/--no-interactive", "-i", help="Run interactive setup wizard"),
     ] = True,
 ) -> None:
     """
@@ -112,14 +197,7 @@ def setup(
         for name, run_func in modules:
             task = progress.add_task(f"Setting up {name}...", total=None)
             try:
-                # Create minimal UI wrapper for legacy modules
-                class LegacyUI:
-                    def print_header(self, msg): pass
-                    def print_step(self, msg, status):
-                        if status == "ERROR":
-                            console.print(f"[red]✗ {msg}[/red]")
-
-                run_func(fs, LegacyUI(), policy_version=POLICY_VERSION)
+                run_func(fs, policy_version=POLICY_VERSION)
                 progress.update(task, description=f"[green]✓[/green] {name}")
             except Exception as e:
                 progress.update(task, description=f"[red]✗[/red] {name} - {e}")
@@ -379,10 +457,6 @@ def hydrate(
         ("Operations", run_setup_operations),
     ]
 
-    class LegacyUI:
-        def print_header(self, msg): pass
-        def print_step(self, msg, status): pass
-
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -391,7 +465,7 @@ def hydrate(
         for name, run_func in modules_to_run:
             task = progress.add_task(f"Hydrating {name}...", total=None)
             try:
-                run_func(fs, LegacyUI(), policy_version=POLICY_VERSION)
+                run_func(fs, policy_version=POLICY_VERSION)
                 progress.update(task, description=f"[green]✓[/green] {name}")
             except Exception as e:
                 progress.update(task, description=f"[red]✗[/red] {name}")

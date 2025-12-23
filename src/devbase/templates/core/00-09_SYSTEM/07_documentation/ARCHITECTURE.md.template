@@ -41,17 +41,13 @@ O DevBase é organizado em módulos que trabalham em conjunto para criar um Pers
 
 ### 2.1 Responsabilidades dos Módulos
 
-| Componente | Responsabilidade | Dependências |
-|------------|------------------|--------------|
-| `bootstrap.ps1` | Orquestrar execução, validações iniciais | `common-functions.ps1`, todos os `setup-*.ps1` |
-| `common-functions.ps1` | Funções utilitárias (Write-Step, New-FileSafe, etc.) | Nenhuma |
-| `setup-core.ps1` | Criar estrutura Johnny.Decimal base | `common-functions.ps1` |
-| `setup-pkm.ps1` | Criar estrutura de conhecimento | `common-functions.ps1` |
-| `setup-code.ps1` | Criar estrutura de código e templates | `common-functions.ps1` |
-| `setup-operations.ps1` | Instalar CLI e scripts de automação | `common-functions.ps1`, `assets/` |
-| `setup-hooks.ps1` | Instalar e configurar git hooks | `common-functions.ps1` |
-| `setup-ai.ps1` | Criar estrutura do módulo de IA | `common-functions.ps1` |
-| `devbase.ps1.asset` | CLI do usuário final | `common-functions.ps1` |
+| Componente | Responsabilidade | Localização |
+|------------|------------------|-------------|
+| `main.py` | Orquestrar CLI Typer, registrar subcomandos | `src/devbase/main.py` |
+| `commands/` | Grupos de comandos (core, dev, pkm, etc.) | `src/devbase/commands/` |
+| `services/` | Lógica de negócio isolada | `src/devbase/services/` |
+| `utils/` | Funções utilitárias (workspace, templates, etc.) | `src/devbase/utils/` |
+| `templates/` | Templates Jinja2 para estrutura do workspace | `src/devbase/templates/` |
 
 ---
 
@@ -59,13 +55,11 @@ O DevBase é organizado em módulos que trabalham em conjunto para criar um Pers
 
 ### 3.1 Ordem de Execução dos Módulos
 
-1. setup-core.ps1       → Estrutura base Johnny.Decimal
-2. setup-pkm.ps1        → Knowledge Management (PKM)
-3. setup-code.ps1       → Templates de código
-4. setup-operations.ps1 → CLI e automação
-5. setup-templates.ps1  → Padrões técnicos
-6. setup-hooks.ps1      → Git hooks
-7. setup-ai.ps1         → Módulo de IA local
+1. Core Structure       → Estrutura base Johnny.Decimal
+2. Knowledge Management → PKM folders e templates
+3. Code Templates       → Templates de código
+4. AI Integration       → Módulo de IA local
+5. Operations           → CLI e automação
 
 A ordem importa! Módulos posteriores podem depender de estruturas criadas por módulos anteriores.
 
@@ -75,27 +69,32 @@ A ordem importa! Módulos posteriores podem depender de estruturas criadas por m
 
 ### 4.1 Estrutura de um Módulo
 
-Cada módulo `setup-*.ps1` segue um padrão consistente para processar templates e criar estruturas de diretórios.
+Cada módulo de comando em `commands/` segue um padrão consistente usando Typer para criar CLIs declarativas:
 
-### 4.2 Funções Compartilhadas (common-functions.ps1)
+```python
+import typer
+from rich.console import Console
 
-```powershell
-# Funções de Output
-Write-Header "Título"           # Exibe cabeçalho formatado
-Write-Step "Mensagem" "OK"      # Exibe status [+] verde
-Write-Step "Mensagem" "WARN"    # Exibe status [!] amarelo
-Write-Step "Mensagem" "ERROR"   # Exibe status [X] vermelho
-Write-Step "Mensagem" "INFO"    # Exibe status [i] ciano
+app = typer.Typer(help="Descrição do grupo de comandos")
+console = Console()
 
-# Funções de Segurança
-Assert-SafePath -TargetPath $path -AllowedRoot $root  # Previne path traversal
-Assert-NoBOM -Path $file                               # Remove BOM UTF-8
+@app.command()
+def meu_comando():
+    """Executa ação específica."""
+    console.print("[green]✓ Comando executado![/green]")
+```
 
-# Funções de Filesystem (Atômicas)
-New-DirSafe -Path $path         # Cria diretório se não existir
-Write-FileAtomic -Path $path -Content $content  # Escrita atômica via temp file
-New-FileSafe -Path $path -Content $content      # Cria arquivo se não existir
-Copy-ItemAtomic -Source $src -Destination $dest    # Cópia atômica
+### 4.2 Funções Utilitárias (utils/)
+
+```python
+# Funções de Workspace
+from devbase.utils.workspace import detect_workspace_root
+
+# Funções de Templates
+from devbase.utils.templates import render_template
+
+# Funções de Filesystem
+from devbase.utils.filesystem import safe_copy, assert_safe_path
 ```
 
 ---
@@ -185,34 +184,33 @@ O DevBase implementa múltiplas camadas de segurança:
 
 Para adicionar um novo módulo:
 
-1. Criar `modules/setup-meunome.ps1`
-2. Criar `modules/templates/meunome/` com templates
-3. Adicionar ao array de módulos em `bootstrap.ps1`
-4. Chamar a função no fluxo de execução
+1. Criar entry em `FOLDER_STRUCTURE` em `commands/core.py`
+2. Criar templates em `templates/meunome/`
+3. Adicionar função de setup se necessário
 
 ### 9.2 Adicionando Comando à CLI
 
 Para adicionar um novo comando:
 
-1. Adicionar ao `ValidateSet` em `devbase.ps1`
-2. Criar função `Invoke-MeuComando`
-3. Adicionar ao switch de comandos
+1. Criar arquivo em `commands/meu_modulo.py` com Typer app
+2. Registrar em `main.py` via `app.add_typer()`
+3. Adicionar testes em `tests/`
 
 ---
 
 ## 10. Decisões de Design
 
-### 10.1 Por que PowerShell?
+### 10.1 Por que Python + Typer?
 
 **Prós:**
-- Nativo no Windows (sem instalação)
-- PowerShell Core funciona em Linux/macOS
-- Sintaxe expressiva para manipulação de arquivos
-- Objetos ao invés de strings (mais robusto)
+- Cross-platform nativo (Windows, Linux, macOS)
+- Ecossistema maduro de ferramentas
+- Typer oferece CLI declarativa com type hints
+- Rich proporciona output bonito e consistênte
+- fácil de testar com pytest
 
 **Contras:**
-- Menos familiar para desenvolvedores Unix
-- Performance em operações massivas
+- Requer instalação do Python (resolvido com `uv`)
 
 ### 10.2 Por que Johnny.Decimal?
 

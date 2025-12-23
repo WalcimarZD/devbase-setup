@@ -8,9 +8,29 @@ Based on Ergonomic Report recommendations:
 - Use colors semantically (not decoratively)
 - Reserve highlights for actionable items
 """
+from typing import Optional
+
+from rich.console import Console
 from rich.style import Style
 from rich.theme import Theme
 
+
+# === CONSOLE SINGLETON ===
+# Centralizes Console creation to reduce duplication across 15+ modules
+_console: Optional[Console] = None
+
+
+def get_console() -> Console:
+    """
+    Get shared Console instance with DevBase theme.
+    
+    Use this instead of creating Console() in each module.
+    """
+    global _console
+    if _console is None:
+        # Import here avoids circular reference (DEVBASE_THEME defined below)
+        _console = Console(theme=DEVBASE_THEME)
+    return _console
 
 # === SEMANTIC COLOR CONSTANTS ===
 # Following cognitive load reduction principles

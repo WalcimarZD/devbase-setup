@@ -1,254 +1,89 @@
-# DevBase v4.0 - Modern Python CLI 🚀
+# DevBase v5.0.0 🚀
 
-**Personal Engineering Operating System** built with Typer, Rich, and uv.
+**The Personal Engineering Operating System**
 
-> [!IMPORTANT]
-> This is **v4.0** - a complete rewrite using modern Python tooling.
-> Migrating from v3.x? See [MIGRATION.md](MIGRATION.md)
+[![Python 3.13](https://img.shields.io/badge/Python-3.13-blue.svg)](https://python.org)
+[![Typer](https://img.shields.io/badge/CLI-Typer-white.svg)](https://typer.tiangolo.com)
+[![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-## Quick Start
+**DevBase** is a modular CLI that transforms your chaos into a structured, high-performance engineering workspace. Built on the [Johnny.Decimal](https://johnnydecimal.com) methodology, it organizes your code, knowledge, and operations into a standard, navigable directory tree.
 
-### Installation (Global CLI)
-
-```bash
-# Install with uv (recommended)
-uv tool install devbase
-
-# Install with pipx
-pipx install devbase
-
-# Verify installation
-devbase --help
-```
-
-### 5-Second Setup
-
-```bash
-devbase core setup
-# Follow interactive prompts
-```
-
-That's it! You now have a complete Johnny.Decimal workspace at `~/Dev_Workspace`.
-
-## What's New in v4.0?
-
-✨ **Modern Stack**:
-- 🔷 **Typer** - Type-safe CLI (replaces argparse)
-- 🎨 **Rich** - Beautiful terminal output
-- ⚡ **uv** - 100x faster Python package management
-- 🔧 **Ruff** - Instant linting & formatting
-
-✨ **Usability Improvements**:
-- 🔍 **Auto-detection** of workspace (no more `--root` flag)
-- 🧙 **Interactive wizard** for first-time setup
-- 🎯 **Context-aware** commands
-- 📦 **Global installation** (`devbase` works from anywhere)
-
-✨ **Better DevX**:
-- 📖 Auto-generated help with examples
-- 🎭 Rich status indicators & progress bars
-- 🔒 Strong type safety
-- ⚡ 10x faster operations
-
-## Command Groups
-
-### Core Workspace Management
-
-```bash
-devbase core setup      # Initialize workspace with interactive wizard 🧙
-devbase core doctor     # Health check with rich diagnostics
-devbase core hydrate    # Update templates from source
-```
-
-### Development & Templates
-
-```bash
-# Interactive project creation (recommended)
-devbase dev new my-app
-
-# Specific template queries
-devbase dev new my-api --template api
-devbase dev new my-lib --no-interactive
-
-# Code quality
-devbase dev audit       # Check naming conventions
-devbase dev audit --fix # Auto-fix violations
-```
-
-### Operations & Context-Awareness
-
-```bash
-# Context-aware tracking (auto-detects project & type)
-cd my-project
-devbase ops track "Implemented feature X"  # tag: [coding:my-project]
-
-# Manual tracking
-devbase ops track "Meeting notes" --type meeting
-
-# Analytics & Maintenance
-devbase ops stats                      # View activity stats
-devbase ops weekly --output report.md  # Generate weekly report
-devbase ops backup                     # Create incremental backup
-devbase ops clean                      # Remove temp files
-```
-
-### Semantic Navigation
-
-```bash
-devbase nav goto code      # → 20-29_CODE/21_monorepo_apps
-devbase nav goto vault     # → 10-19_KNOWLEDGE/12_private_vault
-devbase nav goto ai        # → 30-39_OPERATIONS/30_ai
-
-# Shell integration (add to RC file):
-goto code                  # Jump directly!
-```
-
-### Quick Actions
-
-```bash
-devbase quick note "Python f-strings support = for debug"  # Instant TIL capture 📝
-devbase quick quickstart my-app   # Create + Git Init + VS Code 🚀
-devbase quick sync                # Doctor + Hydrate + Backup 🔄
-```
-
-### Personal Knowledge Management 🧠
-
-```bash
-# Knowledge graph analysis
-devbase pkm graph              # Visualize connections \u0026 hub notes
-devbase pkm graph --html       # Interactive HTML visualization
-
-# Navigate links
-devbase pkm links til/2025-12-22-mypost.md  # Show backlinks \u0026 outlinks
-
-# Generate index
-devbase pkm index til          # Create _index.md (Map of Content)
-```
-
-### Academic Workflow 📚
-
-```bash
-# See docs/academic-workflow.md for full setup guide
-
-# Build paper with citations (requires Pandoc + Zotero)
-./scripts/build_paper.sh thesis.md abnt pdf
-./scripts/build_paper.sh article.md apa docx
-```
-
-## Example Workflow
-
-```bash
-# Day 1: Setup
-devbase core setup
-# ... follow interactive prompts ...
-
-# Day 2: Create project
-devbase dev new my-api
-cd 20-29_CODE/21_monorepo_apps/my-api
-
-# Day 3: Track work
-devbase ops track "Implemented OAuth2 authentication"
-
-# Friday: Generate report
-devbase ops weekly --output ~/weeknotes.md
-```
-
-## Architecture
-
-```
-~/Dev_Workspace/
-├── 00-09_SYSTEM/       # Configuration & dotfiles
-├── 10-19_KNOWLEDGE/    # PKM, notes, decisions
-├── 20-29_CODE/         # Source code projects
-├── 30-39_OPERATIONS/   # Automation, backups, AI
-├── 40-49_MEDIA_ASSETS/ # Media files
-└── 90-99_ARCHIVE_COLD/ # Archived projects
-```
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for details on the Johnny.Decimal methodology.
-
-## Configuration
-
-DevBase v4.0 supports user configuration via `~/.devbase/config.toml`:
-
-```toml
-[workspace]
-auto_detect = true
-
-[behavior]
-expert_mode = false
-color_output = true
-
-[telemetry]
-enabled = true
-```
-
-## Development
-
-### Setup Dev Environment
-
-```bash
-# Clone repository
-git clone https://github.com/walcimarzd/devbase-setup
-cd devbase-setup
-
-# Install with uv (creates .venv automatically)
-uv sync
-
-# Install in editable mode
-uv pip install -e .
-
-# Run from source
-uv run devbase --help
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-uv run pytest
-
-# With coverage
-uv run pytest --cov=devbase
-
-# Run specific test
-uv run pytest tests/test_workspace.py -v
-```
-
-### Code Quality
-
-```bash
-# Lint & format with Ruff
-uv run ruff check .
-uv run ruff format .
-
-# Type check
-uv run mypy src/
-```
-
-## Migration from v3.x
-
-v4.0 introduces breaking changes:
-
-| v3.x | v4.0 |
-|------|------|
-| `python devbase.py doctor` | `devbase core doctor` |
-| `devbase new my-app` | `devbase dev new my-app` |
-| `devbase track "msg"` | `devbase ops track "msg"` |
-| Must specify `--root` | Auto-detected ✨ |
-| `argparse` CLI | Typer CLI ✨ |
-
-See [MIGRATION.md](MIGRATION.md) for full details.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## License
-
-MIT © DevBase Team
+> [!NOTE]
+> **v5.0.0 (The "Velocity" Release)**: This version eliminates all PowerShell dependencies, consolidating on a unified, high-speed Python 3.13 core powered by `uv`.
 
 ---
 
-**Questions?** Open an [issue](https://github.com/walcimarzd/devbase-setup/issues).
-**Documentation:** [https://walcimarzd.github.io/devbase-setup/](https://walcimarzd.github.io/devbase-setup/)
+## ⚡ Productivity First
+
+- **Zero-Config Workspace**: Auto-detects your `Dev_Workspace` root from anywhere.
+- **Instant Project Scaffolding**: Generate production-ready Clean Architecture boilerplate in seconds.
+- **Knowledge Graph**: Integrated Personal Knowledge Management (PKM) with backlinking.
+- **Context-Aware Analytics**: Track your "Flow State" and generate weekly summaries automatically.
+
+## 🚀 Installation
+
+### Option A: The One-Liner (Recommended)
+Installs `uv`, Python 3.13, and DevBase in an isolated environment.
+
+```bash
+curl -Ls https://raw.githubusercontent.com/walcimarzd/devbase-setup/main/install.sh | bash
+```
+
+### Option B: Power Users (`uv`)
+If you already have `uv` installed:
+
+```bash
+uv tool install devbase
+```
+
+*Verify installation:*
+```bash
+devbase --version
+# Output: devbase 5.0.0
+```
+
+---
+
+## ⏱️ Quick Start: 30 Seconds to Flow
+
+1. **Initialize Workspace**
+   Creates the Johnny.Decimal structure (Code, Knowledge, Operations) and installs governance files.
+   ```bash
+   devbase core setup
+   ```
+
+2. **Create New Project**
+   Scaffolds a new API with Git, pre-commit hooks, and VS Code settings.
+   ```bash
+   devbase dev new my-awesome-api
+   ```
+
+3. **Track Your Work**
+   Log your progress directly to the local telemetry database.
+   ```bash
+   devbase ops track "Initial commit for my-awesome-api"
+   ```
+
+---
+
+## 🔄 Migration Parity (v4 vs v5)
+
+DevBase v5.0.0 replaces all legacy PowerShell scripts with standard CLI subcommands.
+
+| Legacy (v4 PowerShell) | Modern (v5 Python) | Benefit |
+| :--- | :--- | :--- |
+| `./bootstrap.ps1` | `devbase core setup` | Interactive wizard, better error handling |
+| `devbase.py doctor` | `devbase core doctor` | Rich visuals, auto-fix capabilities |
+| `devbase.py new ...` | `devbase dev new ...` | Faster templating, `copier` integration |
+| `devbase.py track` | `devbase ops track` | Context-aware, lower latency |
+| `devbase.py stats` | `devbase ops stats` | DuckDB-powered analytics |
+
+> **Upgrading?** See [MIGRATION.md](MIGRATION.md) for a complete guide on moving from v4.
+
+---
+
+## 📚 Documentation
+
+- [**USAGE-GUIDE.md**](USAGE-GUIDE.md): The complete field manual for all commands.
+- [**ARCHITECTURE.md**](ARCHITECTURE.md): Deep dive into the Command-Service-Adapter pattern.
+- [**CONTRIBUTING.md**](CONTRIBUTING.md): How to build your own plugins and templates.

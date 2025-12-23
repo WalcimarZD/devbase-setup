@@ -44,67 +44,50 @@ O **DevBase** é um **Sistema Operacional de Engenharia Pessoal** — uma metodo
 
 ### 2.1 Verificando Pré-requisitos
 
-**Windows:**
-```powershell
-# Verificar versão do PowerShell
-$PSVersionTable.PSVersion
-# Deve ser 5.1 ou superior (recomendado: PowerShell 7+)
+**Todos os sistemas (Windows, Linux, macOS):**
+```bash
+# Verificar Python
+python3 --version
+# Deve ser 3.10 ou superior
 
 # Verificar Git
 git --version
 # Deve ser 2.25 ou superior
-```
 
-**Linux/macOS:**
-```bash
-# Verificar Python
-python3 --version
-# Deve ser 3.8 ou superior
-
-# Verificar Git
-git --version
+# Verificar uv (gerenciador de pacotes)
+uv --version
+# Se não instalado: curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ### 2.2 Instalação Passo a Passo
 
 #### **Passo 1: Clone o Repositório**
 
-```powershell
-# Windows
-cd C:\Projetos
-git clone https://github.com/seu-usuario/devbase-setup-v3.git
-cd devbase-setup-v3
-
-# Linux/macOS
-cd ~/Projetos
-git clone https://github.com/seu-usuario/devbase-setup-v3.git
-cd devbase-setup-v3
+```bash
+# Qualquer OS
+git clone https://github.com/walcimarzd/devbase-setup.git
+cd devbase-setup
 ```
 
-#### **Passo 2: Execute o Bootstrap**
-
-```powershell
-# Windows - Execução básica
-.\bootstrap.ps1
-
-# Windows - Em local personalizado
-.\bootstrap.ps1 -RootPath "D:\MeuWorkspace"
-```
+#### **Passo 2: Instale o DevBase**
 
 ```bash
-# Linux/macOS
+# Usando o instalador
 chmod +x install.sh
 ./install.sh
+
+# Ou instale diretamente via uv
+uv tool install .
 ```
 
 #### **Passo 3: Verifique a Instalação**
 
-```powershell
-# O workspace foi criado em:
-cd ~/Dev_Workspace
+```bash
+# Verifique se o CLI está disponível
+devbase --version
 
-# Execute o comando doctor
-.\30-39_OPERATIONS\35_devbase_cli\devbase.ps1 doctor
+# Execute o diagnóstico
+devbase core doctor
 ```
 
 ---

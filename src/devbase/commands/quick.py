@@ -181,12 +181,6 @@ def sync(ctx: typer.Context) -> None:
     # Step 1: Doctor
     console.print(Panel("[bold]Step 1/3:[/bold] Health Check", border_style="cyan"))
     try:
-        # Create minimal context for commands
-        class MockArgs:
-            def __init__(self):
-                self.force = False
-                self.dry_run = False
-
         doctor(ctx)
     except Exception as e:
         console.print(f"[red]✗ Health check failed: {e}[/red]")
@@ -198,10 +192,6 @@ def sync(ctx: typer.Context) -> None:
     try:
         ctx_dict = {"root": root, "console": console, "verbose": False}
         mock_ctx = type('obj', (object,), {'obj': ctx_dict})()
-
-        class HydrateArgs:
-            force = False
-
         hydrate(mock_ctx, False)
     except Exception as e:
         console.print(f"[yellow]⚠ Template sync issue: {e}[/yellow]")

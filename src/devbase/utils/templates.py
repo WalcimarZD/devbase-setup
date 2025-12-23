@@ -96,28 +96,35 @@ class CopierRenderer(TemplateRenderer):
         console.print(f"[dim]Using Copier engine for {template_path.name}...[/dim]")
         
         import copier
-        from copier.errors import CopierError
 
-        # Prepare data for non-interactive mode
-        data = {}
-        if not interactive:
-            # Map context to copier answers
-            data = {
-                'project_name': context['project_name'],
-                'description': context['description'],
-                'author': context['author'],
-                'license': context['license']
-            }
+        # Prepare data for non-interactive mode - only provide values for known questions
+        data = {
+            'project_name': context['project_name'],
+            'description': context.get('description', f"{context['project_name']} Application"),
+            'author': context.get('author', 'DevBase User'),
+            'license': context.get('license', 'MIT')
+        }
 
         try:
-            copier.run_copy(
-                src_path=str(template_path),
-                dst_path=str(dest_path),
-                data=data if not interactive else None,
-                user_defaults=data if interactive else None,
-                unsafe=True,
-                quiet=not interactive
-            )
+            if not interactive:
+                # Non-interactive: provide data and use defaults for unspecified
+                copier.run_copy(
+                    src_path=str(template_path),
+                    dst_path=str(dest_path),
+                    data=data,
+                    defaults=True,
+                    unsafe=True,
+                    quiet=True,
+                )
+            else:
+                # Interactive: use user_defaults to pre-populate but still prompt
+                copier.run_copy(
+                    src_path=str(template_path),
+                    dst_path=str(dest_path),
+                    user_defaults=data,
+                    unsafe=True,
+                    quiet=False,
+                )
         except Exception as e:
             console.print(f"[red]Copier failed: {e}[/red]")
             raise

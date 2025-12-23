@@ -60,12 +60,6 @@ export DEVBASE_ROOT="D:\MeusProjetos\Workspace"
 devbase core setup
 ```
 
-### Opção 3: PowerShell (Windows Legacy)
-
-```powershell
-# Execute o bootstrap antigo
-.\bootstrap.ps1
-```
 
 ## Verificação
 
@@ -104,12 +98,6 @@ eval "$(register-python-argcomplete devbase)"
 source completions/devbase.bash
 ```
 
-### PowerShell
-
-```powershell
-# Adicione ao $PROFILE
-Import-Module ./completions/_devbase.ps1
-```
 
 ## Próximos Passos
 
