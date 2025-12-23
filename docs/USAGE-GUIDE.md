@@ -56,15 +56,15 @@ O **DevBase** é um **Sistema Operacional de Engenharia Pessoal** — não um si
 
 Antes de instalar, verifique se você tem os requisitos mínimos:
 
-**Windows:**
-```powershell
-# Verificar versão do PowerShell
-$PSVersionTable.PSVersion
-# Deve ser 5.1 ou superior (recomendado: PowerShell 7+)
+**Generic (Bash/Zsh/PowerShell):**
+```bash
+# Verify Python
+python3 --version
+# Should be 3.10 or superior (Recommended: 3.13)
 
-# Verificar Git
+# Verify Git
 git --version
-# Deve ser 2.25 ou superior
+# Should be 2.25 or superior
 ```
 
 **Linux/macOS:**
@@ -94,7 +94,7 @@ cd devbase-setup
 
 #### **Passo 2: Instale o CLI**
 
-```powershell
+```bash
 # Instale via uv (Recomendado)
 uv tool install --force .
 
@@ -104,13 +104,13 @@ pip install .
 
 #### **Passo 3: Execute o Setup Interativo**
 
-```powershell
+```bash
 devbase core setup
 ```
 
 #### **Passo 4: Verifique a Instalação**
 
-```powershell
+```bash
 devbase core doctor
 ```
 
@@ -136,7 +136,7 @@ DevBase está SAUDÁVEL
 Ao instalar via `uv tool install`, o comando `devbase` fica disponível globalmente no seu terminal (Bash, Zsh ou PowerShell). Não é mais necessário configurar aliases manuais para o script principal.
 
 Você pode usar:
-```powershell
+```bash
 devbase core doctor
 devbase dev new "meu-projeto"
 ```
@@ -738,8 +738,8 @@ rclone sync ~/Dev_Workspace remote:DevBase \
 # 1. Restaurar do backup local
 Copy-Item -Recurse "D:\Backups\DevBase\devbase_backup_20241207_143000\*" "C:\Dev_Workspace\"
 
-# 2. Reexecutar bootstrap para garantir integridade
-.\bootstrap.ps1 -Force
+# 2. Reexecutar setup para garantir integridade
+devbase core setup --force
 
 # 3. Verificar
 devbase doctor

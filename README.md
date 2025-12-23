@@ -1,10 +1,10 @@
-# DevBase v4.0 - Modern Python CLI 🚀
+# DevBase v5.0.0-alpha - Modern Python CLI 🚀
 
 **Personal Engineering Operating System** built with Typer, Rich, and uv.
 
 > [!IMPORTANT]
-> This is **v4.0** - a complete rewrite using modern Python tooling.
-> Migrating from v3.x? See [MIGRATION.md](MIGRATION.md)
+> This is **v5.0.0-alpha** - a complete migration to a Python-only core.
+> PowerShell components have been fully decommissioned.
 
 ## Quick Start
 

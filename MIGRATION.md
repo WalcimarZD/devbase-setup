@@ -1,4 +1,4 @@
-# DevBase v4.0 - Migration Guide
+# DevBase v5.0.0-alpha - Migration Guide
 
 ## Overview
 
@@ -132,6 +132,10 @@ alias db-doctor="devbase core doctor"
     devbase core setup  # Auto-creates at ~/Dev_Workspace
 ```
 
+> [!CAUTION]
+> **PowerShell Decommissioned**: As of v5.0.0, PowerShell is no longer a supported runtime. All legacy `.ps1` files in the root and `_deprecated_ps1/` have been removed.
+```
+
 ## Breaking Changes
 
 ### Python Module Imports
@@ -171,7 +175,7 @@ from devbase._deprecated.state import StateManager
 
 ### What's Removed
 
-❌ PowerShell fallback (`devbase.ps1`)
+❌ All PowerShell legacy scripts (`bootstrap.ps1`, `_deprecated_ps1/`)
 ❌ `argparse`-based CLI
 ❌ `requirements.txt`
 
