@@ -1,6 +1,6 @@
 [project]
 name = "devbase"
-version = "5.0.0-alpha"
+version = "5.1.0-alpha"
 description = "DevBase - Personal Engineering Operating System"
 authors = [
     { name = "DevBase Team", email = "devbase@example.com" }
@@ -30,16 +30,22 @@ dependencies = [
     "jinja2>=3.1.6",
     "toml>=0.10.2",
     "copier>=9.1.0",
-    # Knowledge Management (Fase 4)
+    # Knowledge Management
     "networkx>=3.2",
     "python-frontmatter>=1.1.0",
+    # Database (v5.1 Core)
+    "duckdb>=0.10.0",
+    "groq>=1.0.0",
 ]
 
 [project.optional-dependencies]
 viz = [
     # Knowledge graph visualization
     "pyvis>=0.3.2",
-    "duckdb>=0.10.0",
+]
+notifications = [
+    # Desktop notifications (cross-platform)
+    "plyer>=2.1.0",
 ]
 
 [project.scripts]

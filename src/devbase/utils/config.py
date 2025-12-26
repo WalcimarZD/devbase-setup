@@ -28,6 +28,26 @@ class Config:
             "default_template": "clean-arch",
         },
         "aliases": {},
+        # v5.1 AI Configuration (disabled by default)
+        "ai": {
+            "enabled": False,  # Default: OFF per TDD v1.2
+            "provider": "groq",
+            "async_only": True,  # Hard-block synchronous calls
+            "notification": "console",  # "desktop" | "console" | "none"
+        },
+        # v5.1 Security Configuration
+        "security": {
+            "ai_generation": {
+                "max_daily_artifacts": 5,
+                "human_approval_required": True,
+                "blocked_paths": [
+                    "12_private_vault/",
+                    "*.env",
+                    "credentials/",
+                    "*secret*",
+                ],
+            },
+        },
     }
 
 

@@ -14,7 +14,7 @@ import typer
 from rich.console import Console
 from typing_extensions import Annotated
 
-from devbase.commands import core, development, navigation, operations, quick, pkm, study, analytics
+from devbase.commands import core, development, navigation, operations, quick, pkm, study, analytics, ai
 from devbase.utils.workspace import detect_workspace_root
 
 # Initialize Typer app with rich help
@@ -83,6 +83,12 @@ app.add_typer(
     analytics.app,
     name="analytics",
     help="📈 Productivity insights",
+    rich_help_panel="🔵 Advanced",
+)
+app.add_typer(
+    ai.app,
+    name="ai",
+    help="🧠 AI-powered features",
     rich_help_panel="🔵 Advanced",
 )
 

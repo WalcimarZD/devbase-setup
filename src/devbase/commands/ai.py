@@ -1,0 +1,249 @@
+"""
+AI Commands - DevBase AI Module CLI
+====================================
+CLI commands for interacting with AI features.
+
+Commands:
+- ai chat: Interactive chat with LLM
+- ai classify: Classify text into categories
+- ai status: Check AI worker status
+- ai process: Force process queued tasks
+
+Author: DevBase Team
+Version: 5.1.0
+"""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Optional
+
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from typing_extensions import Annotated
+
+# Initialize Typer app for this command group
+app = typer.Typer(
+    name="ai",
+    help="🧠 AI-powered features (classification, summarization, chat)",
+    no_args_is_help=True,
+)
+
+console = Console()
+
+
+def _get_provider():
+    """Get LLM provider with proper error handling."""
+    try:
+        from devbase.adapters.ai.groq_adapter import GroqProvider
+        return GroqProvider()
+    except ImportError:
+        console.print(
+            "[red]Error:[/red] Groq SDK not installed. Run: [cyan]uv add groq[/cyan]"
+        )
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]Error initializing AI:[/red] {e}")
+        console.print(
+            "[dim]💡 Tip: Set GROQ_API_KEY environment variable[/dim]"
+        )
+        raise typer.Exit(1)
+
+
+@app.command("chat")
+def chat(
+    prompt: Annotated[
+        str,
+        typer.Argument(help="Your message or question"),
+    ],
+    model: Annotated[
+        Optional[str],
+        typer.Option("--model", "-m", help="Model to use (default: llama-3.1-8b-instant)"),
+    ] = None,
+    temperature: Annotated[
+        float,
+        typer.Option("--temperature", "-t", help="Creativity level (0.0-2.0)"),
+    ] = 0.7,
+) -> None:
+    """
+    💬 Chat with AI assistant.
+    
+    Send a prompt and get a response from the configured LLM.
+    
+    Examples:
+        devbase ai chat "Explain SOLID principles briefly"
+        devbase ai chat "Suggest a project name for a REST API" -t 1.0
+    """
+    provider = _get_provider()
+    
+    with console.status("[bold blue]Thinking...[/bold blue]"):
+        try:
+            response = provider.generate(
+                prompt,
+                model=model,
+                temperature=temperature,
+            )
+        except Exception as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1)
+    
+    # Display response in a nice panel
+    console.print()
+    console.print(Panel(
+        response.content,
+        title="[bold green]🤖 AI Response[/bold green]",
+        subtitle=f"[dim]{response.model} | {response.tokens_used} tokens | {response.latency_ms:.0f}ms[/dim]",
+        border_style="green",
+    ))
+
+
+@app.command("classify")
+def classify(
+    text: Annotated[
+        str,
+        typer.Argument(help="Text to classify"),
+    ],
+    categories: Annotated[
+        str,
+        typer.Option("--categories", "-c", help="Comma-separated list of categories"),
+    ] = "feature,bug,docs,chore,refactor",
+) -> None:
+    """
+    🏷️ Classify text into a category.
+    
+    Uses AI to classify text into one of the provided categories.
+    
+    Examples:
+        devbase ai classify "Fix login button not working" -c "bug,feature,docs"
+        devbase ai classify "Add dark mode support"
+    """
+    provider = _get_provider()
+    category_list = [c.strip() for c in categories.split(",")]
+    
+    with console.status("[bold blue]Classifying...[/bold blue]"):
+        try:
+            result = provider.classify(text, category_list)
+        except Exception as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1)
+    
+    # Display result
+    console.print()
+    console.print(f"[bold]Text:[/bold] {text[:100]}{'...' if len(text) > 100 else ''}")
+    console.print(f"[bold green]Category:[/bold green] {result}")
+
+
+@app.command("summarize")
+def summarize(
+    text: Annotated[
+        str,
+        typer.Argument(help="Text to summarize"),
+    ],
+    max_length: Annotated[
+        int,
+        typer.Option("--max-length", "-l", help="Maximum summary length in words"),
+    ] = 50,
+) -> None:
+    """
+    📝 Summarize text.
+    
+    Uses AI to create a concise summary of the provided text.
+    
+    Examples:
+        devbase ai summarize "Long text here..." -l 30
+    """
+    provider = _get_provider()
+    
+    with console.status("[bold blue]Summarizing...[/bold blue]"):
+        try:
+            result = provider.summarize(text, max_length=max_length)
+        except Exception as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1)
+    
+    # Display result
+    console.print()
+    console.print(Panel(
+        result,
+        title="[bold green]📝 Summary[/bold green]",
+        border_style="green",
+    ))
+
+
+@app.command("status")
+def status() -> None:
+    """
+    📊 Check AI worker status.
+    
+    Shows the current state of the background AI worker
+    and pending tasks in the queue.
+    """
+    try:
+        from devbase.services.async_worker import get_worker
+        from devbase.adapters.storage.duckdb_adapter import get_connection
+    except ImportError as e:
+        console.print(f"[red]Import error:[/red] {e}")
+        raise typer.Exit(1)
+    
+    # Check worker status
+    worker = get_worker()
+    worker_status = "🟢 Running" if worker.is_running() else "🔴 Stopped"
+    
+    # Check queue
+    try:
+        conn = get_connection()
+        result = conn.execute("""
+            SELECT 
+                COUNT(*) FILTER (WHERE status = 'pending') as pending,
+                COUNT(*) FILTER (WHERE status = 'processing') as processing,
+                COUNT(*) FILTER (WHERE status = 'done') as done,
+                COUNT(*) FILTER (WHERE status = 'failed') as failed
+            FROM ai_task_queue
+        """).fetchone()
+        
+        pending, processing, done, failed = result if result else (0, 0, 0, 0)
+    except Exception:
+        pending, processing, done, failed = 0, 0, 0, 0
+    
+    # Display status
+    table = Table(title="AI Worker Status")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value")
+    
+    table.add_row("Worker", worker_status)
+    table.add_row("Pending Tasks", str(pending))
+    table.add_row("Processing", str(processing))
+    table.add_row("Completed", str(done))
+    table.add_row("Failed", str(failed))
+    
+    console.print()
+    console.print(table)
+    
+    # Tips
+    if not worker.is_running():
+        console.print()
+        console.print("[dim]💡 Tip: Set ai.enabled=true in config to auto-start worker[/dim]")
+
+
+@app.command("start")
+def start_worker() -> None:
+    """
+    🚀 Start the AI background worker.
+    
+    Starts the daemon thread that processes queued AI tasks.
+    """
+    try:
+        from devbase.services.async_worker import get_worker
+    except ImportError as e:
+        console.print(f"[red]Import error:[/red] {e}")
+        raise typer.Exit(1)
+    
+    worker = get_worker()
+    
+    if worker.is_running():
+        console.print("[yellow]Worker is already running[/yellow]")
+        return
+    
+    worker.start()
+    console.print("[green]✓[/green] AI worker started")
