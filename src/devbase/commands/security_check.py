@@ -58,10 +58,7 @@ def find_unprotected_secrets(root: Path) -> List[Tuple[Path, str]]:
     
     # Scan for sensitive files
     for pattern in SENSITIVE_FILE_PATTERNS:
-        # Convert glob to regex for checking
-        pattern_clean = pattern.replace("*", "")
-        
-        for file in root.rglob(pattern.replace("*", "**")):
+        for file in root.rglob(pattern):
             if file.is_file():
                 # Check if explicitly ignored
                 relative = str(file.relative_to(root)).replace("\\", "/")
