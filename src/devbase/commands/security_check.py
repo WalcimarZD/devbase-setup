@@ -61,7 +61,11 @@ def find_unprotected_secrets(root: Path) -> List[Tuple[Path, str]]:
         # Convert glob to regex for checking
         pattern_clean = pattern.replace("*", "")
         
-        for file in root.rglob(pattern.replace("*", "**")):
+        # recursive glob pattern
+        # If pattern starts with *, we want to match anywhere. rglob does this for filename matching in subdirs.
+        # But rglob("*pattern") matches "pattern" in any subdirectory.
+
+        for file in root.rglob(pattern):
             if file.is_file():
                 # Check if explicitly ignored
                 relative = str(file.relative_to(root)).replace("\\", "/")
