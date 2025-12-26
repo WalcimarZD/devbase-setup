@@ -3,9 +3,10 @@ Security Check Module
 ======================
 Scans workspace for common security misconfigurations and exposed secrets.
 """
-import re
+import os
+import fnmatch
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Set
 
 from rich.console import Console
 
@@ -27,6 +28,26 @@ SENSITIVE_FILE_PATTERNS = [
     ".npmrc",
 ]
 
+# Directories to always ignore during scan (Performance Optimization)
+IGNORED_DIRS = {
+    "node_modules",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "env",
+    ".idea",
+    ".vscode",
+    "dist",
+    "build",
+    "target",
+    "vendor",
+    "coverage",
+    ".tox",
+    ".pytest_cache",
+    ".mypy_cache",
+}
+
 # Known cloud sync directories
 CLOUD_SYNC_PATHS = [
     "OneDrive",
@@ -40,26 +61,33 @@ def find_unprotected_secrets(root: Path) -> List[Tuple[Path, str]]:
     """
     Scan workspace for secret files not protected by .gitignore.
     
+    Optimized to use os.walk with pruning of heavy directories.
+
     Returns:
         List of (file_path, reason) tuples
     """
     issues = []
     
-    # Load .gitignore if exists
+    # Load .gitignore patterns
+    gitignore_patterns: Set[str] = set()
     gitignore_path = root / ".gitignore"
-    gitignore_patterns = set()
     
     if gitignore_path.exists():
-        with open(gitignore_path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    gitignore_patterns.add(line)
-    
-    # Scan for sensitive files
-    for pattern in SENSITIVE_FILE_PATTERNS:
-        # Convert glob to regex for checking
-        pattern_clean = pattern.replace("*", "")
+        try:
+            with open(gitignore_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        gitignore_patterns.add(line)
+        except Exception:
+            # Fail safe if gitignore cannot be read
+            pass
+
+    # Walk the directory tree
+    for current_root, dirs, files in os.walk(root):
+        # Prune ignored directories (Performance Win)
+        # Modify dirs list in-place to prevent os.walk from visiting them
+        dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
         
         # recursive glob pattern
         # If pattern starts with *, we want to match anywhere. rglob does this for filename matching in subdirs.
