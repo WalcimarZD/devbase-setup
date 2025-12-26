@@ -3,9 +3,10 @@ Security Check Module
 ======================
 Scans workspace for common security misconfigurations and exposed secrets.
 """
-import re
+import os
+import fnmatch
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Set
 
 from rich.console import Console
 
@@ -27,6 +28,26 @@ SENSITIVE_FILE_PATTERNS = [
     ".npmrc",
 ]
 
+# Directories to always ignore during scan (Performance Optimization)
+IGNORED_DIRS = {
+    "node_modules",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "env",
+    ".idea",
+    ".vscode",
+    "dist",
+    "build",
+    "target",
+    "vendor",
+    "coverage",
+    ".tox",
+    ".pytest_cache",
+    ".mypy_cache",
+}
+
 # Known cloud sync directories
 CLOUD_SYNC_PATHS = [
     "OneDrive",
@@ -40,39 +61,85 @@ def find_unprotected_secrets(root: Path) -> List[Tuple[Path, str]]:
     """
     Scan workspace for secret files not protected by .gitignore.
     
+    Optimized to use os.walk with pruning of heavy directories.
+
     Returns:
         List of (file_path, reason) tuples
     """
     issues = []
     
-    # Load .gitignore if exists
+    # Load .gitignore patterns
+    gitignore_patterns: Set[str] = set()
     gitignore_path = root / ".gitignore"
-    gitignore_patterns = set()
     
     if gitignore_path.exists():
-        with open(gitignore_path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    gitignore_patterns.add(line)
-    
-    # Scan for sensitive files
-    for pattern in SENSITIVE_FILE_PATTERNS:
-        # Convert glob to regex for checking
-        pattern_clean = pattern.replace("*", "")
+        try:
+            with open(gitignore_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        gitignore_patterns.add(line)
+        except Exception:
+            # Fail safe if gitignore cannot be read
+            pass
+
+    # Walk the directory tree
+    for current_root, dirs, files in os.walk(root):
+        # Prune ignored directories (Performance Win)
+        # Modify dirs list in-place to prevent os.walk from visiting them
+        dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
         
-        for file in root.rglob(pattern.replace("*", "**")):
-            if file.is_file():
-                # Check if explicitly ignored
-                relative = str(file.relative_to(root)).replace("\\", "/")
-                is_ignored = any(
-                    pattern in gitignore_patterns 
-                    or relative.startswith(pattern.rstrip("/"))
-                    for pattern in gitignore_patterns
-                )
-                
-                if not is_ignored:
-                    issues.append((file, f"Unprotected secret file matches pattern: {pattern}"))
+        # Additional pruning based on .gitignore (simple directory matches)
+        # This skips scanning subtrees that are explicitly ignored by name
+        dirs[:] = [
+            d for d in dirs
+            if d not in gitignore_patterns and f"{d}/" not in gitignore_patterns
+        ]
+
+        for filename in files:
+            # Check if file matches any sensitive pattern
+            matched_pattern = None
+            for pattern in SENSITIVE_FILE_PATTERNS:
+                if fnmatch.fnmatch(filename, pattern):
+                    matched_pattern = pattern
+                    break
+
+            if not matched_pattern:
+                continue
+
+            # Found a candidate, now check if it is ignored
+            file_path = Path(current_root) / filename
+            relative_path = str(file_path.relative_to(root)).replace("\\", "/")
+
+            is_ignored = False
+            for gitignore_pat in gitignore_patterns:
+                # 1. Directory prefix match (e.g., "secrets/" matches "secrets/key.pem")
+                clean_pat = gitignore_pat.rstrip("/")
+                if gitignore_pat.endswith("/") and (
+                    relative_path == clean_pat or relative_path.startswith(f"{clean_pat}/")
+                ):
+                    is_ignored = True
+                    break
+
+                # 2. Exact match
+                if relative_path == gitignore_pat:
+                    is_ignored = True
+                    break
+
+                # 3. Glob match (e.g., "*.pem" matches "key.pem" or "subdir/key.pem")
+                # gitignore patterns apply to basename if they contain no slash
+                if "/" not in gitignore_pat:
+                    if fnmatch.fnmatch(filename, gitignore_pat):
+                        is_ignored = True
+                        break
+                else:
+                    # Path-specific glob (e.g., "config/*.secret")
+                    if fnmatch.fnmatch(relative_path, gitignore_pat):
+                        is_ignored = True
+                        break
+
+            if not is_ignored:
+                issues.append((file_path, f"Unprotected secret file matches pattern: {matched_pattern}"))
     
     return issues
 
