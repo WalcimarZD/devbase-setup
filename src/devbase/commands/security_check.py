@@ -89,57 +89,22 @@ def find_unprotected_secrets(root: Path) -> List[Tuple[Path, str]]:
         # Modify dirs list in-place to prevent os.walk from visiting them
         dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
         
-        # Additional pruning based on .gitignore (simple directory matches)
-        # This skips scanning subtrees that are explicitly ignored by name
-        dirs[:] = [
-            d for d in dirs
-            if d not in gitignore_patterns and f"{d}/" not in gitignore_patterns
-        ]
+        # recursive glob pattern
+        # If pattern starts with *, we want to match anywhere. rglob does this for filename matching in subdirs.
+        # But rglob("*pattern") matches "pattern" in any subdirectory.
 
-        for filename in files:
-            # Check if file matches any sensitive pattern
-            matched_pattern = None
-            for pattern in SENSITIVE_FILE_PATTERNS:
-                if fnmatch.fnmatch(filename, pattern):
-                    matched_pattern = pattern
-                    break
-
-            if not matched_pattern:
-                continue
-
-            # Found a candidate, now check if it is ignored
-            file_path = Path(current_root) / filename
-            relative_path = str(file_path.relative_to(root)).replace("\\", "/")
-
-            is_ignored = False
-            for gitignore_pat in gitignore_patterns:
-                # 1. Directory prefix match (e.g., "secrets/" matches "secrets/key.pem")
-                clean_pat = gitignore_pat.rstrip("/")
-                if gitignore_pat.endswith("/") and (
-                    relative_path == clean_pat or relative_path.startswith(f"{clean_pat}/")
-                ):
-                    is_ignored = True
-                    break
-
-                # 2. Exact match
-                if relative_path == gitignore_pat:
-                    is_ignored = True
-                    break
-
-                # 3. Glob match (e.g., "*.pem" matches "key.pem" or "subdir/key.pem")
-                # gitignore patterns apply to basename if they contain no slash
-                if "/" not in gitignore_pat:
-                    if fnmatch.fnmatch(filename, gitignore_pat):
-                        is_ignored = True
-                        break
-                else:
-                    # Path-specific glob (e.g., "config/*.secret")
-                    if fnmatch.fnmatch(relative_path, gitignore_pat):
-                        is_ignored = True
-                        break
-
-            if not is_ignored:
-                issues.append((file_path, f"Unprotected secret file matches pattern: {matched_pattern}"))
+        for file in root.rglob(pattern):
+            if file.is_file():
+                # Check if explicitly ignored
+                relative = str(file.relative_to(root)).replace("\\", "/")
+                is_ignored = any(
+                    pattern in gitignore_patterns 
+                    or relative.startswith(pattern.rstrip("/"))
+                    for pattern in gitignore_patterns
+                )
+                
+                if not is_ignored:
+                    issues.append((file, f"Unprotected secret file matches pattern: {pattern}"))
     
     return issues
 
