@@ -18,7 +18,7 @@ import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, date
-from pathlib import Path
+from pathlib import Path, PureWindowsPath, PurePosixPath
 from typing import Callable
 
 
@@ -113,11 +113,19 @@ def anonymize_paths(content: str, salt: str) -> str:
     
     def hash_path(match: re.Match[str]) -> str:
         path = match.group(0)
-        # Keep filename, hash the directory
-        parts = Path(path).parts
+
+        # Use appropriate Path class based on path format
+        # This ensures correct parsing on any OS (e.g. Windows paths on Linux)
+        if re.match(r"[A-Za-z]:\\", path):
+            p = PureWindowsPath(path)
+        else:
+            p = PurePosixPath(path)
+
+        parts = p.parts
         if len(parts) > 1:
+            # Hash directory components
             dir_hash = hashlib.sha256(
-                (salt + str(Path(*parts[:-1]))).encode()
+                (salt + str(p.parent)).encode()
             ).hexdigest()[:8]
             return f"[PATH:{dir_hash}]/{parts[-1]}"
         return path

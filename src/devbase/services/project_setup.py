@@ -48,22 +48,22 @@ class ProjectSetupService:
         return True
 
     def _git_init(self, path: Path):
-        console.print("[dim]⚡ Initializing Git...[/dim]")
         try:
-            subprocess.run(["git", "init"], cwd=path, check=True, capture_output=True)
+            with console.status("[bold cyan]Initializing Git...[/bold cyan]"):
+                subprocess.run(["git", "init"], cwd=path, check=True, capture_output=True)
             console.print("  [green]✓[/green] Git initialized")
         except Exception:
             console.print("  [yellow]⚠[/yellow] Git init failed")
 
     def _install_dependencies(self, path: Path):
         """Polyglot dependency installation."""
-        console.print("[dim]⚡ Installing dependencies...[/dim]")
         
         # Python (uv) - Priority
         if (path / "pyproject.toml").exists():
             if shutil.which("uv"):
                 try:
-                    subprocess.run(["uv", "sync"], cwd=path, check=True, capture_output=True)
+                    with console.status("[bold cyan]Installing Python dependencies (uv)...[/bold cyan]"):
+                        subprocess.run(["uv", "sync"], cwd=path, check=True, capture_output=True)
                     console.print("  [green]✓[/green] Python deps (uv)")
                     return
                 except subprocess.CalledProcessError:
@@ -75,7 +75,8 @@ class ProjectSetupService:
         elif (path / "package.json").exists():
             if shutil.which("npm"):
                 try:
-                    subprocess.run(["npm", "install"], cwd=path, check=True, capture_output=True)
+                    with console.status("[bold cyan]Installing Node dependencies (npm)...[/bold cyan]"):
+                        subprocess.run(["npm", "install"], cwd=path, check=True, capture_output=True)
                     console.print("  [green]✓[/green] Node deps (npm)")
                     return
                 except subprocess.CalledProcessError:
@@ -88,7 +89,8 @@ class ProjectSetupService:
             if (path / "go.mod").exists():
                 if shutil.which("go"):
                     try:
-                        subprocess.run(["go", "mod", "download"], cwd=path, check=True, capture_output=True)
+                        with console.status("[bold cyan]Downloading Go modules...[/bold cyan]"):
+                            subprocess.run(["go", "mod", "download"], cwd=path, check=True, capture_output=True)
                         console.print("  [green]✓[/green] Go deps (go mod)")
                         return
                     except subprocess.CalledProcessError:
@@ -101,7 +103,8 @@ class ProjectSetupService:
                 if shutil.which("cargo"):
                     try:
                         # minimal check, build usually fetches deps
-                        subprocess.run(["cargo", "fetch"], cwd=path, check=True, capture_output=True)
+                        with console.status("[bold cyan]Fetching Rust dependencies...[/bold cyan]"):
+                            subprocess.run(["cargo", "fetch"], cwd=path, check=True, capture_output=True)
                         console.print("  [green]✓[/green] Rust deps (cargo)")
                         return
                     except subprocess.CalledProcessError:
@@ -114,18 +117,18 @@ class ProjectSetupService:
 
     def _setup_pre_commit(self, path: Path):
         if (path / ".pre-commit-config.yaml").exists() and shutil.which("pre-commit"):
-            console.print("[dim]⚡ Setting up pre-commit...[/dim]")
             try:
-                subprocess.run(["pre-commit", "install"], cwd=path, check=True, capture_output=True)
+                with console.status("[bold cyan]Setting up pre-commit...[/bold cyan]"):
+                    subprocess.run(["pre-commit", "install"], cwd=path, check=True, capture_output=True)
                 console.print("  [green]✓[/green] Hooks installed")
             except Exception:
                 console.print("  [yellow]⚠[/yellow] pre-commit failed")
 
     def _initial_commit(self, path: Path, project_name: str):
-        console.print("[dim]⚡ Creating initial commit...[/dim]")
         try:
-            subprocess.run(["git", "add", "."], cwd=path, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", f"feat: Initialize {project_name}"], cwd=path, check=True, capture_output=True)
+            with console.status("[bold cyan]Creating initial commit...[/bold cyan]"):
+                subprocess.run(["git", "add", "."], cwd=path, check=True, capture_output=True)
+                subprocess.run(["git", "commit", "-m", f"feat: Initialize {project_name}"], cwd=path, check=True, capture_output=True)
             console.print("  [green]✓[/green] Initial commit created")
         except Exception:
             console.print("  [yellow]⚠[/yellow] Commit failed")
