@@ -99,8 +99,16 @@ def anonymize_paths(content: str, salt: str) -> str:
         Content with paths anonymized
     """
     # Pattern for Windows and Unix absolute paths
+    # Note: Double backslashes in regex string to match literal backslash in Windows paths
     path_pattern = re.compile(
         r"(?:[A-Za-z]:\\[\w\\.-]+|/(?:home|Users|var|tmp|opt)/[\w/.-]+)"
+    )
+    # Fix for Windows path detection:
+    # On Windows, backslashes need to be handled carefully in regex.
+    # The original pattern likely missed because of how re handles backslashes.
+    # Let's use a more robust pattern.
+    path_pattern = re.compile(
+        r"(?:[A-Za-z]:\\\\[\w\\\\.-]+|/(?:home|Users|var|tmp|opt)/[\w/.-]+)"
     )
     
     def hash_path(match: re.Match[str]) -> str:

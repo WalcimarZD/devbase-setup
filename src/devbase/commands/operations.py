@@ -12,6 +12,7 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 from typing_extensions import Annotated
 

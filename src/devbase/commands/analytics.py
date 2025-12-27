@@ -146,6 +146,7 @@ def report(
             cat_expr = f"coalesce({cols_str}, 'unknown') as category"
 
         # Safe Select
+        # Cast timestamp to TIMESTAMP to ensure comparison works
         df = con.execute(f"""
             SELECT 
                 timestamp,
@@ -153,7 +154,7 @@ def report(
                 coalesce(message, '') as message,
                 'event_id' as event_id
             FROM raw_events
-            WHERE timestamp >= (current_date - INTERVAL 7 DAY)
+            WHERE CAST(timestamp AS TIMESTAMP) >= (current_date - INTERVAL 7 DAY)
         """).fetchdf()
         
         # Calculate Metrics
