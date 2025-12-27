@@ -3,7 +3,6 @@ Core Commands: setup, doctor, hydrate
 ======================================
 Essential workspace management commands.
 """
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -15,9 +14,12 @@ from typing_extensions import Annotated
 
 from devbase.utils.filesystem import get_filesystem
 from devbase.utils.state import get_state_manager
+from devbase.commands.debug import debug_cmd
 
 app = typer.Typer(help="Core workspace commands")
 console = Console()
+
+app.command(name="debug")(debug_cmd)
 
 SCRIPT_VERSION = "4.0.0"
 POLICY_VERSION = "4.0"
