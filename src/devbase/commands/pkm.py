@@ -22,43 +22,47 @@ def find(
     tag: Annotated[Optional[List[str]], typer.Option("--tag", "-t", help="Filter by tag(s)")] = None,
     note_type: Annotated[Optional[str], typer.Option("--type", help="Filter by note type")] = None,
     reindex: Annotated[bool, typer.Option("--reindex", help="Rebuild database before searching")] = False,
+    global_search: Annotated[bool, typer.Option("--global", "-g", help="Search archived content as well")] = False,
 ) -> None:
     """
-    🔍 Fast search across knowledge base (SQLite-powered).
+    🔍 Fast search across knowledge base (DuckDB-powered).
     
     Searches notes by title, content, tags, and type.
     First run will index all notes (~5 sec for 1000 notes).
     
+    Default searches only 'Active Knowledge' (10-19).
+    Use --global to also search 'Archived Content' (90-99).
+
     Examples:
         devbase pkm find python
+        devbase pkm find python --global
         devbase pkm find --tag git --tag cli
         devbase pkm find --type til
         devbase pkm find typer --tag python
     """
-    # TODO: Knowledge DB requires implementation (was phantom _deprecated dependency)
-    console.print("[yellow]⚠ Knowledge search not yet implemented[/yellow]")
-    console.print("[dim]This command will be available in a future version.[/dim]")
-    return
+    from devbase.services.knowledge_db import KnowledgeDB
 
     root: Path = ctx.obj["root"]
+    db = KnowledgeDB(root)
     
     # Index if database is empty or reindex requested
-    if reindex or not db.get_stats()["total_notes"]:
+    stats = db.get_stats()
+    if reindex or stats["total_notes"] == 0:
         console.print("[bold]Indexing knowledge base...[/bold]")
         with console.status("[green]Scanning files..."):
-            stats = db.index_workspace()
+            index_stats = db.index_workspace()
         
-        console.print(f"[green]✓[/green] Indexed {stats['indexed']} notes")
-        if stats['errors'] > 0:
-            console.print(f"[yellow]⚠[/yellow] {stats['errors']} errors")
+        console.print(f"[green]✓[/green] Indexed {index_stats['indexed']} notes")
+        if index_stats['errors'] > 0:
+            console.print(f"[yellow]⚠[/yellow] {index_stats['errors']} errors")
         console.print()
     
     # Search
-    results = db.search(query=query, tags=tag, note_type=note_type, limit=50)
+    results = db.search(query=query, tags=tag, note_type=note_type, limit=50, global_search=global_search)
     
     # Fallback: if --type returned no results, try searching by tag instead
     if not results and note_type and not tag:
-        results = db.search(query=query, tags=[note_type], note_type=None, limit=50)
+        results = db.search(query=query, tags=[note_type], note_type=None, limit=50, global_search=global_search)
         if results:
             console.print(f"[dim](Searching by tag '{note_type}' instead of type)[/dim]")
     

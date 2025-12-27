@@ -133,8 +133,8 @@ def init_schema(conn: "duckdb.DuckDBPyConnection") -> None:
     
     Creates all required tables per TDD v1.2:
     - notes_index: Main note index with JD validation
-    - hot_fts: FTS for recent content (last 7 days)
-    - cold_fts: FTS for archived content
+    - hot_fts: Full-text search for Active Knowledge (10-19)
+    - cold_fts: Full-text search for Archived Content (90-99)
     - ai_task_queue: Async AI task queue
     - events: Telemetry events table
     - schema_version: Migration tracking
@@ -161,6 +161,30 @@ def init_schema(conn: "duckdb.DuckDBPyConnection") -> None:
         );
     """)
     
+    # Hot FTS (Active Knowledge 10-19)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS hot_fts (
+            file_path TEXT PRIMARY KEY,
+            title TEXT,
+            content TEXT,
+            tags TEXT,
+            note_type TEXT,
+            mtime_epoch BIGINT
+        );
+    """)
+
+    # Cold FTS (Archived 90-99)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cold_fts (
+            file_path TEXT PRIMARY KEY,
+            title TEXT,
+            content TEXT,
+            tags TEXT,
+            note_type TEXT,
+            mtime_epoch BIGINT
+        );
+    """)
+
     # AI task queue for async processing
     # DuckDB requires explicit sequences for auto-increment (unlike SQLite)
     conn.execute("CREATE SEQUENCE IF NOT EXISTS ai_task_queue_id_seq;")
