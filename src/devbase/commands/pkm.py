@@ -105,29 +105,33 @@ def graph(
         bool,
         typer.Option("--html", help="Generate interactive HTML visualization"),
     ] = False,
+    global_scope: Annotated[
+        bool,
+        typer.Option("--global", help="Include archive (90-99_ARCHIVE_COLD) in graph"),
+    ] = False,
 ) -> None:
     """
     📊 Visualize knowledge graph statistics.
     
-    Shows network analysis of your knowledge base:
+    Shows network analysis of your knowledge base using NetworkX:
     - Total nodes and connections
     - Hub notes (most connected)
     - Orphan notes (isolated)
     - Connection density
     
+    Supports exporting to Graphviz DOT format or interactive HTML (PyVis).
+
     Examples:
-        devbase pkm graph              # Show stats
-        devbase pkm graph --export      # Save as graph.dot
-        devbase pkm graph --html        # Interactive visualization
+        devbase pkm graph              # Show stats for active knowledge
+        devbase pkm graph --global     # Include archive
+        devbase pkm graph --export     # Save as graph.dot
+        devbase pkm graph --html       # Interactive visualization
     """
     import networkx as nx
+    from devbase.services.knowledge_graph import KnowledgeGraph
     
-    # TODO: Knowledge Graph requires implementation (was phantom _deprecated dependency)
-    console.print("[yellow]⚠ Knowledge graph not yet implemented[/yellow]")
-    console.print("[dim]This command will be available in a future version.[/dim]")
-    return
-
     root: Path = ctx.obj["root"]
+    kg = KnowledgeGraph(root, include_archive=global_scope)
     
     with console.status("[bold green]Scanning knowledge base..."):
         stats = kg.scan()
@@ -168,23 +172,23 @@ def graph(
     # Export options
     if export:
         output_path = root / "knowledge_graph.dot"
-        kg.export_to_graphviz(output_path)
+        try:
+            kg.export_to_graphviz(output_path)
+            console.print(f"\n[green]✓[/green] Graph exported to: [cyan]{output_path}[/cyan]")
+        except ImportError as e:
+            console.print(f"\n[yellow]⚠️  {str(e)}[/yellow]")
+        except Exception as e:
+            console.print(f"\n[red]✗[/red] Failed to export graph: {str(e)}")
     
     if html:
+        output_path = root / "knowledge_graph.html"
         try:
-            from pyvis.network import Network
-            
-            net = Network(height="750px", width="100%", bgcolor="#222222", font_color="white")
-            net.from_nx(kg.graph)
-            
-            output_path = root / "knowledge_graph.html"
-            net.save_graph(str(output_path))
-            
+            kg.export_to_pyvis(output_path)
             console.print(f"\n[green]✓[/green] Interactive graph saved to: [cyan]{output_path}[/cyan]")
             console.print("[dim]Open in browser to explore[/dim]")
         except ImportError:
             console.print("\n[yellow]⚠️  PyVis not installed[/yellow]")
-            console.print("[dim]Install with: pip install pyvis[/dim]")
+            console.print("[dim]Install with: pip install devbase[viz][/dim]")
 
 
 @app.command()
@@ -203,19 +207,25 @@ def links(
         devbase pkm links til/2025-12-22-typer-context.md
     """
     import networkx as nx
-    
-    # TODO: Knowledge Graph requires implementation (was phantom _deprecated dependency)
-    console.print("[yellow]⚠ Link analysis not yet implemented[/yellow]")
-    console.print("[dim]This command will be available in a future version.[/dim]")
-    return
+    from devbase.services.knowledge_graph import KnowledgeGraph
 
     root: Path = ctx.obj["root"]
-    kg.scan()
+    kg = KnowledgeGraph(root, include_archive=True) # Always include all notes for link analysis
+
+    with console.status("[bold green]Scanning knowledge base..."):
+        kg.scan()
     
     # Get connections
-    outlinks = kg.get_outlinks(note_path)
-    backlinks = kg.get_backlinks(note_path)
+    outlinks = kg.get_outlinks(note)
+    backlinks = kg.get_backlinks(note)
     
+    # Check if note exists
+    # If not found directly, try to find by resolving it same way as get_outlinks does internally
+    # But since scan is done, we can just check if it's in the graph or if it's a valid path
+    # note might be a file path passed by user.
+
+    console.print(f"[bold]Link Analysis for:[/bold] [cyan]{note}[/cyan]\n")
+
     # Display outgoing
     if outlinks:
         console.print(f"[bold]→ Links to ({len(outlinks)}):[/bold]")
@@ -234,7 +244,7 @@ def links(
             title = kg.graph.nodes[source].get("title", Path(source).stem)
             console.print(f"  • [cyan]{title}[/cyan] [dim]({source})[/dim]")
     else:
-        console.print("[dim]← No backlinks (orphan note)[/dim]")
+        console.print("[dim]← No backlinks[/dim]")
 
 
 @app.command()
