@@ -245,14 +245,9 @@ class SearchEngine:
         # Ideally, we would map back to chunks, but for now we mix file-level FTS results.
 
         # Whitelist allowed tables to prevent SQL injection
-        ALLOWED_FTS_TABLES = {"hot_fts", "cold_fts"}
+        ALLOWED_FTS_TABLES = ["hot_fts", "cold_fts"]
 
-        for table in ["hot_fts", "cold_fts"]:
-            # Validate table name against whitelist
-            if table not in ALLOWED_FTS_TABLES:
-                logger.warning(f"Skipping invalid table name: {table}")
-                continue
-
+        for table in ALLOWED_FTS_TABLES:
             try:
                 # Use parameterized query with validated table name
                 # Note: query is passed as parameter to match_bm25, not interpolated

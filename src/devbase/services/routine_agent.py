@@ -193,7 +193,6 @@ Narrative:"""
             repo = Repo(self.root_path, search_parent_directories=True)
 
             # Count commits since midnight
-            from datetime import datetime
             midnight = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
             # Get commits from HEAD since midnight
