@@ -247,3 +247,102 @@ def start_worker() -> None:
     
     worker.start()
     console.print("[green]✓[/green] AI worker started")
+
+
+# Routine commands
+routine_app = typer.Typer(
+    name="routine",
+    help="📅 Routine management (briefing, triage)",
+    no_args_is_help=True,
+)
+app.add_typer(routine_app, name="routine")
+
+
+@routine_app.command("briefing")
+def briefing() -> None:
+    """
+    🌅 Daily briefing.
+
+    Shows pending tasks from yesterday's daybook.
+    """
+    try:
+        from devbase.services.routine_agent import RoutineAgent
+    except ImportError as e:
+        console.print(f"[red]Import error:[/red] {e}")
+        raise typer.Exit(1)
+
+    agent = RoutineAgent()
+    pending = agent.get_yesterday_pending()
+
+    console.print()
+    console.print(Panel(
+        "\n".join([f"- {task}" for task in pending]),
+        title="[bold yellow]🌅 Morning Briefing: Pending Tasks[/bold yellow]",
+        border_style="yellow",
+    ))
+
+
+@routine_app.command("triage")
+def triage(
+    apply: Annotated[
+        bool,
+        typer.Option("--apply", help="Automatically move files to suggested categories"),
+    ] = False,
+) -> None:
+    """
+    📥 Inbox triage.
+
+    Scans Inbox and suggests JD categories.
+    Use --apply to move files automatically.
+    """
+    from rich.prompt import Confirm
+    try:
+        from devbase.services.routine_agent import RoutineAgent
+    except ImportError as e:
+        console.print(f"[red]Import error:[/red] {e}")
+        raise typer.Exit(1)
+
+    agent = RoutineAgent()
+    files = agent.scan_inbox()
+
+    if not files:
+        console.print("[green]Inbox is empty! 🎉[/green]")
+        return
+
+    console.print(f"[bold]Found {len(files)} items in Inbox:[/bold]")
+    console.print()
+
+    for file_path in files:
+        console.print(f"📄 [bold]{file_path.name}[/bold]")
+
+        # Read content (text only)
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            console.print("  [dim]Skipping (binary or non-text)[/dim]")
+            continue
+
+        with console.status("  Analyzing..."):
+            result = agent.classify_inbox_item(content)
+
+        category = result["category"]
+        confidence = result.get("confidence", "unknown")
+
+        console.print(f"  ➜ Suggested: [cyan]{category}[/cyan] [dim]({confidence})[/dim]")
+
+        should_move = False
+        if apply:
+            should_move = True
+        else:
+            should_move = Confirm.ask(f"  Move to {category}?", default=False)
+
+        if should_move:
+            new_path = agent.move_to_category(file_path, category)
+            if new_path:
+                console.print(f"  [green]✓ Moved to {new_path}[/green]")
+            else:
+                console.print("  [red]✗ Failed to move[/red]")
+        else:
+            console.print("  [dim]Skipped[/dim]")
+
+        console.print()
