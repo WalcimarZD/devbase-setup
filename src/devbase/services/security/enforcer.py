@@ -5,7 +5,7 @@ Enforces security policies for AI generation features.
 
 Features:
 - Blocked path patterns (config-driven)
-- Daily artifact quota tracking
+- Daily artifact quota tracking (Persistent in DuckDB)
 - Human approval requirement (stub)
 
 Author: DevBase Team
@@ -14,9 +14,12 @@ Version: 5.1.0
 from __future__ import annotations
 
 import fnmatch
+import json
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+
+from devbase.adapters.storage import duckdb_adapter
 
 
 class SecurityError(Exception):
@@ -31,36 +34,64 @@ class QuotaExceeded(Exception):
 
 @dataclass
 class QuotaTracker:
-    """Tracks daily AI generation quotas."""
+    """
+    Tracks daily AI generation quotas using DuckDB.
     
-    _counts: dict[str, dict[str, int]] = field(default_factory=dict)
-    
-    def _get_today_key(self) -> str:
-        return date.today().isoformat()
+    Persistence is handled by the 'events' table in DuckDB.
+    """
     
     def get_count(self, user: str) -> int:
-        """Get today's artifact count for a user."""
-        today = self._get_today_key()
-        if today not in self._counts:
-            self._counts[today] = {}
-        return self._counts[today].get(user, 0)
-    
-    def increment(self, user: str) -> int:
-        """Increment and return new count for today."""
-        today = self._get_today_key()
-        if today not in self._counts:
-            # Clean up old dates
-            self._counts = {today: {}}
+        """
+        Get today's artifact count for a user from DuckDB.
+
+        Queries the events table for 'ai_generation' events created today
+        by the specified user.
+        """
+        conn = duckdb_adapter.get_connection()
+
+        # Query for events today
+        # Use DuckDB's date_trunc or casting to date
+        query = """
+            SELECT COUNT(*)
+            FROM events
+            WHERE event_type = 'ai_generation'
+              AND timestamp::DATE = current_date()
+        """
         
-        current = self._counts[today].get(user, 0)
-        self._counts[today][user] = current + 1
-        return current + 1
+        # If user is specified, check metadata.
+        # Note: We assume metadata contains JSON with 'user' field.
+        # Since metadata is TEXT, we use json_extract.
+        if user:
+             # This assumes metadata is valid JSON. The schema check enforces it or NULL.
+             # We need to handle potential NULLs safely if not all events have metadata.
+             # DuckDB json_extract returns NULL if path doesn't exist or JSON is invalid.
+             # However, for this to work robustly, we'll fetch all today's events and filter in SQL if possible,
+             # or filter in Python if SQL json extraction is tricky with simple string matching.
+             # DuckDB's JSON extension is powerful.
+             query += " AND json_extract_string(metadata, '$.user') = ?"
+             result = conn.execute(query, [user]).fetchone()
+        else:
+             result = conn.execute(query).fetchone()
+
+        return result[0] if result else 0
     
-    def reset(self, user: str) -> None:
-        """Reset quota for a user (for testing)."""
-        today = self._get_today_key()
-        if today in self._counts:
-            self._counts[today][user] = 0
+    def record_usage(self, user: str) -> int:
+        """
+        Record an artifact generation event in DuckDB.
+
+        Args:
+            user: User identifier
+
+        Returns:
+            New count for today
+        """
+        metadata = json.dumps({"user": user})
+        duckdb_adapter.log_event(
+            event_type="ai_generation",
+            message="Artifact generated",
+            metadata=metadata
+        )
+        return self.get_count(user)
 
 
 @dataclass
@@ -88,6 +119,7 @@ class SecurityEnforcer:
         try:
             enforcer.enforce(target_path, user_id)
             # Proceed with AI generation
+            enforcer.record_usage(user_id)
         except SecurityError as e:
             console.print(f"[red]Blocked: {e}[/red]")
         except QuotaExceeded as e:
@@ -152,7 +184,7 @@ class SecurityEnforcer:
         Returns:
             New count for today
         """
-        return self.tracker.increment(user)
+        return self.tracker.record_usage(user)
     
     def get_remaining_quota(self, user: str) -> int:
         """
