@@ -227,7 +227,7 @@ def test_init_schema_handles_corrupted_schema_version(caplog):
         # Verify that the warning was logged
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
-        log_message = caplog.records[0].message
+        log_message = caplog.records[0].getMessage()
         assert "Unexpected error checking schema version" in log_message
         assert "Simulated unexpected database error" in log_message
         
