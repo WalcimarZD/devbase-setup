@@ -172,6 +172,7 @@ Narrative:"""
         # Git Metrics
         metrics = self.get_git_metrics()
 
+
         # Suggest ADR if architecture events found
         # Import lazily to avoid circular import (RoutineAgent <-> ADRGhostwriter)
         from devbase.services.adr_generator import get_ghostwriter

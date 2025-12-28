@@ -36,6 +36,7 @@ dependencies = [
     # Database (v5.1 Core)
     "duckdb>=0.10.0",
     "groq>=1.0.0",
+    "fastembed>=0.7.4",
 ]
 
 [project.optional-dependencies]
