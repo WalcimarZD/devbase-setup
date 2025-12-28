@@ -161,6 +161,7 @@ def init_schema(conn: duckdb.DuckDBPyConnection) -> None:
         logger.warning(f"Unexpected error checking schema version: {e}")
         pass
 
+
     # Schema version table (must exist first for migration checks)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS schema_version (

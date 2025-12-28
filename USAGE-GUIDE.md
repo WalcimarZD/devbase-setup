@@ -177,6 +177,30 @@ devbase pkm graph
 devbase pkm graph --html
 ```
 
+### `devbase ai`
+*AI-powered workspace intelligence.*
+
+#### `ai config`
+Configures the LLM provider (Groq) for AI features.
+```bash
+devbase ai config
+# Prompts for API key and saves to ~/.devbase/config.toml
+```
+
+#### `ai organize`
+Suggests the best Johnny.Decimal location for a file.
+```bash
+devbase ai organize inbox/random-notes.md
+# Analyzes content and suggests destination with reasoning
+```
+
+#### `ai insights`
+Analyzes your workspace structure for optimization opportunities.
+```bash
+devbase ai insights
+# Generates a report on architecture, organization, and potential improvements
+```
+
 ---
 
 ## 🎨 Template Customization

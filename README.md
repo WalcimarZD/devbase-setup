@@ -1,4 +1,4 @@
-# DevBase v5.0.0 🚀
+# DevBase v5.1.0-alpha.1 🚀
 
 **The Personal Engineering Operating System**
 
@@ -9,13 +9,14 @@
 **DevBase** is a modular CLI that transforms your chaos into a structured, high-performance engineering workspace. Built on the [Johnny.Decimal](https://johnnydecimal.com) methodology, it organizes your code, knowledge, and operations into a standard, navigable directory tree.
 
 > [!NOTE]
-> **v5.0.0 (The "Velocity" Release)**: This version eliminates all PowerShell dependencies, consolidating on a unified, high-speed Python 3.13 core powered by `uv`.
+> **v5.1.0 (The "Intelligence" Release)**: This version introduces the AI module, empowering your workspace with LLM-driven organization and insights, while maintaining the high-speed Python core.
 
 ---
 
 ## ⚡ Productivity First
 
 - **Zero-Config Workspace**: Auto-detects your `Dev_Workspace` root from anywhere.
+- **AI-Powered Organization**: Let `devbase ai` handle your file sorting and structure optimization.
 - **Instant Project Scaffolding**: Generate production-ready Clean Architecture boilerplate in seconds.
 - **Knowledge Graph**: Integrated Personal Knowledge Management (PKM) with backlinking.
 - **Context-Aware Analytics**: Track your "Flow State" and generate weekly summaries automatically.

@@ -5,7 +5,7 @@ Modern CLI using Typer framework for type-safe, declarative commands.
 Replaces the legacy argparse-based devbase.py.
 
 Author: DevBase Team
-Version: 4.0.0
+Version: Dynamic (see __init__.py)
 """
 from pathlib import Path
 from typing import Optional
@@ -96,12 +96,8 @@ app.add_typer(
 def version_callback(value: bool) -> None:
     """Display version and exit."""
     if value:
-        from importlib.metadata import version as get_version
-        try:
-            ver = get_version("devbase")
-        except Exception:
-            ver = "4.0.5"  # Fallback
-        console.print(f"devbase {ver}")
+        from devbase import __version__
+        console.print(f"devbase {__version__}")
         raise typer.Exit()
 
 
