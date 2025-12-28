@@ -50,8 +50,25 @@ def new(
 
     # Validate project name (kebab-case)
     if not re.match(r'^[a-z0-9]+([-.][a-z0-9]+)*$', name):
-        console.print("[red]✗ Project name must be in kebab-case (e.g., my-project)[/red]")
-        raise typer.Exit(1)
+        from rich.prompt import Confirm
+
+        console.print(f"[red]✗ Project name '{name}' is not kebab-case.[/red]")
+
+        # Suggest valid name
+        suggestion = re.sub(r'([a-z])([A-Z])', r'\1-\2', name).lower()
+        suggestion = re.sub(r'[_ ]', '-', suggestion)
+        # Remove any remaining invalid chars (keep only a-z, 0-9, -)
+        suggestion = re.sub(r'[^a-z0-9-]', '', suggestion)
+
+        if suggestion and suggestion != name:
+            if Confirm.ask(f"Did you mean [bold cyan]{suggestion}[/bold cyan]?", default=True):
+                name = suggestion
+                console.print(f"[green]✓ Using '{name}'[/green]\n")
+            else:
+                raise typer.Exit(1)
+        else:
+            console.print("  [dim]Name must contain only lowercase letters, numbers, and hyphens.[/dim]")
+            raise typer.Exit(1)
 
     # Use template engine
     from devbase.utils.templates import generate_project_from_template, list_available_templates
