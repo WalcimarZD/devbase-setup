@@ -152,9 +152,6 @@ def init_schema(conn: duckdb.DuckDBPyConnection) -> None:
     except (duckdb.CatalogException, duckdb.ProgrammingError):
         # Table doesn't exist, proceed with full init
         pass
-    except Exception:
-        # Safety net
-        pass
 
     # Schema version table (must exist first for migration checks)
     conn.execute("""
