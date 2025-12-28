@@ -15,7 +15,6 @@ Version: 5.1.0
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -58,7 +57,7 @@ def chat(
         typer.Argument(help="Your message or question"),
     ],
     model: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--model", "-m", help="Model to use (default: llama-3.1-8b-instant)"),
     ] = None,
     temperature: Annotated[
@@ -68,15 +67,15 @@ def chat(
 ) -> None:
     """
     💬 Chat with AI assistant.
-    
+
     Send a prompt and get a response from the configured LLM.
-    
+
     Examples:
         devbase ai chat "Explain SOLID principles briefly"
         devbase ai chat "Suggest a project name for a REST API" -t 1.0
     """
     provider = _get_provider()
-    
+
     # Try RAG Retrieval
     context = ""
     try:
@@ -89,9 +88,8 @@ def chat(
                  context = "\n\n".join([f"Source: {r.file_path}\n{r.content}" for r in results])
                  console.print(f"[dim]Found {len(results)} relevant context chunks.[/dim]")
     except Exception as e:
-        # Don't fail chat if search fails
-        # console.print(f"[dim yellow]Search unavailable: {e}[/dim yellow]")
-        pass
+        # Don't fail chat if search fails, but surface the issue for visibility
+        console.print(f"[dim yellow]Search unavailable: {e}[/dim yellow]")
 
     # Inject context
     final_prompt = prompt
@@ -115,7 +113,7 @@ Question:
         except Exception as e:
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1)
-    
+
     # Display response in a nice panel
     console.print()
     console.print(Panel(
@@ -171,23 +169,23 @@ def classify(
 ) -> None:
     """
     🏷️ Classify text into a category.
-    
+
     Uses AI to classify text into one of the provided categories.
-    
+
     Examples:
         devbase ai classify "Fix login button not working" -c "bug,feature,docs"
         devbase ai classify "Add dark mode support"
     """
     provider = _get_provider()
     category_list = [c.strip() for c in categories.split(",")]
-    
+
     with console.status("[bold blue]Classifying...[/bold blue]"):
         try:
             result = provider.classify(text, category_list)
         except Exception as e:
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1)
-    
+
     # Display result
     console.print()
     console.print(f"[bold]Text:[/bold] {text[:100]}{'...' if len(text) > 100 else ''}")
@@ -207,21 +205,21 @@ def summarize(
 ) -> None:
     """
     📝 Summarize text.
-    
+
     Uses AI to create a concise summary of the provided text.
-    
+
     Examples:
         devbase ai summarize "Long text here..." -l 30
     """
     provider = _get_provider()
-    
+
     with console.status("[bold blue]Summarizing...[/bold blue]"):
         try:
             result = provider.summarize(text, max_length=max_length)
         except Exception as e:
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1)
-    
+
     # Display result
     console.print()
     console.print(Panel(
@@ -235,51 +233,51 @@ def summarize(
 def status() -> None:
     """
     📊 Check AI worker status.
-    
+
     Shows the current state of the background AI worker
     and pending tasks in the queue.
     """
     try:
-        from devbase.services.async_worker import get_worker
         from devbase.adapters.storage.duckdb_adapter import get_connection
+        from devbase.services.async_worker import get_worker
     except ImportError as e:
         console.print(f"[red]Import error:[/red] {e}")
         raise typer.Exit(1)
-    
+
     # Check worker status
     worker = get_worker()
     worker_status = "🟢 Running" if worker.is_running() else "🔴 Stopped"
-    
+
     # Check queue
     try:
         conn = get_connection()
         result = conn.execute("""
-            SELECT 
+            SELECT
                 COUNT(*) FILTER (WHERE status = 'pending') as pending,
                 COUNT(*) FILTER (WHERE status = 'processing') as processing,
                 COUNT(*) FILTER (WHERE status = 'done') as done,
                 COUNT(*) FILTER (WHERE status = 'failed') as failed
             FROM ai_task_queue
         """).fetchone()
-        
+
         pending, processing, done, failed = result if result else (0, 0, 0, 0)
     except Exception:
         pending, processing, done, failed = 0, 0, 0, 0
-    
+
     # Display status
     table = Table(title="AI Worker Status")
     table.add_column("Metric", style="bold")
     table.add_column("Value")
-    
+
     table.add_row("Worker", worker_status)
     table.add_row("Pending Tasks", str(pending))
     table.add_row("Processing", str(processing))
     table.add_row("Completed", str(done))
     table.add_row("Failed", str(failed))
-    
+
     console.print()
     console.print(table)
-    
+
     # Tips
     if not worker.is_running():
         console.print()
@@ -290,7 +288,7 @@ def status() -> None:
 def start_worker() -> None:
     """
     🚀 Start the AI background worker.
-    
+
     Starts the daemon thread that processes queued AI tasks.
     """
     try:
@@ -298,13 +296,13 @@ def start_worker() -> None:
     except ImportError as e:
         console.print(f"[red]Import error:[/red] {e}")
         raise typer.Exit(1)
-    
+
     worker = get_worker()
-    
+
     if worker.is_running():
         console.print("[yellow]Worker is already running[/yellow]")
         return
-    
+
     worker.start()
     console.print("[green]✓[/green] AI worker started")
 

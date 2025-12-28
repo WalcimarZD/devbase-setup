@@ -16,12 +16,9 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Generator
 
-import numpy as np
 from fastembed import TextEmbedding
 
 from devbase.adapters.storage.duckdb_adapter import get_connection
@@ -52,7 +49,7 @@ class MarkdownSplitter:
     def __init__(self, max_words: int = 500):
         self.max_words = max_words
 
-    def split(self, text: str) -> List[str]:
+    def split(self, text: str) -> list[str]:
         """Split text into chunks."""
         # Simple header-based splitting for now
         # Regex matches headers like "# Title" or "## Subtitle"
@@ -113,7 +110,7 @@ class SearchEngine:
             self._embedding_model = TextEmbedding(model_name=self.model_name)
         return self._embedding_model
 
-    def generate_embedding(self, text: str) -> List[float]:
+    def generate_embedding(self, text: str) -> list[float]:
         """Generate embedding vector for text."""
         # FastEmbed returns a generator of iterables (numpy arrays)
         embeddings = list(self.embedding_model.embed([text]))
@@ -199,7 +196,7 @@ class SearchEngine:
 
         logger.debug(f"Indexed {rel_path} ({len(chunks)} chunks)")
 
-    def search(self, query: str, limit: int = 5) -> List[SearchResult]:
+    def search(self, query: str, limit: int = 5) -> list[SearchResult]:
         """
         Perform hybrid search (Vector + Keyword).
 
@@ -246,10 +243,19 @@ class SearchEngine:
         # We query hot_fts and cold_fts for keywords
         # Note: FTS usually returns whole files, so we treat the 'content' as a large chunk.
         # Ideally, we would map back to chunks, but for now we mix file-level FTS results.
-        sanitized_query = query.replace("'", "''")  # Basic SQL escape
+
+        # Whitelist allowed tables to prevent SQL injection
+        ALLOWED_FTS_TABLES = {"hot_fts", "cold_fts"}
+
         for table in ["hot_fts", "cold_fts"]:
+            # Validate table name against whitelist
+            if table not in ALLOWED_FTS_TABLES:
+                logger.warning(f"Skipping invalid table name: {table}")
+                continue
+
             try:
-                # Simple MATCH query
+                # Use parameterized query with validated table name
+                # Note: query is passed as parameter to match_bm25, not interpolated
                 rows = conn.execute(
                     f"""
                     SELECT file_path, content, score
@@ -261,7 +267,7 @@ class SearchEngine:
                     ORDER BY score DESC
                     LIMIT ?
                     """,
-                    [sanitized_query, limit]
+                    [query, limit]
                 ).fetchall()
 
                 for row in rows:
