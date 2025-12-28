@@ -194,7 +194,6 @@ def test_init_schema_handles_missing_schema_version_table():
 def test_init_schema_handles_corrupted_schema_version(caplog):
     """Verify init_schema logs unexpected errors when querying schema_version."""
     import logging
-    from unittest.mock import patch
     from devbase.adapters.storage.duckdb_adapter import init_connection, init_schema
     
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -228,7 +227,8 @@ def test_init_schema_handles_corrupted_schema_version(caplog):
         # Verify that the warning was logged
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
-        assert "Unexpected error checking schema version" in caplog.records[0].message
-        assert "RuntimeError" in caplog.records[0].message or "Simulated unexpected database error" in caplog.records[0].message
+        log_message = caplog.records[0].message
+        assert "Unexpected error checking schema version" in log_message
+        assert "Simulated unexpected database error" in log_message
         
         conn.close()
