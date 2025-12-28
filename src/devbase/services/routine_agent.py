@@ -13,17 +13,14 @@ Version: 5.1.0
 """
 from __future__ import annotations
 
-import json
 import logging
-import re
-import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, NamedTuple
 
 from devbase.adapters.ai.groq_adapter import GroqProvider
 from devbase.adapters.storage.duckdb_adapter import get_connection
-from devbase.config.taxonomy import JD_TAXONOMY, list_areas
+from devbase.config.taxonomy import list_areas
 from devbase.services.security.sanitizer import sanitize_context
 
 logger = logging.getLogger("devbase.routine_agent")
@@ -172,15 +169,6 @@ Narrative:"""
         # Git Metrics
         metrics = self.get_git_metrics()
 
-
-        # Suggest ADR if architecture events found
-        # Import lazily to avoid circular import (RoutineAgent <-> ADRGhostwriter)
-        from devbase.services.adr_generator import get_ghostwriter
-        ghostwriter = get_ghostwriter(self.root_path)
-        arch_events = ghostwriter.find_recent_decisions(hours=24)
-        if arch_events:
-            narrative += "\n\n**💡 Suggestion:** detected architectural discussions. Run `devbase dev adr-gen` to draft an ADR."
-
         return DaybookSummary(
             date=target_date,
             focus=focus,
@@ -190,27 +178,33 @@ Narrative:"""
 
     def get_git_metrics(self) -> dict[str, int]:
         """
-        Fetch git metrics for the current day using shell commands.
+        Fetch git metrics for the current day using GitPython library.
+
+        Returns:
+            Dictionary with commits, prs, and issues counts
         """
         metrics = {"commits": 0, "prs": 0, "issues": 0}
 
         try:
-            # Check if inside git repo
-            subprocess.run(
-                ["git", "rev-parse", "--is-inside-work-tree"],
-                check=True, capture_output=True
-            )
+            # Use GitPython for safe git operations
+            from git import InvalidGitRepositoryError, Repo
+
+            # Initialize repository from current path
+            repo = Repo(self.root_path, search_parent_directories=True)
 
             # Count commits since midnight
-            cmd = ["git", "rev-list", "--count", "--since=midnight", "HEAD"]
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode == 0:
-                metrics["commits"] = int(result.stdout.strip() or 0)
+            midnight = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+            # Get commits from HEAD since midnight
+            commits = list(repo.iter_commits('HEAD', since=midnight))
+            metrics["commits"] = len(commits)
 
             # PRs and Issues would require GH CLI or API, keeping simple for now
             # per instructions ("podes usar comandos de shell simples (git)")
 
-        except subprocess.CalledProcessError:
+        except ImportError:
+            logger.warning("GitPython not available, git metrics unavailable")
+        except InvalidGitRepositoryError:
             pass  # Not a git repo
         except Exception as e:
             logger.warning(f"Git metrics failed: {e}")

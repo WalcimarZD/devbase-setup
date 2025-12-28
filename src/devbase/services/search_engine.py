@@ -246,8 +246,12 @@ class SearchEngine:
         # We query hot_fts and cold_fts for keywords
         # Note: FTS usually returns whole files, so we treat the 'content' as a large chunk.
         # Ideally, we would map back to chunks, but for now we mix file-level FTS results.
+
+        # Whitelist allowed tables to prevent SQL injection
+        ALLOWED_FTS_TABLES = ["hot_fts", "cold_fts"]
         sanitized_query = query.replace("'", "''")  # Basic SQL escape
-        for table in ["hot_fts", "cold_fts"]:
+
+        for table in ALLOWED_FTS_TABLES:
             try:
                 # Simple MATCH query
                 rows = conn.execute(
