@@ -184,7 +184,9 @@ def archive(
 
     try:
         archive_root.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(project_path), str(archive_path))
+
+        with console.status("[bold yellow]Archiving project...[/bold yellow]"):
+            shutil.move(str(project_path), str(archive_path))
         
         console.print(f"\n[green]✓[/green] Project archived to: {archive_path}")
         
@@ -487,32 +489,33 @@ def audit(
 
     violations = []
 
-    for item in root.rglob('*'):
-        if not item.is_dir():
-            continue
+    with console.status("[bold cyan]Auditing workspace...[/bold cyan]"):
+        for item in root.rglob('*'):
+            if not item.is_dir():
+                continue
 
-        name = item.name
+            name = item.name
 
-        # Check if should ignore
-        if name in default_ignore:
-            continue
-        
-        # Skip anything inside known good structures
-        rel_parts = item.relative_to(root).parts
-        if any(part in default_ignore for part in rel_parts):
-            continue
+            # Check if should ignore
+            if name in default_ignore:
+                continue
 
-        # Check if name matches allowed patterns
-        is_allowed = any(re.match(pattern, name) for pattern in allowed_patterns)
+            # Skip anything inside known good structures
+            rel_parts = item.relative_to(root).parts
+            if any(part in default_ignore for part in rel_parts):
+                continue
 
-        if not is_allowed:
-            suggestion = re.sub(r'([a-z])([A-Z])', r'\1-\2', name).lower()
-            suggestion = re.sub(r'[_ ]', '-', suggestion)
-            violations.append({
-                'path': item,
-                'name': name,
-                'suggestion': suggestion
-            })
+            # Check if name matches allowed patterns
+            is_allowed = any(re.match(pattern, name) for pattern in allowed_patterns)
+
+            if not is_allowed:
+                suggestion = re.sub(r'([a-z])([A-Z])', r'\1-\2', name).lower()
+                suggestion = re.sub(r'[_ ]', '-', suggestion)
+                violations.append({
+                    'path': item,
+                    'name': name,
+                    'suggestion': suggestion
+                })
 
     if not violations:
         console.print("[bold green]✅ No violations found[/bold green]")
