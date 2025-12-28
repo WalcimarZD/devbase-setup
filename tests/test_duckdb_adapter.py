@@ -191,27 +191,44 @@ def test_init_schema_handles_missing_schema_version_table():
         conn.close()
 
 
-def test_init_schema_handles_corrupted_schema_version():
-    """Verify init_schema handles unexpected errors when querying schema_version."""
+def test_init_schema_handles_corrupted_schema_version(caplog):
+    """Verify init_schema logs unexpected errors when querying schema_version."""
+    import logging
+    from unittest.mock import patch
     from devbase.adapters.storage.duckdb_adapter import init_connection, init_schema
     
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.duckdb"
         conn = init_connection(db_path)
         
-        # Create a schema_version table but with wrong structure (no 'version' column)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS schema_version (
-                wrong_column TEXT PRIMARY KEY
-            );
-        """)
+        # Create a mock connection that will raise an unexpected error
+        class MockConnection:
+            def __init__(self, real_conn):
+                self._real_conn = real_conn
+                self._check_version_called = False
+            
+            def execute(self, sql, *args, **kwargs):
+                # First call to check schema version should raise unexpected error
+                if "SELECT version FROM schema_version" in sql and not self._check_version_called:
+                    self._check_version_called = True
+                    raise RuntimeError("Simulated unexpected database error")
+                # All other calls go to the real connection
+                return self._real_conn.execute(sql, *args, **kwargs)
+            
+            def __getattr__(self, name):
+                return getattr(self._real_conn, name)
         
-        # This should handle the exception and proceed with full initialization
-        # (though it will fail at INSERT, it should not crash)
-        try:
-            init_schema(conn)
-        except Exception:
-            # Expected to fail at INSERT due to wrong schema, but should not crash earlier
-            pass
+        mock_conn = MockConnection(conn)
+        
+        # Capture logs at WARNING level
+        with caplog.at_level(logging.WARNING):
+            # This should catch the unexpected error, log a warning, and proceed with full init
+            init_schema(mock_conn)
+        
+        # Verify that the warning was logged
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Unexpected error checking schema version" in caplog.records[0].message
+        assert "RuntimeError" in caplog.records[0].message or "Simulated unexpected database error" in caplog.records[0].message
         
         conn.close()
