@@ -5,6 +5,12 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [5.1.0-alpha.1] - 2025-02-23
+
+### 🐛 Corrigido
+
+- **Dependência de Produção**: Resolvido erro `ModuleNotFoundError: No module named 'pytest'` ao executar o comando `debug` em ambiente de produção (instalação via `uv tool`). O `pytest` agora é carregado apenas quando necessário (lazy loading).
+
 ## [3.2.0] - 2025-12-11
 
 ### ✨ Adicionado
