@@ -168,7 +168,21 @@ class SearchEngine:
         # Clear existing chunks for this file
         conn.execute(f"DELETE FROM {table} WHERE file_path = ?", [rel_path])
 
-        # Embed and Insert
+        # Determine FTS table
+        fts_table = "cold_fts" if is_cold else "hot_fts"
+        conn.execute(f"DELETE FROM {fts_table} WHERE file_path = ?", [rel_path])
+
+        # Upsert into FTS (File level)
+        # We store the full content for FTS search
+        conn.execute(
+            f"""
+            INSERT INTO {fts_table} (file_path, title, content, mtime_epoch)
+            VALUES (?, ?, ?, ?)
+            """,
+            [rel_path, file_path.name, sanitized.content, mtime]
+        )
+
+        # Embed and Insert (Chunk level)
         for i, chunk in enumerate(chunks):
             if not chunk.strip():
                 continue

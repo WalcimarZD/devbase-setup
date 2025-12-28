@@ -185,6 +185,27 @@ def init_schema(conn: "duckdb.DuckDBPyConnection") -> None:
         );
     """)
 
+    # Initialize FTS Indexes (Idempotent)
+    # Note: DuckDB's FTS extension requires explicit index creation via PRAGMA
+    try:
+        # Load FTS extension (idempotent in recent versions)
+        conn.execute("INSTALL fts; LOAD fts;")
+
+        # Create FTS indexes if they don't exist
+        # We catch exceptions because 'PRAGMA create_fts_index' might fail if already exists depending on version
+        try:
+            conn.execute("PRAGMA create_fts_index('hot_fts', 'file_path', 'content', 'title', 'tags');")
+        except Exception:
+            pass
+
+        try:
+            conn.execute("PRAGMA create_fts_index('cold_fts', 'file_path', 'content', 'title', 'tags');")
+        except Exception:
+            pass
+    except Exception:
+        # FTS might not be available in some environments
+        pass
+
     # Embeddings Tables (Hot/Cold Separation)
     # Using ARRAY(FLOAT) to be compatible with standard DuckDB
     # If vector extension is loaded, we can use vector operations on these arrays.
