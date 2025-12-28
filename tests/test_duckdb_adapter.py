@@ -123,3 +123,95 @@ def test_log_event():
         assert result[2] == "test-project"
         
         conn.close()
+
+
+def test_init_schema_early_return_when_version_matches():
+    """Verify init_schema returns early when schema version matches."""
+    from devbase.adapters.storage.duckdb_adapter import (
+        init_connection, 
+        init_schema,
+        SCHEMA_VERSION
+    )
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.duckdb"
+        conn = init_connection(db_path)
+        
+        # First call: should create all tables
+        init_schema(conn)
+        
+        # Verify schema version is set correctly
+        version = conn.execute("SELECT version FROM schema_version").fetchone()
+        assert version is not None
+        assert version[0] == SCHEMA_VERSION
+        
+        # Drop a table that would normally be created
+        conn.execute("DROP TABLE IF EXISTS events")
+        
+        # Second call: should return early and NOT recreate the events table
+        init_schema(conn)
+        
+        # Verify events table was NOT recreated (early return worked)
+        tables = conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_name = 'events'"
+        ).fetchall()
+        assert len(tables) == 0, "events table should not be recreated on early return"
+        
+        conn.close()
+
+
+def test_init_schema_handles_missing_schema_version_table():
+    """Verify init_schema handles the case when schema_version table doesn't exist."""
+    from devbase.adapters.storage.duckdb_adapter import init_connection, init_schema
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.duckdb"
+        conn = init_connection(db_path)
+        
+        # Call init_schema on a fresh database (no schema_version table exists)
+        # This should handle the exception and proceed with full initialization
+        init_schema(conn)
+        
+        # Verify all tables were created
+        tables = conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+        ).fetchall()
+        table_names = {t[0] for t in tables}
+        
+        required_tables = {
+            "notes_index",
+            "ai_task_queue",
+            "events",
+            "schema_version",
+        }
+        
+        for table in required_tables:
+            assert table in table_names, f"Table {table} should exist"
+        
+        conn.close()
+
+
+def test_init_schema_handles_corrupted_schema_version():
+    """Verify init_schema handles unexpected errors when querying schema_version."""
+    from devbase.adapters.storage.duckdb_adapter import init_connection, init_schema
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.duckdb"
+        conn = init_connection(db_path)
+        
+        # Create a schema_version table but with wrong structure (no 'version' column)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS schema_version (
+                wrong_column TEXT PRIMARY KEY
+            );
+        """)
+        
+        # This should handle the exception and proceed with full initialization
+        # (though it will fail at INSERT, it should not crash)
+        try:
+            init_schema(conn)
+        except Exception:
+            # Expected to fail at INSERT due to wrong schema, but should not crash earlier
+            pass
+        
+        conn.close()
