@@ -172,6 +172,14 @@ Narrative:"""
         # Git Metrics
         metrics = self.get_git_metrics()
 
+        # Suggest ADR if architecture events found
+        # Import lazily to avoid circular import (RoutineAgent <-> ADRGhostwriter)
+        from devbase.services.adr_generator import get_ghostwriter
+        ghostwriter = get_ghostwriter(self.root_path)
+        arch_events = ghostwriter.find_recent_decisions(hours=24)
+        if arch_events:
+            narrative += "\n\n**💡 Suggestion:** detected architectural discussions. Run `devbase dev adr-gen` to draft an ADR."
+
         return DaybookSummary(
             date=target_date,
             focus=focus,
