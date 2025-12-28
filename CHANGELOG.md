@@ -5,7 +5,15 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [5.1.0-alpha.1] - 2025-02-23
+## [5.1.0-alpha.1] - 2025-12-28
+
+### ✨ Adicionado
+
+- **Módulo de IA (`devbase ai`)**:
+  - `ai config`: Configuração segura de API Key (Groq).
+  - `ai organize`: Sugestão inteligente de organização de arquivos baseada em conteúdo.
+  - `ai insights`: Análise arquitetural do workspace com recomendações de melhoria.
+  - Arquitetura Hexagonal (Ports & Adapters) para fácil extensão de providers.
 
 ### 🐛 Corrigido
 

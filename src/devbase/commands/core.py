@@ -22,9 +22,9 @@ console = Console()
 
 app.command(name="debug")(debug_cmd)
 
-SCRIPT_VERSION = "4.0.0"
-POLICY_VERSION = "4.0"
+from devbase import __version__ as SCRIPT_VERSION 
 
+POLICY_VERSION = "5.0"
 
 # Data-driven folder structure (replaces 5 stub functions)
 FOLDER_STRUCTURE = {

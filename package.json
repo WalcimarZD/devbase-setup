@@ -1,12 +1,11 @@
 {
   "name": "devbase-setup",
-  "version": "0.1.0",
+  "version": "5.1.0-alpha.1",
   "private": true,
   "scripts": {
     "test": "echo \"No tests defined\" && exit 0",
     "lint": "echo \"No linter configured\" && exit 0"
   },
-
   "devDependencies": {
     "semantic-release": "^25.0.2",
     "@semantic-release/github": "^12.0.2",
@@ -16,6 +15,8 @@
     "@semantic-release/commit-analyzer": "^10.0.0"
   },
   "release": {
-    "branches": ["main"]
+    "branches": [
+      "main"
+    ]
   }
 }
