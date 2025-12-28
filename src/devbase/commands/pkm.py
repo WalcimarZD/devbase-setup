@@ -343,3 +343,76 @@ def index(
     
     console.print(f"[green]✓[/green] Index created: [cyan]{index_file}[/cyan]")
     console.print(f"[dim]Indexed {len(notes)} note(s)[/dim]")
+
+
+@app.command()
+def new(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Name of the note (slugified)")],
+    note_type: Annotated[str, typer.Option("--type", "-t", help="Diataxis type (tutorial, how-to, reference, explanation)")],
+) -> None:
+    """
+    📝 Create a new note and queue for AI classification.
+
+    Creates a new note in the appropriate folder based on Diataxis type:
+    - tutorial -> 10-19_KNOWLEDGE/10_references (placeholder)
+    - how-to -> 10-19_KNOWLEDGE/10_references
+    - reference -> 10-19_KNOWLEDGE/10_references
+    - explanation -> 10-19_KNOWLEDGE/10_references
+
+    (Note: In v5.1, we default to '10_references' or '11_public_garden' until
+     more granular mapping is defined. Using '10_references' for now.)
+
+    After creation, an asynchronous 'classify' task is added to the AI queue.
+
+    Example:
+        devbase pkm new my-new-concept --type explanation
+    """
+    import json
+    from datetime import datetime
+    from devbase.adapters.storage import duckdb_adapter
+
+    root: Path = ctx.obj["root"]
+
+    # Simple slugify
+    slug = name.lower().replace(" ", "-")
+    if not slug.endswith(".md"):
+        slug += ".md"
+
+    # Determine target directory
+    # Defaulting to 10-19_KNOWLEDGE/10_references as a safe default for now
+    target_dir = root / "10-19_KNOWLEDGE" / "10_references"
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = target_dir / slug
+
+    if file_path.exists():
+        console.print(f"[red]✗[/red] File already exists: {file_path}")
+        raise typer.Exit(1)
+
+    # Create content
+    content = f"""---
+title: {name}
+type: {note_type}
+created: {datetime.now().isoformat()}
+tags: []
+status: draft
+---
+
+# {name}
+
+"""
+    file_path.write_text(content, encoding="utf-8")
+
+    console.print(f"[green]✓[/green] Created note: [cyan]{file_path}[/cyan]")
+
+    # Enqueue AI task
+    task_id = duckdb_adapter.enqueue_ai_task(
+        task_type="classify",
+        payload=json.dumps({"path": str(file_path)})
+    )
+
+    if task_id > 0:
+        console.print(f"[dim]queued AI classification (task #{task_id})[/dim]")
+    else:
+        console.print("[yellow]⚠ Failed to enqueue AI task[/yellow]")

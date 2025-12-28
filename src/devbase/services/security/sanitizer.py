@@ -18,18 +18,23 @@ import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, date
-from pathlib import Path, PureWindowsPath, PurePosixPath
+from pathlib import PureWindowsPath, PurePosixPath
 from typing import Callable
 
 
 # Secret detection patterns (TDD v1.2 Section 7.2)
-# These regex patterns capture both the key identifier AND the secret value
 SECRETS_PATTERNS: list[re.Pattern[str]] = [
     # Generic secret patterns: captures key=value or key: value
+    # TDD specifies `(?i)(api[_-]?key|secret|password|token)\s*[:=]`
+    # We include `\s*\S+` to ensure the value is actually redacted, not just the label.
     re.compile(r"(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*\S+"),
+
+    # Specific patterns (strictly matching TDD v1.2 Section 7.2)
     re.compile(r"sk-[a-zA-Z0-9]{48}"),     # OpenAI API keys
     re.compile(r"ghp_[a-zA-Z0-9]{36}"),    # GitHub Personal Access Tokens
     re.compile(r"AKIA[0-9A-Z]{16}"),       # AWS Access Key IDs
+
+    # Additional safety patterns (not in TDD but good practice)
     re.compile(r"gsk_[a-zA-Z0-9]{52}"),    # Groq API keys
     re.compile(r"xox[baprs]-[a-zA-Z0-9-]+"),  # Slack tokens
 ]
@@ -99,16 +104,10 @@ def anonymize_paths(content: str, salt: str) -> str:
         Content with paths anonymized
     """
     # Pattern for Windows and Unix absolute paths
-    # Note: Double backslashes in regex string to match literal backslash in Windows paths
+    # Windows: Matches C:\Path\To\File (escaped as \\ in regex)
+    # Unix: Matches /home/..., /Users/...
     path_pattern = re.compile(
         r"(?:[A-Za-z]:\\[\w\\.-]+|/(?:home|Users|var|tmp|opt)/[\w/.-]+)"
-    )
-    # Fix for Windows path detection:
-    # On Windows, backslashes need to be handled carefully in regex.
-    # The original pattern likely missed because of how re handles backslashes.
-    # Let's use a more robust pattern.
-    path_pattern = re.compile(
-        r"(?:[A-Za-z]:\\\\[\w\\\\.-]+|/(?:home|Users|var|tmp|opt)/[\w/.-]+)"
     )
     
     def hash_path(match: re.Match[str]) -> str:
@@ -183,7 +182,7 @@ def audit_log(
     
     if log_func:
         log_func(log_entry)
-    # Default: silent (audit logs go to DuckDB via adapter)
+    # Default: silent (audit logs go to DuckDB via adapter in production use)
 
 
 def sanitize_context(raw: str, config: SecurityConfig | None = None) -> SanitizedContext:
