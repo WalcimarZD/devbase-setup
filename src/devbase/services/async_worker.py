@@ -268,6 +268,90 @@ def _default_synthesize_handler(payload: str) -> str:
     return json.dumps({"result": "Task queued but LLM not available", "source": "fallback"})
 
 
+def _summarize_day_handler(payload: str) -> str:
+    """
+    Handle summarize_day task: Generates the Daybook.
+
+    Payload: {"date": "YYYY-MM-DD"}
+    """
+    try:
+        from devbase.services.routine_agent import RoutineAgent
+
+        data = json.loads(payload)
+        target_date = data.get("date")
+        if not target_date:
+            return json.dumps({"error": "Missing date"})
+
+        agent = RoutineAgent()
+        summary = agent.generate_daybook_summary(target_date)
+
+        # Locate template
+        template_path = Path("src/devbase/templates/pkm/12_private_vault/journal/template-daybook.md.template")
+        if not template_path.exists():
+             # Try relative to module if installed as package
+             template_path = Path(__file__).parents[2] / "templates" / "pkm" / "12_private_vault" / "journal" / "template-daybook.md.template"
+
+        if not template_path.exists():
+            return json.dumps({"error": "Template not found"})
+
+        template_content = template_path.read_text(encoding="utf-8")
+
+        # Basic template processing
+        final_lines = []
+        lines = template_content.splitlines()
+        i = 0
+
+        while i < len(lines):
+            line = lines[i]
+
+            if "{{DATE}}" in line:
+                line = line.replace("{{DATE}}", summary.date)
+                final_lines.append(line)
+
+            elif "## 🎯 Foco do Dia" in line:
+                final_lines.append(line)
+                final_lines.append("")
+                final_lines.append(summary.focus)
+                # Skip placeholder list items
+                while i + 1 < len(lines) and lines[i+1].strip().startswith("- [ ] ["):
+                     i += 1
+
+            elif "## 📝 Log de Trabalho" in line:
+                final_lines.append(line)
+                final_lines.append("")
+                final_lines.append(summary.log_narrative)
+                # Skip placeholder sections
+                while i + 1 < len(lines) and (lines[i+1].strip().startswith("###") or "[Atividade]" in lines[i+1] or "[Notas" in lines[i+1]):
+                     i += 1
+
+            elif "## 📊 Métricas" in line:
+                final_lines.append(line)
+                final_lines.append("")
+                final_lines.append(f"- Commits: {summary.metrics.get('commits', 0)}")
+                final_lines.append(f"- PRs: {summary.metrics.get('prs', 0)}")
+                final_lines.append(f"- Issues fechadas: {summary.metrics.get('issues', 0)}")
+                # Skip placeholder metrics
+                while i + 1 < len(lines) and lines[i+1].strip().startswith("- "):
+                     i += 1
+            else:
+                final_lines.append(line)
+
+            i += 1
+
+        final_content = "\n".join(final_lines)
+
+        # Write to file
+        output_path = agent.journal_path / f"{summary.date}.md"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(final_content, encoding="utf-8")
+
+        return json.dumps({"path": str(output_path), "status": "created"})
+
+    except Exception as e:
+        logger.error(f"Summarize day failed: {e}")
+        return json.dumps({"error": str(e)})
+
+
 # Module-level worker instance
 _worker: AIWorker | None = None
 
@@ -294,6 +378,7 @@ def get_worker(db_path: Path | None = None) -> AIWorker:
         _worker.register_handler("classify", _default_classify_handler)
         _worker.register_handler("summarize", _default_summarize_handler)
         _worker.register_handler("synthesize", _default_synthesize_handler)
+        _worker.register_handler("summarize_day", _summarize_day_handler)
     
     return _worker
 
