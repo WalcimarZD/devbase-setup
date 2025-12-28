@@ -74,6 +74,7 @@ def new(
     from devbase.utils.templates import generate_project_from_template, list_available_templates
     from devbase.services.project_setup import get_project_setup
     from devbase.utils.telemetry import get_telemetry
+    from devbase.services.adr_generator import get_ghostwriter
 
     telemetry = get_telemetry(root)
     setup_service = get_project_setup(root)
@@ -271,6 +272,166 @@ def update(
         console.print("Legacy template hydration is strongly discouraged for manual updates.")
         console.print("Recommendation: Migrate to Copier for update capabilities.")
         telemetry.track(f"Update skipped {name}", category="lifecycle", action="update_project", status="skipped")
+
+
+@app.command(name="blueprint")
+def blueprint(
+    ctx: typer.Context,
+    description: Annotated[str, typer.Argument(help="Descrição do projeto (ex: 'API FastAPI com Redis')")],
+) -> None:
+    """
+    🏗️ Generate Dynamic Project Blueprint (IA).
+
+    Usa IA para gerar uma estrutura de projeto baseada na descrição,
+    inspirada em Clean Architecture.
+    """
+    import json
+    from rich.tree import Tree
+    from rich.prompt import Confirm
+    from devbase.adapters.ai.groq_adapter import GroqProvider
+    from devbase.services.security.sanitizer import sanitize_context
+    from devbase.services.project_setup import get_project_setup
+
+    root: Path = ctx.obj["root"]
+
+    console.print()
+    console.print(Panel.fit(
+        f"[bold blue]DevBase Blueprint Generator[/bold blue]\n\n"
+        f"Request: [cyan]{description}[/cyan]",
+        border_style="blue"
+    ))
+
+    provider = GroqProvider()
+
+    # Prompt for the AI
+    # We want a JSON structure: {"files": [{"path": "src/main.py", "content": "..."}]}
+    # We enforce Clean Arch inspiration.
+    prompt = f"""
+Generate a project file structure for: "{description}".
+Follow Clean Architecture principles (Domain, Use Cases, Interfaces, Infrastructure).
+Return ONLY a valid JSON object with this exact schema:
+{{
+  "project_name": "suggested-kebab-name",
+  "files": [
+    {{
+      "path": "relative/path/to/file.ext",
+      "content": "Minimal content/stub code..."
+    }}
+  ]
+}}
+Do not include markdown blocks or extra text.
+"""
+
+    with console.status("[bold green]🤖 Generating Blueprint...[/bold green]"):
+        try:
+            response = provider.generate(prompt, temperature=0.2, model="llama-3.3-70b-versatile")
+            # Cleanup potential markdown fencing
+            raw_json = response.content.strip()
+            if raw_json.startswith("```"):
+                raw_json = raw_json.strip("`").replace("json", "").strip()
+
+            plan = json.loads(raw_json)
+        except Exception as e:
+            console.print(f"[red]Failed to generate blueprint: {e}[/red]")
+            raise typer.Exit(1)
+
+    project_name = plan.get("project_name", "unnamed-project")
+    files = plan.get("files", [])
+
+    # Preview using Rich Tree
+    tree = Tree(f"📂 [bold cyan]{project_name}[/bold cyan]")
+
+    # Group by directories for display
+    # (Simple flat list to tree conversion for visualization)
+    target_dir = root / "20-29_CODE" / "21_monorepo_apps" / project_name
+
+    if target_dir.exists():
+         console.print(f"[red]Error: Project '{project_name}' already exists at {target_dir}[/red]")
+         raise typer.Exit(1)
+
+    for f in files:
+        tree.add(f"[green]📄 {f['path']}[/green]")
+
+    console.print(tree)
+    console.print()
+
+    if Confirm.ask("[bold]Confirmar criação desta estrutura?[/bold]", default=True):
+        console.print(f"\n[dim]Writing to {target_dir}...[/dim]")
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        for f in files:
+            path = target_dir / f['path']
+            content = f['content']
+
+            # Security check
+            # We don't want to overwrite anything outside target_dir
+            # sanitizer is for content, but we need path safety here.
+            try:
+                # Resolve ensures it's absolute
+                # relative_to ensures it's inside target_dir
+                full_path = (target_dir / path).resolve()
+                full_path.relative_to(target_dir.resolve())
+
+                full_path.parent.mkdir(parents=True, exist_ok=True)
+                full_path.write_text(content, encoding="utf-8")
+                console.print(f"  [green]✓[/green] {path}")
+            except Exception as e:
+                console.print(f"  [red]✗[/red] Skipped unsafe path {path}: {e}")
+
+        console.print(f"\n[bold green]✅ Project '{project_name}' created successfully![/bold green]")
+
+        # Optional: Run Golden Path Setup?
+        if Confirm.ask("Run Golden Path setup? (Git init, venv)", default=True):
+            setup_service = get_project_setup(root)
+            setup_service.run_golden_path(target_dir, project_name)
+    else:
+        console.print("[yellow]Aborted.[/yellow]")
+
+
+@app.command(name="adr-gen")
+def adr_gen(
+    ctx: typer.Context,
+    context: Annotated[str, typer.Option("--context", "-c", help="Context or reasoning for the decision")] = "",
+) -> None:
+    """
+    👻 Ghostwrite an ADR from recent activity.
+
+    Analyses recent 'track' events or uses provided context to generate
+    an Architecture Decision Record (MADR format).
+    """
+    root: Path = ctx.obj["root"]
+    ghostwriter = get_ghostwriter(root)
+
+    console.print()
+    console.print("[bold]ADR Ghostwriter[/bold]")
+
+    final_context = context
+
+    # If no manual context, scan recent events
+    if not final_context:
+        console.print("[dim]Scanning recent architecture events...[/dim]")
+        events = ghostwriter.find_recent_decisions()
+        if events:
+            console.print(f"[green]Found {len(events)} relevant events.[/green]")
+            lines = [f"- {e['message']} ({e['timestamp']})" for e in events]
+            final_context = "\n".join(lines)
+        else:
+            if not context:
+                console.print("[yellow]No recent architecture events found.[/yellow]")
+                from rich.prompt import Prompt
+                final_context = Prompt.ask("Please provide context for the ADR")
+
+    if final_context:
+        path = ghostwriter.generate_draft(final_context)
+        if path:
+            console.print(Panel.fit(
+                f"[bold green]✅ ADR Drafted![/bold green]\n\n"
+                f"Location: [cyan]{path}[/cyan]\n"
+                f"Review and edit before committing.",
+                border_style="green"
+            ))
+        else:
+            console.print("[red]Failed to generate ADR.[/red]")
 
 
 @app.command()
