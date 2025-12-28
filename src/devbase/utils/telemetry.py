@@ -2,6 +2,7 @@
 Telemetry Service
 =================
 Centralized event tracking for DevBase.
+Persists events to DuckDB for analytics and flow detection.
 """
 import json
 import uuid
@@ -10,17 +11,13 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 from devbase.utils.context import detect_context, infer_activity_type, infer_project_name
+from devbase.adapters.storage.duckdb_adapter import log_event
+from devbase.services.cognitive_detector import check_flow_state
 
 class TelemetryService:
     def __init__(self, root: Path):
         self.root = root
-        self.telemetry_dir = root / ".telemetry"
-        self.events_file = self.telemetry_dir / "events.jsonl"
         self._session_id = str(uuid.uuid4())  # Cache per-instance (session)
-        self._ensure_dir()
-
-    def _ensure_dir(self):
-        self.telemetry_dir.mkdir(exist_ok=True)
 
     def track(
         self,
@@ -41,7 +38,7 @@ class TelemetryService:
             metadata: Additional data
             
         Returns:
-            dict: The recorded event
+            dict: The recorded event structure
         """
         # Auto-detect context
         current_dir = Path.cwd()
@@ -50,33 +47,51 @@ class TelemetryService:
         if not category:
             category = infer_activity_type(context)
 
-        event = {
-            "event_id": str(uuid.uuid4()),
-            "timestamp": datetime.now().isoformat(),
-            "session_id": self._session_id,  # Use cached session ID
-            "duration_ms": 0,
-            "category": category,
-            "action": action,
+        # Prepare metadata payload (serializing extras)
+        full_metadata = {
+            "session_id": self._session_id,
             "status": status,
-            "message": message,
+            "category": category,
             "context": {
                 "type": context.get("context_type"),
-                "project": infer_project_name(context),
                 "area": context.get("area"),
-                "category": context.get("category"),
                 "semantic_location": context.get("semantic_location")
-            },
-            "metadata": metadata or {}
+            }
         }
 
+        # Merge user metadata
+        if metadata:
+            full_metadata.update(metadata)
+
+        # Log to DuckDB
+        project_name = infer_project_name(context)
+
         try:
-            with open(self.events_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(event) + "\n")
+            log_event(
+                event_type=action,
+                message=message,
+                project=project_name,
+                metadata=json.dumps(full_metadata)
+            )
         except Exception:
             # Telemetry should never crash the app
             pass
 
-        return event
+        # Trigger Active Assistance (Flow Detection)
+        # We do this after logging so the current event counts towards the flow
+        try:
+            check_flow_state()
+        except Exception:
+            pass
+
+        # Return event dict for callers who might need it (mostly legacy)
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "event_type": action,
+            "message": message,
+            "project": project_name,
+            "metadata": full_metadata
+        }
 
 def get_telemetry(root: Path) -> TelemetryService:
     return TelemetryService(root)

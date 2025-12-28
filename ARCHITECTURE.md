@@ -12,6 +12,7 @@ graph TD
     Service -->|DTO| Adapter[Adapter Layer]
     Adapter -->|IO| FS[Filesystem / OS]
     Adapter -->|SQL| DB[DuckDB / SQLite]
+    Adapter -->|JSON| LLM[Groq API]
 ```
 
 ### 1. CLI Layer (`src/devbase/commands`)
@@ -61,7 +62,8 @@ src/devbase/
 │   ├── core.py          # Setup, Doctor
 │   ├── dev.py           # Project Management
 │   ├── ops.py           # Operations & Telemetry
-│   └── pkm.py           # Knowledge Graph
+│   ├── pkm.py           # Knowledge Graph
+│   └── ai.py            # AI Features
 ├── services/            # Business Logic
 │   └── project_setup.py # Project scaffolding service
 ├── utils/               # Shared Utilities
