@@ -14,6 +14,7 @@ Version: 5.1.0
 from __future__ import annotations
 
 import atexit
+import logging
 import signal
 import sys
 from pathlib import Path
@@ -26,6 +27,9 @@ if TYPE_CHECKING:
 _connection: duckdb.DuckDBPyConnection | None = None
 _db_path: Path | None = None
 SCHEMA_VERSION = '5.1'
+
+# Logger for debugging schema initialization issues
+logger = logging.getLogger(__name__)
 
 
 def get_db_path() -> Path:
@@ -152,6 +156,11 @@ def init_schema(conn: duckdb.DuckDBPyConnection) -> None:
     except (duckdb.CatalogException, duckdb.ProgrammingError):
         # Table doesn't exist, proceed with full init
         pass
+    except Exception as e:
+        # Log unexpected errors to aid debugging, then proceed with full init
+        logger.warning(f"Unexpected error checking schema version: {e}")
+        pass
+
 
     # Schema version table (must exist first for migration checks)
     conn.execute("""

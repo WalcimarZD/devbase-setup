@@ -43,3 +43,4 @@ test_output/
 
 # DevBase State (should be local)
 .devbase_state.json
+.coverage
