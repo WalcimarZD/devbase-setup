@@ -185,6 +185,32 @@ def init_schema(conn: "duckdb.DuckDBPyConnection") -> None:
         );
     """)
 
+    # Embeddings Tables (Hot/Cold Separation)
+    # Using ARRAY(FLOAT) to be compatible with standard DuckDB
+    # If vector extension is loaded, we can use vector operations on these arrays.
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS hot_embeddings (
+            file_path TEXT,
+            chunk_id INTEGER,
+            content_chunk TEXT,
+            embedding DOUBLE[],
+            mtime_epoch BIGINT,
+            PRIMARY KEY (file_path, chunk_id)
+        );
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cold_embeddings (
+            file_path TEXT,
+            chunk_id INTEGER,
+            content_chunk TEXT,
+            embedding DOUBLE[],
+            mtime_epoch BIGINT,
+            PRIMARY KEY (file_path, chunk_id)
+        );
+    """)
+
     # AI task queue for async processing
     # DuckDB requires explicit sequences for auto-increment (unlike SQLite)
     conn.execute("CREATE SEQUENCE IF NOT EXISTS ai_task_queue_id_seq;")
