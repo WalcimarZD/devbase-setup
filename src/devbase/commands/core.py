@@ -26,7 +26,7 @@ import importlib.metadata
 try:
     SCRIPT_VERSION = importlib.metadata.version("devbase")
 except importlib.metadata.PackageNotFoundError:
-    SCRIPT_VERSION = "5.1.0a1" 
+    SCRIPT_VERSION = "5.1.0-alpha.3"
 
 POLICY_VERSION = "5.0"
 
