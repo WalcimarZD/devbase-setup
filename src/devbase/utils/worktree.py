@@ -96,60 +96,15 @@ def add_worktree(
     
     worktrees_dir.mkdir(parents=True, exist_ok=True)
     
-    cmd = ["git", "worktree", "add"]
-    
-    # Check if branch exists
-    branch_exists = False
-    try:
-        subprocess.run(
-            ["git", "rev-parse", "--verify", branch],
-            cwd=str(project_path),
-            check=True,
-            capture_output=True
-        )
-        branch_exists = True
-    except subprocess.CalledProcessError:
-        pass
-    
-    console.print(f"[dim]Debug: branch_exists={branch_exists}, create={create_branch}[/dim]")
-
+    # Simple approach: if --create, always create new branch from HEAD
+    # Otherwise, try to checkout existing branch
     if create_branch:
-        if branch_exists:
-             console.print(f"[yellow]⚠ Branch '{branch}' already exists. Switching to existing branch.[/yellow]")
-        else:
-            # cmd.extend(["-b", branch]) # Logic handled below
-            pass
-    elif not branch_exists:
-        # Check if it's a remote branch that we can track
-        try:
-             subprocess.run(
-                ["git", "rev-parse", "--verify", f"origin/{branch}"],
-                cwd=str(project_path),
-                check=True,
-                capture_output=True
-            )
-             console.print(f"[blue]ℹ Found remote branch 'origin/{branch}'. Creating local tracking branch.[/blue]")
-             # Logic handled below
-        except subprocess.CalledProcessError:
-             console.print(f"[red]✗ Branch '{branch}' not found. Use --create to create a new branch.[/red]")
-             return None
-
-    # Reset cmd to be safe and simple
-    cmd = ["git", "worktree", "add"]
-    
-    if create_branch and not branch_exists:
-        # Create new branch from HEAD: git worktree add -b <branch> <path> HEAD
-        cmd.extend(["-b", branch, str(worktree_path), "HEAD"])
-    elif not branch_exists:
-        # Try remote tracking magic: git worktree add -b <branch> <path> origin/<branch>
-        cmd.extend(["-b", branch, str(worktree_path), f"origin/{branch}"])
+        cmd = ["git", "worktree", "add", "-b", branch, str(worktree_path), "HEAD"]
     else:
-        # Existing local branch
-        cmd.append(str(worktree_path))
-        cmd.append(branch)
-
-    console.print(f"[dim]Debug: Running command: {' '.join(cmd)}[/dim]")
-
+        cmd = ["git", "worktree", "add", str(worktree_path), branch]
+    
+    console.print(f"[cyan]→ git {' '.join(cmd[1:])}[/cyan]")
+    
     try:
         result = subprocess.run(
             cmd,
@@ -161,6 +116,13 @@ def add_worktree(
         
         if result.returncode != 0:
             console.print(f"[red]✗ Failed to create worktree:[/red]\n{result.stderr}")
+            
+            # Helpful hint for common errors
+            if "invalid reference" in result.stderr and not create_branch:
+                console.print(f"[yellow]💡 Branch '{branch}' doesn't exist. Try with --create flag.[/yellow]")
+            elif "already used" in result.stderr:
+                console.print(f"[yellow]💡 This branch is checked out elsewhere. Create a worktree for a different branch.[/yellow]")
+            
             return None
         
         console.print(f"[green]✓[/green] Created worktree: {worktree_name}")
