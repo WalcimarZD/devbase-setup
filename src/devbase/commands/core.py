@@ -291,7 +291,7 @@ def doctor(
     required_files = [
         '.editorconfig',
         '.gitignore',
-        '00.00_index.md',
+        '00-09_SYSTEM/00.00_index.md',
         '.devbase_state.json'
     ]
 
