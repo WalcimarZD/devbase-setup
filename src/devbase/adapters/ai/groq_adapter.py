@@ -65,7 +65,20 @@ class GroqProvider(LLMProvider):
         Raises:
             LLMAuthenticationError: If no API key is provided or found
         """
+        # Try config file if env var missing
+        if not api_key and not os.environ.get("GROQ_API_KEY"):
+            try:
+                import toml
+                from devbase.utils.paths import get_config_path
+                config_path = get_config_path()
+                if config_path.exists():
+                    config = toml.load(config_path)
+                    api_key = config.get("ai", {}).get("groq_api_key")
+            except Exception:
+                pass
+
         self.api_key = api_key or os.environ.get("GROQ_API_KEY")
+
         if not self.api_key:
             raise LLMAuthenticationError(
                 "GROQ_API_KEY not found. Set it via environment variable or pass api_key."

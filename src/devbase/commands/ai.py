@@ -231,7 +231,7 @@ def insights(
 
 
 @app.command()
-def status() -> None:
+def status(ctx: typer.Context) -> None:
     """Check AI provider configuration status."""
     console.print("\n[bold]🤖 AI Status[/bold]\n")
     env_key = os.environ.get("GROQ_API_KEY", "")
@@ -386,6 +386,7 @@ def briefing() -> None:
 
 @routine_app.command("triage")
 def triage(
+    ctx: typer.Context,
     apply: Annotated[bool, typer.Option("--apply", help="Automatically move files")] = False,
 ) -> None:
     """📥 Inbox triage and classification."""
@@ -396,7 +397,8 @@ def triage(
         console.print(f"[red]Import error:[/red] {e}")
         raise typer.Exit(1)
 
-    agent = RoutineAgent()
+    root = ctx.obj["root"] if ctx and ctx.obj and "root" in ctx.obj else None
+    agent = RoutineAgent(root_path=root)
     files = agent.scan_inbox()
     if not files:
         console.print("[green]Inbox is empty! 🎉[/green]")
