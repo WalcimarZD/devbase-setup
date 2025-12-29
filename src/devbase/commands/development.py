@@ -138,6 +138,115 @@ def new(
         raise typer.Exit(1)
 
 
+@app.command(name="import")
+def import_project(
+    ctx: typer.Context,
+    source: Annotated[str, typer.Argument(help="Git URL or local path to import")],
+    name: Annotated[
+        str,
+        typer.Option("--name", "-n", help="Override project name")
+    ] = None,
+) -> None:
+    """
+    📥 Import an existing project (brownfield).
+    
+    Clones a Git repository or copies a local project into the DevBase workspace.
+    Imported projects are marked as 'external' and exempt from governance rules.
+    
+    Examples:
+        devbase dev import https://github.com/user/repo.git
+        devbase dev import D:\\Projects\\legacy-app --name legacy
+    """
+    import subprocess
+    import json
+    import shutil
+    from datetime import datetime
+    import devbase
+
+    root: Path = ctx.obj["root"]
+    apps_dir = root / "20-29_CODE" / "21_monorepo_apps"
+    apps_dir.mkdir(parents=True, exist_ok=True)
+
+    # Determine if source is URL or path
+    is_url = source.startswith("http://") or source.startswith("https://") or source.startswith("git@")
+    
+    if is_url:
+        # Extract repo name from URL
+        repo_name = name or source.rstrip("/").split("/")[-1].replace(".git", "")
+        dest_path = apps_dir / repo_name
+        
+        if dest_path.exists():
+            console.print(f"[red]✗ Project '{repo_name}' already exists.[/red]")
+            raise typer.Exit(1)
+        
+        console.print(f"\n[bold]Importing project from Git...[/bold]")
+        console.print(f"[dim]Source: {source}[/dim]")
+        console.print(f"[dim]Destination: {dest_path}[/dim]\n")
+        
+        try:
+            result = subprocess.run(
+                ["git", "clone", source, str(dest_path)],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            if result.returncode != 0:
+                console.print(f"[red]✗ Git clone failed:[/red]\n{result.stderr}")
+                raise typer.Exit(1)
+            console.print(f"[green]✓[/green] Repository cloned successfully")
+        except FileNotFoundError:
+            console.print("[red]✗ Git not found. Please install Git.[/red]")
+            raise typer.Exit(1)
+        except subprocess.TimeoutExpired:
+            console.print("[red]✗ Clone timed out (120s).[/red]")
+            raise typer.Exit(1)
+    else:
+        # Local path
+        source_path = Path(source).resolve()
+        if not source_path.exists():
+            console.print(f"[red]✗ Source path not found: {source}[/red]")
+            raise typer.Exit(1)
+        
+        project_name = name or source_path.name
+        dest_path = apps_dir / project_name
+        
+        if dest_path.exists():
+            console.print(f"[red]✗ Project '{project_name}' already exists.[/red]")
+            raise typer.Exit(1)
+        
+        console.print(f"\n[bold]Importing local project...[/bold]")
+        console.print(f"[dim]Source: {source_path}[/dim]")
+        console.print(f"[dim]Destination: {dest_path}[/dim]\n")
+        
+        try:
+            shutil.copytree(source_path, dest_path)
+            console.print(f"[green]✓[/green] Project copied successfully")
+        except Exception as e:
+            console.print(f"[red]✗ Copy failed: {e}[/red]")
+            raise typer.Exit(1)
+    
+    # Create .devbase.json with external governance
+    metadata = {
+        "template": "imported",
+        "governance": "external",
+        "source": source,
+        "imported_at": datetime.now().isoformat(),
+        "devbase_version": devbase.__version__
+    }
+    
+    meta_file = dest_path / ".devbase.json"
+    meta_file.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    console.print(f"[green]✓[/green] Created .devbase.json (governance: external)")
+    
+    console.print(Panel(
+        f"[bold green]✅ Import Complete![/bold green]\n\n"
+        f"Project: [cyan]{dest_path.name}[/cyan]\n"
+        f"Location: [dim]{dest_path}[/dim]\n\n"
+        f"[dim]This project is marked as 'external' and exempt from governance rules.[/dim]",
+        border_style="green"
+    ))
+
+
 @app.command(name="info")
 def info_project(
     ctx: typer.Context,
@@ -184,10 +293,20 @@ def info_project(
     
     # Construct Display
     template = metadata.get("template", "Unknown / Custom")
-    created = metadata.get("created_at", datetime.fromtimestamp(created_ts).strftime("%Y-%m-%d %H:%M"))
+    governance = metadata.get("governance", "full")
+    created = metadata.get("created_at", metadata.get("imported_at", datetime.fromtimestamp(created_ts).strftime("%Y-%m-%d %H:%M")))
     version = metadata.get("devbase_version", "Pre-5.1.0")
     author = metadata.get("author", "Unknown")
     desc = metadata.get("description", "No description")
+    source = metadata.get("source", None)
+
+    # Governance badge
+    if governance == "external":
+        gov_display = "[yellow]External[/yellow] (Governance skipped)"
+    elif governance == "partial":
+        gov_display = "[blue]Partial[/blue]"
+    else:
+        gov_display = "[green]Full[/green]"
 
     grid = Table.grid(expand=True)
     grid.add_column(style="bold cyan", width=15)
@@ -195,7 +314,10 @@ def info_project(
     
     grid.add_row("Project:", project_name)
     grid.add_row("Location:", str(project_path))
+    grid.add_row("Governance:", gov_display)
     grid.add_row("Template:", template)
+    if source:
+        grid.add_row("Source:", source)
     grid.add_row("Created:", created)
     grid.add_row("DevBase Ver:", version)
     grid.add_row("Author:", author)
@@ -240,17 +362,34 @@ def list_projects(
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Name", style="cyan")
     table.add_column("Last Modified", justify="right")
-    table.add_column("Type", justify="center")
+    table.add_column("Governance", justify="center")
+    
+    import json
     
     for p in sorted(projects, key=lambda x: x.name):
-        # Determine type
-        is_copier = (p / ".copier-answers.yml").exists() or (p / ".copier-answers.yaml").exists()
-        p_type = "[blue]Copier[/blue]" if is_copier else "[dim]Custom[/dim]"
+        # Read governance from .devbase.json
+        meta_file = p / ".devbase.json"
+        governance = "full"
+        
+        if meta_file.exists():
+            try:
+                meta = json.loads(meta_file.read_text(encoding="utf-8"))
+                governance = meta.get("governance", "full")
+            except:
+                pass
+        
+        # Determine badge style
+        if governance == "external":
+            gov_badge = "[yellow]External[/yellow]"
+        elif governance == "partial":
+            gov_badge = "[blue]Partial[/blue]"
+        else:
+            gov_badge = "[green]Full[/green]"
         
         # Modified time
         mtime = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
         
-        table.add_row(p.name, mtime, p_type)
+        table.add_row(p.name, mtime, gov_badge)
         
     console.print(table)
     console.print(f"\n[dim]Total: {len(projects)} projects[/dim]")
