@@ -22,7 +22,11 @@ console = Console()
 
 app.command(name="debug")(debug_cmd)
 
-from devbase import __version__ as SCRIPT_VERSION 
+import importlib.metadata
+try:
+    SCRIPT_VERSION = importlib.metadata.version("devbase")
+except importlib.metadata.PackageNotFoundError:
+    SCRIPT_VERSION = "5.1.0a1" 
 
 POLICY_VERSION = "5.0"
 
