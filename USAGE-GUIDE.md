@@ -194,11 +194,28 @@ devbase ai organize inbox/random-notes.md
 # Analyzes content and suggests destination with reasoning
 ```
 
-#### `ai insights`
-Analyzes your workspace structure for optimization opportunities.
+#### `ai chat`
+Interactive chat with your workspace using Local RAG (Retrieval-Augmented Generation).
 ```bash
-devbase ai insights
-# Generates a report on architecture, organization, and potential improvements
+devbase ai chat "Como eu implemento um adaptador de armazenamento no DevBase?"
+# Busca contexto no seu workspace e responde via IA
+```
+
+#### `ai index`
+Rebuilds the semantic search index for your local files.
+```bash
+devbase ai index --rebuild
+```
+
+#### `ai routine`
+*Cognitive assistance and daily hygiene.*
+
+- `briefing`: Shows pending tasks and activity summary.
+- `triage`: Interactive organization of your `00_inbox`.
+
+```bash
+devbase ai routine briefing
+devbase ai routine triage --apply
 ```
 
 ---

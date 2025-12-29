@@ -10,6 +10,8 @@ DevBase v5.0.0 follows a strict **Command-Service-Adapter** pattern to ensure te
 graph TD
     CLI[CLI Layer (Typer)] -->|Context| Service[Service Layer]
     Service -->|DTO| Adapter[Adapter Layer]
+    Service -->|RAG| AI_Service[AI & Routine Services]
+    AI_Service -->|Query| Adapter
     Adapter -->|IO| FS[Filesystem / OS]
     Adapter -->|SQL| DB[DuckDB / SQLite]
     Adapter -->|JSON| LLM[Groq API]
@@ -65,7 +67,9 @@ src/devbase/
 │   ├── pkm.py           # Knowledge Graph
 │   └── ai.py            # AI Features
 ├── services/            # Business Logic
-│   └── project_setup.py # Project scaffolding service
+│   ├── project_setup.py # Project scaffolding service
+│   ├── routine_agent.py # Daily briefings & triage
+│   └── search_engine.py # Local RAG & Vector search
 ├── utils/               # Shared Utilities
 │   ├── filesystem.py    # Atomic file operations
 │   ├── wizard.py        # Interactive prompts

@@ -13,7 +13,21 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - `ai config`: Configuração segura de API Key (Groq).
   - `ai organize`: Sugestão inteligente de organização de arquivos baseada em conteúdo.
   - `ai insights`: Análise arquitetural do workspace com recomendações de melhoria.
+  - `ai chat`: Chat interativo com o workspace usando RAG (Retrieval-Augmented Generation).
+  - `ai index`: Indexação semântica local para busca vetorial.
+  - `ai classify/summarize`: Utilitários de processamento de texto via LLM.
   - Arquitetura Hexagonal (Ports & Adapters) para fácil extensão de providers.
+
+- **Routine Agent (`devbase ai routine`)**:
+  - `ai routine briefing`: Briefing matinal com tarefas pendentes e métricas.
+  - `ai routine triage`: Classificação e organização automática da Inbox.
+  - Integração com Telemetria (DuckDB) para análise de logs diários.
+
+### 🛡️ Segurança
+
+- **Prevenção de Injeção**: Whitelist de tabelas FTS e limpeza de inputs em queries Dinâmicas (DuckDB).
+- **Sanitização de Contexto**: Filtros básicos antes de enviar dados do workspace para APIs de LLM.
+
 
 ### 🐛 Corrigido
 

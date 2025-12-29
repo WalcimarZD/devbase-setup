@@ -40,7 +40,7 @@ uv tool install devbase
 *Verify installation:*
 ```bash
 devbase --version
-# Output: devbase 5.0.0
+# Output: devbase 5.1.0-alpha.1
 ```
 
 ---
