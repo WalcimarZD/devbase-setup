@@ -119,33 +119,20 @@ def copy_built_in_templates(fs, category: str, destination: str):
     pkg_root = Path(devbase.__file__).parent
     tmpl_src = pkg_root / "templates" / category
     
-    # Write debug to file because Progress swallows console
-    debug_path = Path(fs.root) / "setup_debug.txt"
-    with open(debug_path, "a", encoding="utf-8") as f:
-        f.write(f"\n--- Hydration Debug ({category}) ---\n")
-        f.write(f"PKG_ROOT: {pkg_root}\n")
-        f.write(f"TMPL_SRC: {tmpl_src} (exists: {tmpl_src.exists()})\n")
-        f.write(f"DEST: {Path(fs.root) / destination}\n")
+    if not tmpl_src.exists():
+        return
 
-        if not tmpl_src.exists():
-            f.write("ERROR: tmpl_src NOT FOUND\n")
-            return
-
-        dest_path = Path(fs.root) / destination
-        items = list(tmpl_src.iterdir())
-        f.write(f"Items found: {[i.name for i in items]}\n")
-        
-        for item in items:
-            if item.name.startswith("__template-") or item.name.endswith(".template"):
-                src = item
-                dst = dest_path / item.name
-                f.write(f"Copying {item.name} -> {dst}\n")
-                
-                if src.is_dir():
-                    shutil.copytree(src, dst, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(src, dst)
-        f.write("Done.\n")
+    dest_path = Path(fs.root) / destination
+    
+    for item in tmpl_src.iterdir():
+        if item.name.startswith("__template-") or item.name.endswith(".template"):
+            src = item
+            dst = dest_path / item.name
+            
+            if src.is_dir():
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+            else:
+                shutil.copy2(src, dst)
 
 def run_setup_code(fs, policy_version=None):
     run_setup_module(fs, "Code Templates", policy_version)
