@@ -154,3 +154,81 @@ def test_quick_note(tmp_path):
     notes_dir = tmp_path / "10-19_KNOWLEDGE" / "11_public_garden" / "til"
     assert any(notes_dir.rglob("*.md"))
 
+
+# ============================================================================
+# NEW COMMANDS TESTS (v5.1.0+)
+# ============================================================================
+
+def test_dev_list(tmp_path):
+    """Test 'dev list' shows projects."""
+    # Setup workspace with a project
+    runner.invoke(app, ["--root", str(tmp_path), "core", "setup", "--no-interactive"])
+    
+    # Create a mock project
+    project_dir = tmp_path / "20-29_CODE" / "21_monorepo_apps" / "test-project"
+    project_dir.mkdir(parents=True)
+    
+    result = runner.invoke(app, ["--root", str(tmp_path), "dev", "list"])
+    
+    assert result.exit_code == 0
+    assert "test-project" in result.stdout
+    assert "Project List" in result.stdout
+
+
+def test_dev_info(tmp_path):
+    """Test 'dev info' shows project details."""
+    # Setup workspace
+    runner.invoke(app, ["--root", str(tmp_path), "core", "setup", "--no-interactive"])
+    
+    # Create a project with metadata
+    project_dir = tmp_path / "20-29_CODE" / "21_monorepo_apps" / "info-test"
+    project_dir.mkdir(parents=True)
+    
+    metadata = {
+        "template": "clean-arch",
+        "governance": "full",
+        "created_at": "2025-01-01T00:00:00"
+    }
+    (project_dir / ".devbase.json").write_text(json.dumps(metadata))
+    
+    result = runner.invoke(app, ["--root", str(tmp_path), "dev", "info", "info-test"])
+    
+    assert result.exit_code == 0
+    assert "info-test" in result.stdout
+    assert "clean-arch" in result.stdout or "Template" in result.stdout
+
+
+def test_dev_info_not_found(tmp_path):
+    """Test 'dev info' with non-existent project."""
+    runner.invoke(app, ["--root", str(tmp_path), "core", "setup", "--no-interactive"])
+    
+    result = runner.invoke(app, ["--root", str(tmp_path), "dev", "info", "nonexistent"])
+    
+    assert result.exit_code != 0
+    assert "not found" in result.stdout.lower()
+
+
+def test_dev_worktree_list_empty(tmp_path):
+    """Test 'dev worktree-list' with no worktrees."""
+    runner.invoke(app, ["--root", str(tmp_path), "core", "setup", "--no-interactive"])
+    
+    result = runner.invoke(app, ["--root", str(tmp_path), "dev", "worktree-list"])
+    
+    assert result.exit_code == 0
+    assert "No worktrees found" in result.stdout
+
+
+def test_dev_restore_not_dotnet(tmp_path):
+    """Test 'dev restore' on non-.NET project."""
+    # Setup workspace
+    runner.invoke(app, ["--root", str(tmp_path), "core", "setup", "--no-interactive"])
+    
+    # Create a non-.NET project
+    project_dir = tmp_path / "20-29_CODE" / "21_monorepo_apps" / "python-project"
+    project_dir.mkdir(parents=True)
+    (project_dir / "main.py").write_text("print('hello')")
+    
+    result = runner.invoke(app, ["--root", str(tmp_path), "dev", "restore", "python-project"])
+    
+    assert result.exit_code != 0
+    assert ".NET" in result.stdout or "No .sln" in result.stdout or "does not appear" in result.stdout

@@ -72,6 +72,64 @@ devbase dev new my-script --no-setup
 - `python-lib`: Shared library/package.
 - `script`: Minimal script scaffold.
 
+#### `dev import`
+Import an existing project (brownfield) into the workspace.
+```bash
+# Clone from Git
+devbase dev import https://github.com/user/repo.git
+
+# Clone and restore NuGet packages (.NET)
+devbase dev import https://github.com/user/dotnet-app.git --restore
+
+# Import local project
+devbase dev import D:\Projects\legacy-app --name legacy
+```
+Imported projects are marked as "external" and exempt from governance rules.
+
+#### `dev list`
+List all projects in the workspace with governance status.
+```bash
+devbase dev list
+```
+Shows: Project name, last modified, governance level (Full/External/Worktree).
+
+#### `dev info`
+Show detailed metadata for a project.
+```bash
+devbase dev info my-project
+```
+Displays: Template used, creation date, author, governance level.
+
+#### `dev open`
+Open a project in VS Code.
+```bash
+devbase dev open my-project
+```
+
+#### `dev restore`
+Restore NuGet packages for .NET Framework projects.
+```bash
+devbase dev restore MedSempreMVC_GIT
+devbase dev restore MyProject --solution MyProject.Web.sln
+```
+Downloads `nuget.exe` automatically if not present.
+
+#### Worktree Commands
+Manage git worktrees for parallel development.
+```bash
+# Create a worktree
+devbase dev worktree-add my-project feature/new-feature
+devbase dev worktree-add my-project hotfix/bug-123 --create  # Create new branch
+
+# List all worktrees
+devbase dev worktree-list
+devbase dev worktree-list my-project  # For specific project
+
+# Remove a worktree
+devbase dev worktree-remove my-project--feature-new-feature
+```
+Worktrees are stored in `22_worktrees/` and shown in `dev list` with `[Worktree]` badge.
+
 #### `dev audit`
 Enforces structure and naming conventions (kebab-case).
 ```bash
