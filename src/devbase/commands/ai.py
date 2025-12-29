@@ -76,9 +76,11 @@ def config() -> None:
     to ~/.devbase/config.toml for persistent use.
     """
     import toml
+    from devbase.utils.paths import get_devbase_dir, get_config_path
     
-    config_dir = Path.home() / ".devbase"
-    config_file = config_dir / "config.toml"
+    root: Path = ctx.obj["root"]
+    config_dir = get_devbase_dir(root)
+    config_file = get_config_path(root)
     
     console.print("\n[bold]🤖 AI Configuration[/bold]\n")
     console.print("This command configures your Groq API key for AI features.")
@@ -239,7 +241,9 @@ def status() -> None:
     else:
         console.print("[dim]✗[/dim] GROQ_API_KEY env var: not set")
     
-    config_file = Path.home() / ".devbase" / "config.toml"
+    from devbase.utils.paths import get_config_path
+    root: Path = ctx.obj["root"]
+    config_file = get_config_path(root)
     if config_file.exists():
         try:
             import toml

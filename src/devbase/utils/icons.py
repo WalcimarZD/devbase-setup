@@ -14,6 +14,8 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Optional
 
+from devbase.utils.paths import get_icons_dir as _get_icons_dir
+
 from rich.console import Console
 
 console = Console()
@@ -53,14 +55,9 @@ AREA_ICONS: Dict[str, Dict] = {
 }
 
 
-def get_icon_dir() -> Path:
-    """Get the directory where icons are stored."""
-    if platform.system() == "Windows":
-        return Path.home() / ".devbase" / "icons"
-    elif platform.system() == "Darwin":
-        return Path.home() / ".devbase" / "icons"
-    else:  # Linux
-        return Path.home() / ".devbase" / "icons"
+def get_icon_dir(root: Optional[Path] = None) -> Path:
+    """Get the directory where icons are stored (workspace-local or global)."""
+    return _get_icons_dir(root)
 
 
 def set_icon_windows(folder_path: Path, icon_path: Path) -> bool:
@@ -170,7 +167,7 @@ def hydrate_icons(root: Path) -> Dict[str, bool]:
     Returns:
         Dict mapping folder name to success status
     """
-    icon_dir = get_icon_dir()
+    icon_dir = get_icon_dir(root)
     results = {}
     
     if not icon_dir.exists():

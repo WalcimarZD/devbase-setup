@@ -19,7 +19,9 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+from devbase.utils.paths import get_db_path
 
 if TYPE_CHECKING:
     import duckdb
@@ -356,12 +358,13 @@ def _summarize_day_handler(payload: str) -> str:
 _worker: AIWorker | None = None
 
 
-def get_worker(db_path: Path | None = None) -> AIWorker:
+def get_worker(db_path: Path | None = None, root: Optional[Path] = None) -> AIWorker:
     """
     Get or create the singleton AI worker.
     
     Args:
-        db_path: Database path (only used on first call)
+        db_path: Explicit database path
+        root: Workspace root for portable path resolution
         
     Returns:
         AIWorker instance
@@ -370,7 +373,7 @@ def get_worker(db_path: Path | None = None) -> AIWorker:
     
     if _worker is None:
         if db_path is None:
-            db_path = Path.home() / ".devbase" / "devbase.duckdb"
+            db_path = get_db_path(root)
         
         _worker = AIWorker(db_path)
         

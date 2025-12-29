@@ -7,6 +7,8 @@ import tomllib  # Native in Python 3.11+
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from devbase.utils.paths import get_config_path
+
 
 class Config:
     """DevBase configuration manager."""
@@ -51,15 +53,16 @@ class Config:
     }
 
 
-    def __init__(self, config_path: Optional[Path] = None):
+    def __init__(self, config_path: Optional[Path] = None, root: Optional[Path] = None):
         """
         Initialize configuration.
         
         Args:
-            config_path: Path to devbase.toml (default: ~/.devbase/config.toml)
+            config_path: Explicit path to config.toml
+            root: Workspace root for portable config resolution
         """
         if config_path is None:
-            config_path = Path.home() / ".devbase" / "config.toml"
+            config_path = get_config_path(root)
 
         self.config_path = config_path
         self._config = self.DEFAULT_CONFIG.copy()

@@ -33,6 +33,7 @@ from devbase.ai.exceptions import (
     RateLimitError,
 )
 from devbase.ai.interface import LLMProvider
+from devbase.utils.paths import get_config_path
 
 # Default configuration
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
@@ -40,9 +41,9 @@ DEFAULT_TIMEOUT = 30  # seconds
 DEFAULT_MAX_RETRIES = 1
 
 
-def _get_api_key_from_config() -> Optional[str]:
-    """Read API key from ~/.devbase/config.toml if it exists."""
-    config_path = Path.home() / ".devbase" / "config.toml"
+def _get_api_key_from_config(root: Optional[Path] = None) -> Optional[str]:
+    """Read API key from config.toml (workspace-local or global)."""
+    config_path = get_config_path(root)
     if not config_path.exists():
         return None
     

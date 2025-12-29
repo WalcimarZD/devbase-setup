@@ -38,3 +38,79 @@ def resolve_workspace_path(
     if default_subdir:
         return root / default_subdir / output
     return root / output
+
+
+# =============================================================================
+# DevBase Directory Resolution (Portable Workspace Support)
+# =============================================================================
+
+from typing import Optional
+
+
+def get_devbase_dir(root: Optional[Path] = None) -> Path:
+    """
+    Get the .devbase directory path.
+    
+    Resolution order:
+    1. Workspace-local: <root>/.devbase (if root provided and on different drive)
+    2. Global fallback: ~/.devbase
+    
+    Args:
+        root: Workspace root path (optional)
+        
+    Returns:
+        Path to .devbase directory
+    """
+    if root:
+        local_dir = root / ".devbase"
+        if local_dir.exists() or _should_prefer_local(root):
+            return local_dir
+    return Path.home() / ".devbase"
+
+
+def get_config_path(root: Optional[Path] = None) -> Path:
+    """Get path to config.toml file."""
+    return get_devbase_dir(root) / "config.toml"
+
+
+def get_db_path(root: Optional[Path] = None) -> Path:
+    """Get path to DuckDB database file."""
+    return get_devbase_dir(root) / "devbase.duckdb"
+
+
+def get_bin_dir(root: Optional[Path] = None) -> Path:
+    """Get path to binaries directory (nuget.exe, etc)."""
+    return get_devbase_dir(root) / "bin"
+
+
+def get_icons_dir(root: Optional[Path] = None) -> Path:
+    """Get path to icons directory."""
+    return get_devbase_dir(root) / "icons"
+
+
+def get_tools_dir(root: Optional[Path] = None) -> Path:
+    """Get path to tools directory (UV tools, etc)."""
+    return get_devbase_dir(root) / "tools"
+
+
+def _should_prefer_local(root: Path) -> bool:
+    """
+    Determine if we should prefer local workspace storage.
+    
+    Returns True if:
+    - Root is on a different drive than home (e.g., D: vs C:)
+    - Root/.devbase already has some content
+    """
+    try:
+        home_drive = Path.home().drive.upper()
+        root_drive = root.drive.upper()
+        return home_drive != root_drive
+    except Exception:
+        return False
+
+
+def ensure_devbase_dir(root: Optional[Path] = None) -> Path:
+    """Get .devbase directory, creating it if needed."""
+    devbase_dir = get_devbase_dir(root)
+    devbase_dir.mkdir(parents=True, exist_ok=True)
+    return devbase_dir

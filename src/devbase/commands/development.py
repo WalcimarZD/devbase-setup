@@ -256,7 +256,7 @@ def import_project(
         from devbase.utils.nuget import nuget_restore, is_dotnet_project
         if is_dotnet_project(dest_path):
             console.print()
-            nuget_restore(dest_path)
+            nuget_restore(dest_path, root=root)
         else:
             console.print("[dim]--restore specified but no .NET project detected. Skipping.[/dim]")
 
@@ -333,7 +333,7 @@ def restore_packages(
         console.print("[dim]No .sln or packages.config found.[/dim]")
         raise typer.Exit(1)
     
-    success = nuget_restore(project_path, solution)
+    success = nuget_restore(project_path, solution, root=root)
     if not success:
         raise typer.Exit(1)
 

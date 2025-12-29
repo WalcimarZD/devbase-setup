@@ -18,7 +18,9 @@ import logging
 import signal
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
+
+from devbase.utils.paths import get_db_path as _get_db_path_from_paths
 
 if TYPE_CHECKING:
     import duckdb
@@ -32,9 +34,9 @@ SCHEMA_VERSION = '5.1'
 logger = logging.getLogger(__name__)
 
 
-def get_db_path() -> Path:
-    """Get the default database path."""
-    return Path.home() / ".devbase" / "devbase.duckdb"
+def get_db_path(root: Optional[Path] = None) -> Path:
+    """Get the database path (workspace-local or global)."""
+    return _get_db_path_from_paths(root)
 
 
 def init_connection(db_path: Path | None = None) -> duckdb.DuckDBPyConnection:

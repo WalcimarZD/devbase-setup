@@ -17,16 +17,27 @@ NUGET_URL = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
 DEVBASE_BIN_DIR = Path.home() / ".devbase" / "bin"
 
 
-def get_nuget_path() -> Path:
-    """Get path to nuget.exe, downloading if necessary."""
-    nuget_path = DEVBASE_BIN_DIR / "nuget.exe"
+
+def get_nuget_path(root: Optional[Path] = None) -> Path:
+    """
+    Get path to nuget.exe, downloading if necessary.
+    
+    If root is provided, uses <root>/.devbase/bin/nuget.exe (Workspace-local).
+    Otherwise uses ~/.devbase/bin/nuget.exe (Global).
+    """
+    if root:
+        bin_dir = root / ".devbase" / "bin"
+    else:
+        bin_dir = DEVBASE_BIN_DIR
+        
+    nuget_path = bin_dir / "nuget.exe"
     
     if nuget_path.exists():
         return nuget_path
     
     # Download nuget.exe
-    console.print("[dim]Downloading nuget.exe...[/dim]")
-    DEVBASE_BIN_DIR.mkdir(parents=True, exist_ok=True)
+    console.print(f"[dim]Downloading nuget.exe to {bin_dir}...[/dim]")
+    bin_dir.mkdir(parents=True, exist_ok=True)
     
     try:
         urllib.request.urlretrieve(NUGET_URL, nuget_path)
@@ -47,18 +58,37 @@ def is_dotnet_project(project_path: Path) -> bool:
     ])
 
 
-def nuget_restore(project_path: Path, solution_file: Optional[str] = None) -> bool:
+def nuget_restore(project_path: Path, solution_file: Optional[str] = None, root: Optional[Path] = None) -> bool:
     """
     Run nuget restore on a project.
     
     Args:
         project_path: Path to project root
         solution_file: Optional specific .sln file to restore
+        root: Workspace root for hermetic package storage
         
     Returns:
         True if successful, False otherwise
     """
-    nuget_exe = get_nuget_path()
+    nuget_exe = get_nuget_path(root)
+    
+    # Configure environment for hermetic storage if root is provided
+    env = None
+    if root:
+        import os
+        env = os.environ.copy()
+        
+        # 1. Set global packages folder to <root>/.nuget/packages
+        packages_dir = root / ".nuget" / "packages"
+        env["NUGET_PACKAGES"] = str(packages_dir)
+        
+        # 2. Set http cache to <root>/.nuget/http-cache (prevent global pollution)
+        env["NUGET_HTTP_CACHE_PATH"] = str(root / ".nuget" / "http-cache")
+        
+        # 3. Set plugin cache (optional but cleanliness)
+        env["NUGET_PLUGINS_CACHE_PATH"] = str(root / ".nuget" / "plugins-cache")
+        
+        console.print(f"[dim]Using workspace NuGet cache: {packages_dir}[/dim]")
     
     # Find solution file if not specified
     if not solution_file:
@@ -85,6 +115,7 @@ def nuget_restore(project_path: Path, solution_file: Optional[str] = None) -> bo
         result = subprocess.run(
             [str(nuget_exe), "restore", target],
             cwd=str(project_path),
+            env=env,  # Inject hermetic environment
             capture_output=True,
             text=True,
             timeout=300  # 5 min timeout
