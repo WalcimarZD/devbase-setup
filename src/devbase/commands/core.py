@@ -115,33 +115,37 @@ import shutil
 
 def copy_built_in_templates(fs, category: str, destination: str):
     """Copy built-in templates from package to workspace."""
-    # Locate package templates directory associated with this module
-    # core.py is in devbase/commands, templates are in devbase/templates
-    pkg_root = Path(__file__).resolve().parent.parent
+    import devbase
+    pkg_root = Path(devbase.__file__).parent
     tmpl_src = pkg_root / "templates" / category
     
-    if not tmpl_src.exists():
-        return
+    # Write debug to file because Progress swallows console
+    debug_path = Path(fs.root) / "setup_debug.txt"
+    with open(debug_path, "a", encoding="utf-8") as f:
+        f.write(f"\n--- Hydration Debug ({category}) ---\n")
+        f.write(f"PKG_ROOT: {pkg_root}\n")
+        f.write(f"TMPL_SRC: {tmpl_src} (exists: {tmpl_src.exists()})\n")
+        f.write(f"DEST: {Path(fs.root) / destination}\n")
 
-    # Destination in workspace
-    dest_path = Path(fs.root) / destination
-    
-    # Copy all __template-* directories (and others if needed)
-    for item in tmpl_src.iterdir():
-        if item.name.startswith("__template-") or item.name.endswith(".template"):
-            src = item
-            dst = dest_path / item.name
-            
-            if src.is_dir():
-                # Recursive copy
-                if dst.exists():
-                    # Check if we should overwrite? Hydrate usually implies safe updates or force
-                    # For now, let's use dirs_exist_ok=True
+        if not tmpl_src.exists():
+            f.write("ERROR: tmpl_src NOT FOUND\n")
+            return
+
+        dest_path = Path(fs.root) / destination
+        items = list(tmpl_src.iterdir())
+        f.write(f"Items found: {[i.name for i in items]}\n")
+        
+        for item in items:
+            if item.name.startswith("__template-") or item.name.endswith(".template"):
+                src = item
+                dst = dest_path / item.name
+                f.write(f"Copying {item.name} -> {dst}\n")
+                
+                if src.is_dir():
                     shutil.copytree(src, dst, dirs_exist_ok=True)
                 else:
-                    shutil.copytree(src, dst)
-            else:
-                shutil.copy2(src, dst)
+                    shutil.copy2(src, dst)
+        f.write("Done.\n")
 
 def run_setup_code(fs, policy_version=None):
     run_setup_module(fs, "Code Templates", policy_version)
