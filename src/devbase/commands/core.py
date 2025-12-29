@@ -249,19 +249,21 @@ def setup(
         migration_id = f"v{SCRIPT_VERSION}-{datetime.now().strftime('%Y%m%d')}"
         if migration_id not in new_state["migrations"]:
             new_state["migrations"].append(migration_id)
-
         state_mgr.save_state(new_state)
         console.print("\n[green]✓[/green] State saved")
 
     console.print()
-    console.print(Panel.fit(
-        f"[bold green]✅ Setup Complete![/bold green]\n\n"
-        f"DevBase v{SCRIPT_VERSION} is ready.\n\n"
-        "Next steps:\n"
-        "  1. [cyan]devbase doctor[/cyan]  - Verify installation\n"
-        "  2. [cyan]devbase dev new my-project[/cyan]  - Create first project",
-        border_style="green"
-    ))
+    # Success message
+    msg = f"""
+[bold green]✅ Setup Complete![/bold green]
+
+DevBase v{SCRIPT_VERSION} is ready.
+
+Next steps:
+  1. [cyan]devbase core doctor[/cyan] - Verify installation
+  2. [cyan]devbase dev new my-project[/cyan] - Create first project
+    """
+    console.print(Panel(msg.strip(), border_style="green"))
 
 
 @app.command()

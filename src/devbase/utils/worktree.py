@@ -97,10 +97,59 @@ def add_worktree(
     worktrees_dir.mkdir(parents=True, exist_ok=True)
     
     cmd = ["git", "worktree", "add"]
-    if create_branch:
-        cmd.extend(["-b", branch])
-    cmd.extend([str(worktree_path), branch])
     
+    # Check if branch exists
+    branch_exists = False
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "--verify", branch],
+            cwd=str(project_path),
+            check=True,
+            capture_output=True
+        )
+        branch_exists = True
+    except subprocess.CalledProcessError:
+        pass
+    
+    console.print(f"[dim]Debug: branch_exists={branch_exists}, create={create_branch}[/dim]")
+
+    if create_branch:
+        if branch_exists:
+             console.print(f"[yellow]⚠ Branch '{branch}' already exists. Switching to existing branch.[/yellow]")
+        else:
+            # cmd.extend(["-b", branch]) # Logic handled below
+            pass
+    elif not branch_exists:
+        # Check if it's a remote branch that we can track
+        try:
+             subprocess.run(
+                ["git", "rev-parse", "--verify", f"origin/{branch}"],
+                cwd=str(project_path),
+                check=True,
+                capture_output=True
+            )
+             console.print(f"[blue]ℹ Found remote branch 'origin/{branch}'. Creating local tracking branch.[/blue]")
+             # Logic handled below
+        except subprocess.CalledProcessError:
+             console.print(f"[red]✗ Branch '{branch}' not found. Use --create to create a new branch.[/red]")
+             return None
+
+    # Reset cmd to be safe and simple
+    cmd = ["git", "worktree", "add"]
+    
+    if create_branch and not branch_exists:
+        # Create new branch from HEAD: git worktree add -b <branch> <path> HEAD
+        cmd.extend(["-b", branch, str(worktree_path), "HEAD"])
+    elif not branch_exists:
+        # Try remote tracking magic: git worktree add -b <branch> <path> origin/<branch>
+        cmd.extend(["-b", branch, str(worktree_path), f"origin/{branch}"])
+    else:
+        # Existing local branch
+        cmd.append(str(worktree_path))
+        cmd.append(branch)
+
+    console.print(f"[dim]Debug: Running command: {' '.join(cmd)}[/dim]")
+
     try:
         result = subprocess.run(
             cmd,
