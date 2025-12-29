@@ -57,7 +57,7 @@ def track(
         category=event_type
     )
 
-    console.print(f"[green]✓[/green] Tracked: [[cyan]{event['category']}[/cyan]] {message}")
+    console.print(f"[green]✓[/green] Tracked: [[cyan]{event['metadata']['category']}[/cyan]] {message}")
 
 
 @app.command()
