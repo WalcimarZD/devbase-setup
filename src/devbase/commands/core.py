@@ -106,6 +106,29 @@ def create_governance_files(fs) -> None:
 def run_setup_core(fs, policy_version=None):
     run_setup_module(fs, "Core Structure", policy_version)
     create_governance_files(fs)
+    
+    # Create required subfolders
+    root = Path(fs.root)
+    required_subfolders = [
+        '00-09_SYSTEM/00_inbox',
+        '00-09_SYSTEM/01_dotfiles',
+        '00-09_SYSTEM/07_documentation',
+        '10-19_KNOWLEDGE/10_references',
+        '10-19_KNOWLEDGE/11_public_garden',
+        '10-19_KNOWLEDGE/12_private_vault',
+        '20-29_CODE/21_monorepo_apps',
+        '20-29_CODE/22_worktrees',
+        '20-29_CODE/23_playground',
+        '30-39_OPERATIONS/31_backups',
+        '30-39_OPERATIONS/32_automation',
+    ]
+    
+    for subfolder in required_subfolders:
+        folder_path = root / subfolder
+        folder_path.mkdir(parents=True, exist_ok=True)
+    
+    # Deploy subfolder templates from core templates
+    copy_built_in_templates(fs, "core/00-09_SYSTEM", "00-09_SYSTEM")
 
 
 def run_setup_pkm(fs, policy_version=None):
@@ -316,6 +339,34 @@ def doctor(
                 f"Missing folder: {area}",
                 fix_action=lambda p=area_path: p.mkdir(parents=True, exist_ok=True),
                 fix_description=f"Create {area}"
+            )
+
+    # Check required subfolders (Johnny.Decimal categories)
+    console.print("\n[bold]Checking required subfolders...[/bold]")
+    required_subfolders = [
+        '00-09_SYSTEM/00_inbox',
+        '00-09_SYSTEM/01_dotfiles',
+        '00-09_SYSTEM/07_documentation',
+        '10-19_KNOWLEDGE/10_references',
+        '10-19_KNOWLEDGE/11_public_garden',
+        '10-19_KNOWLEDGE/12_private_vault',
+        '20-29_CODE/21_monorepo_apps',
+        '20-29_CODE/22_worktrees',
+        '20-29_CODE/23_playground',
+        '30-39_OPERATIONS/31_backups',
+        '30-39_OPERATIONS/32_automation',
+    ]
+
+    for subfolder in required_subfolders:
+        folder_path = root / subfolder
+        if folder_path.exists():
+            console.print(f"  [green]✓[/green] {subfolder}")
+        else:
+            console.print(f"  [red]✗[/red] {subfolder} [dim]- NOT FOUND[/dim]")
+            add_issue(
+                f"Missing subfolder: {subfolder}",
+                fix_action=lambda p=folder_path: p.mkdir(parents=True, exist_ok=True),
+                fix_description=f"Create {subfolder}"
             )
 
     # Check governance files
