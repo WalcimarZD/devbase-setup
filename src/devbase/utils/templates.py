@@ -219,6 +219,21 @@ def generate_project_from_template(
     # 5. Execute
     renderer.render(template_dir, dest_path, context, interactive)
     
+    # 6. Persist Metadata
+    try:
+        import json
+        import devbase
+        metadata = {
+            "template": template_name,
+            "created_at": datetime.now().isoformat(),
+            "devbase_version": devbase.__version__,
+            "author": context.get("author"),
+            "description": context.get("description")
+        }
+        (dest_path / ".devbase.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    except Exception as e:
+        console.print(f"[yellow]⚠ Failed to write metadata: {e}[/yellow]")
+
     return dest_path
 
 def list_available_templates(root: Path) -> List[str]:

@@ -138,6 +138,72 @@ def new(
         raise typer.Exit(1)
 
 
+@app.command(name="info")
+def info_project(
+    ctx: typer.Context,
+    project_name: Annotated[str, typer.Argument(help="Project name to inspect")]
+) -> None:
+    """
+    ℹ️ Show project details.
+    
+    Displays template used, creation date, and metadata.
+    """
+    import json
+    from datetime import datetime
+    from rich.panel import Panel
+    from rich.table import Table
+
+    root: Path = ctx.obj["root"]
+    project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
+
+    if not project_path.exists():
+        console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
+        raise typer.Exit(1)
+
+    # Gather Info
+    meta_file = project_path / ".devbase.json"
+    copier_file = project_path / ".copier-answers.yml"
+    
+    metadata = {}
+    
+    # Strategy 1: .devbase.json (New standard)
+    if meta_file.exists():
+        try:
+            metadata = json.loads(meta_file.read_text(encoding="utf-8"))
+        except:
+            pass
+            
+    # Strategy 2: Copier (Legacy/Alternative)
+    if not metadata and copier_file.exists():
+        metadata["template"] = "copier-template (inferred)"
+        
+    # Strategy 3: Filesystem (Fallback)
+    stat = project_path.stat()
+    created_ts = stat.st_ctime
+    modified_ts = stat.st_mtime
+    
+    # Construct Display
+    template = metadata.get("template", "Unknown / Custom")
+    created = metadata.get("created_at", datetime.fromtimestamp(created_ts).strftime("%Y-%m-%d %H:%M"))
+    version = metadata.get("devbase_version", "Pre-5.1.0")
+    author = metadata.get("author", "Unknown")
+    desc = metadata.get("description", "No description")
+
+    grid = Table.grid(expand=True)
+    grid.add_column(style="bold cyan", width=15)
+    grid.add_column()
+    
+    grid.add_row("Project:", project_name)
+    grid.add_row("Location:", str(project_path))
+    grid.add_row("Template:", template)
+    grid.add_row("Created:", created)
+    grid.add_row("DevBase Ver:", version)
+    grid.add_row("Author:", author)
+    grid.add_row("Description:", desc)
+    
+    console.print(Panel(grid, title=f"ℹ️ Project Info: {project_name}", border_style="blue"))
+
+
 @app.command(name="list")
 def list_projects(
     ctx: typer.Context,
