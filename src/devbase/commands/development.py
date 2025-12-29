@@ -146,6 +146,10 @@ def import_project(
         str,
         typer.Option("--name", "-n", help="Override project name")
     ] = None,
+    restore: Annotated[
+        bool,
+        typer.Option("--restore", "-r", help="Run NuGet restore after import (.NET projects)")
+    ] = False,
 ) -> None:
     """
     📥 Import an existing project (brownfield).
@@ -155,6 +159,7 @@ def import_project(
     
     Examples:
         devbase dev import https://github.com/user/repo.git
+        devbase dev import https://github.com/user/dotnet-app.git --restore
         devbase dev import D:\\Projects\\legacy-app --name legacy
     """
     import subprocess
@@ -245,6 +250,92 @@ def import_project(
         f"[dim]This project is marked as 'external' and exempt from governance rules.[/dim]",
         border_style="green"
     ))
+    
+    # Optional: NuGet restore
+    if restore:
+        from devbase.utils.nuget import nuget_restore, is_dotnet_project
+        if is_dotnet_project(dest_path):
+            console.print()
+            nuget_restore(dest_path)
+        else:
+            console.print("[dim]--restore specified but no .NET project detected. Skipping.[/dim]")
+
+    # Generate VS Code workspace
+    try:
+        from devbase.utils.vscode import generate_vscode_workspace
+        generate_vscode_workspace(dest_path, dest_path.name)
+    except Exception as e:
+        console.print(f"[yellow]⚠ Failed to generate workspace: {e}[/yellow]")
+
+
+@app.command(name="open")
+def open_project(
+    ctx: typer.Context,
+    project_name: Annotated[str, typer.Argument(help="Project name to open in VS Code")],
+) -> None:
+    """
+    💻 Open a project in VS Code.
+    
+    Opens the project's .code-workspace file or folder in VS Code.
+    
+    Examples:
+        devbase dev open MedSempreMVC_GIT
+    """
+    from devbase.utils.vscode import open_in_vscode
+
+    root: Path = ctx.obj["root"]
+    project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
+    
+    # Also check worktrees
+    if not project_path.exists():
+        project_path = root / "20-29_CODE" / "22_worktrees" / project_name
+    
+    if not project_path.exists():
+        console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
+        raise typer.Exit(1)
+    
+    open_in_vscode(project_path)
+
+
+@app.command(name="restore")
+def restore_packages(
+    ctx: typer.Context,
+    project_name: Annotated[str, typer.Argument(help="Project name to restore packages for")],
+    solution: Annotated[
+        str,
+        typer.Option("--solution", "-s", help="Specific .sln file to restore")
+    ] = None,
+) -> None:
+    """
+    📦 Restore NuGet packages for a .NET project.
+    
+    Downloads nuget.exe automatically if needed and runs restore.
+    
+    Examples:
+        devbase dev restore MedSempreMVC_GIT
+        devbase dev restore MyProject --solution MyProject.Web.sln
+    """
+    from devbase.utils.nuget import nuget_restore, is_dotnet_project
+
+    root: Path = ctx.obj["root"]
+    project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
+    
+    # Also check worktrees
+    if not project_path.exists():
+        project_path = root / "20-29_CODE" / "22_worktrees" / project_name
+    
+    if not project_path.exists():
+        console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
+        raise typer.Exit(1)
+    
+    if not is_dotnet_project(project_path):
+        console.print(f"[yellow]⚠ '{project_name}' does not appear to be a .NET project.[/yellow]")
+        console.print("[dim]No .sln or packages.config found.[/dim]")
+        raise typer.Exit(1)
+    
+    success = nuget_restore(project_path, solution)
+    if not success:
+        raise typer.Exit(1)
 
 
 @app.command(name="info")

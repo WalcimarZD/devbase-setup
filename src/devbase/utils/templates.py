@@ -234,6 +234,13 @@ def generate_project_from_template(
     except Exception as e:
         console.print(f"[yellow]⚠ Failed to write metadata: {e}[/yellow]")
 
+    # 7. Generate VS Code workspace
+    try:
+        from devbase.utils.vscode import generate_vscode_workspace
+        generate_vscode_workspace(dest_path, project_name)
+    except Exception as e:
+        console.print(f"[yellow]⚠ Failed to generate workspace: {e}[/yellow]")
+
     return dest_path
 
 def list_available_templates(root: Path) -> List[str]:
