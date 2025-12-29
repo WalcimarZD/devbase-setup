@@ -111,8 +111,42 @@ def run_setup_pkm(fs, policy_version=None):
     run_setup_module(fs, "Knowledge Management", policy_version)
 
 
+import shutil
+
+def copy_built_in_templates(fs, category: str, destination: str):
+    """Copy built-in templates from package to workspace."""
+    # Locate package templates directory associated with this module
+    # core.py is in devbase/commands, templates are in devbase/templates
+    pkg_root = Path(__file__).resolve().parent.parent
+    tmpl_src = pkg_root / "templates" / category
+    
+    if not tmpl_src.exists():
+        return
+
+    # Destination in workspace
+    dest_path = Path(fs.root) / destination
+    
+    # Copy all __template-* directories (and others if needed)
+    for item in tmpl_src.iterdir():
+        if item.name.startswith("__template-") or item.name.endswith(".template"):
+            src = item
+            dst = dest_path / item.name
+            
+            if src.is_dir():
+                # Recursive copy
+                if dst.exists():
+                    # Check if we should overwrite? Hydrate usually implies safe updates or force
+                    # For now, let's use dirs_exist_ok=True
+                    shutil.copytree(src, dst, dirs_exist_ok=True)
+                else:
+                    shutil.copytree(src, dst)
+            else:
+                shutil.copy2(src, dst)
+
 def run_setup_code(fs, policy_version=None):
     run_setup_module(fs, "Code Templates", policy_version)
+    copy_built_in_templates(fs, "code", "20-29_CODE")
+
 
 
 def run_setup_ai(fs, policy_version=None):
@@ -351,6 +385,21 @@ def doctor(
             )
     else:
         console.print("  [yellow]⚠[/yellow] State file not found")
+
+    # Check Templates
+    console.print("\n[bold]Checking templates...[/bold]")
+    templates_dir = root / "20-29_CODE"
+    clean_arch = templates_dir / "__template-clean-arch"
+    
+    if clean_arch.exists():
+        console.print("  [green]✓[/green] Code templates installed")
+    else:
+        console.print("  [red]✗[/red] Templates missing in 20-29_CODE")
+        add_issue(
+            "Missing default code templates",
+            fix_action=lambda: run_setup_code(get_filesystem(str(root), dry_run=False)),
+            fix_description="Hydrate code templates"
+        )
 
     # Run security checks
     from devbase.commands.security_check import run_security_checks
