@@ -14,7 +14,7 @@ import typer
 from rich.console import Console
 from typing_extensions import Annotated
 
-from devbase.commands import core, development, navigation, operations, quick, pkm, study, analytics, ai
+from devbase.commands import core, development, navigation, operations, quick, docs, pkm, study, analytics, ai
 from devbase.utils.workspace import detect_workspace_root
 
 # Initialize Typer app with rich help
@@ -63,6 +63,12 @@ app.add_typer(
     quick.app,
     name="quick",
     help="⚡ One-command shortcuts",
+    rich_help_panel="🟡 Daily Workflow",
+)
+app.add_typer(
+    docs.app,
+    name="docs",
+    help="📚 Generate documentation",
     rich_help_panel="🟡 Daily Workflow",
 )
 

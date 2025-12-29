@@ -19,6 +19,7 @@
 - **AI-Powered Organization**: Let `devbase ai` handle your file sorting and structure optimization.
 - **Instant Project Scaffolding**: Generate production-ready Clean Architecture boilerplate in seconds.
 - **Knowledge Graph**: Integrated Personal Knowledge Management (PKM) with backlinking.
+- **Documentation Engine**: Standardized ADRs, Guides, and Specs via `devbase docs`.
 - **Context-Aware Analytics**: Track your "Flow State" and generate weekly summaries automatically.
 
 ## 🚀 Installation
@@ -78,6 +79,7 @@ DevBase v5.0.0 replaces all legacy PowerShell scripts with standard CLI subcomma
 | `devbase.py new ...` | `devbase dev new ...` | Faster templating, `copier` integration |
 | `devbase.py track` | `devbase ops track` | Context-aware, lower latency |
 | `devbase.py stats` | `devbase ops stats` | DuckDB-powered analytics |
+| *(New in v5)* | `devbase docs new` | **Standardized documentation generator** |
 
 > **Upgrading?** See [MIGRATION.md](MIGRATION.md) for a complete guide on moving from v4.
 
