@@ -287,8 +287,13 @@ def _summarize_day_handler(payload: str) -> str:
         # Locate template
         template_path = Path("src/devbase/templates/pkm/12_private_vault/journal/template-daybook.md.template")
         if not template_path.exists():
+<<<<<<< HEAD
             # Try relative to module if installed as package
             template_path = Path(__file__).parents[2] / "templates" / "pkm" / "12_private_vault" / "journal" / "template-daybook.md.template"
+=======
+             # Try relative to module if installed as package
+             template_path = Path(__file__).parents[2] / "templates" / "pkm" / "12_private_vault" / "journal" / "template-daybook.md.template"
+>>>>>>> origin/main
 
         if not template_path.exists():
             return json.dumps({"error": "Template not found"})
@@ -313,7 +318,11 @@ def _summarize_day_handler(payload: str) -> str:
                 final_lines.append(summary.focus)
                 # Skip placeholder list items
                 while i + 1 < len(lines) and lines[i+1].strip().startswith("- [ ] ["):
+<<<<<<< HEAD
                     i += 1
+=======
+                     i += 1
+>>>>>>> origin/main
 
             elif "## 📝 Log de Trabalho" in line:
                 final_lines.append(line)
@@ -321,7 +330,11 @@ def _summarize_day_handler(payload: str) -> str:
                 final_lines.append(summary.log_narrative)
                 # Skip placeholder sections
                 while i + 1 < len(lines) and (lines[i+1].strip().startswith("###") or "[Atividade]" in lines[i+1] or "[Notas" in lines[i+1]):
+<<<<<<< HEAD
                     i += 1
+=======
+                     i += 1
+>>>>>>> origin/main
 
             elif "## 📊 Métricas" in line:
                 final_lines.append(line)
@@ -331,7 +344,11 @@ def _summarize_day_handler(payload: str) -> str:
                 final_lines.append(f"- Issues fechadas: {summary.metrics.get('issues', 0)}")
                 # Skip placeholder metrics
                 while i + 1 < len(lines) and lines[i+1].strip().startswith("- "):
+<<<<<<< HEAD
                     i += 1
+=======
+                     i += 1
+>>>>>>> origin/main
             else:
                 final_lines.append(line)
 
@@ -378,7 +395,11 @@ def get_worker(db_path: Path | None = None) -> AIWorker:
         _worker.register_handler("summarize", _default_summarize_handler)
         _worker.register_handler("synthesize", _default_synthesize_handler)
         _worker.register_handler("summarize_day", _summarize_day_handler)
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> origin/main
     return _worker
 
 

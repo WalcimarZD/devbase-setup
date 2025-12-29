@@ -16,9 +16,18 @@ from __future__ import annotations
 
 import logging
 import re
+<<<<<<< HEAD
 from dataclasses import dataclass
 from pathlib import Path
 
+=======
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, List, Generator
+
+import numpy as np
+>>>>>>> origin/main
 from fastembed import TextEmbedding
 
 from devbase.adapters.storage.duckdb_adapter import get_connection
@@ -49,7 +58,11 @@ class MarkdownSplitter:
     def __init__(self, max_words: int = 500):
         self.max_words = max_words
 
+<<<<<<< HEAD
     def split(self, text: str) -> list[str]:
+=======
+    def split(self, text: str) -> List[str]:
+>>>>>>> origin/main
         """Split text into chunks."""
         # Simple header-based splitting for now
         # Regex matches headers like "# Title" or "## Subtitle"
@@ -110,7 +123,11 @@ class SearchEngine:
             self._embedding_model = TextEmbedding(model_name=self.model_name)
         return self._embedding_model
 
+<<<<<<< HEAD
     def generate_embedding(self, text: str) -> list[float]:
+=======
+    def generate_embedding(self, text: str) -> List[float]:
+>>>>>>> origin/main
         """Generate embedding vector for text."""
         # FastEmbed returns a generator of iterables (numpy arrays)
         embeddings = list(self.embedding_model.embed([text]))
@@ -196,7 +213,11 @@ class SearchEngine:
 
         logger.debug(f"Indexed {rel_path} ({len(chunks)} chunks)")
 
+<<<<<<< HEAD
     def search(self, query: str, limit: int = 5) -> list[SearchResult]:
+=======
+    def search(self, query: str, limit: int = 5) -> List[SearchResult]:
+>>>>>>> origin/main
         """
         Perform hybrid search (Vector + Keyword).
 
@@ -243,6 +264,7 @@ class SearchEngine:
         # We query hot_fts and cold_fts for keywords
         # Note: FTS usually returns whole files, so we treat the 'content' as a large chunk.
         # Ideally, we would map back to chunks, but for now we mix file-level FTS results.
+<<<<<<< HEAD
 
         # Whitelist allowed tables to prevent SQL injection
         ALLOWED_FTS_TABLES = ["hot_fts", "cold_fts"]
@@ -251,6 +273,12 @@ class SearchEngine:
             try:
                 # Use parameterized query with validated table name
                 # Note: query is passed as parameter to match_bm25, not interpolated
+=======
+        sanitized_query = query.replace("'", "''")  # Basic SQL escape
+        for table in ["hot_fts", "cold_fts"]:
+            try:
+                # Simple MATCH query
+>>>>>>> origin/main
                 rows = conn.execute(
                     f"""
                     SELECT file_path, content, score
@@ -262,7 +290,11 @@ class SearchEngine:
                     ORDER BY score DESC
                     LIMIT ?
                     """,
+<<<<<<< HEAD
                     [query, limit]
+=======
+                    [sanitized_query, limit]
+>>>>>>> origin/main
                 ).fetchall()
 
                 for row in rows:

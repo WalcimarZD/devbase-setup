@@ -12,7 +12,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 
-import pytest
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -336,6 +335,13 @@ def run_smoke_tests(report: DebugReport):
 def run_unit_tests(report: DebugReport):
     """Run pytest and capture output."""
     report.log("Running Unit Tests (pytest)...")
+
+    try:
+        import pytest
+    except ImportError:
+        report.log("pytest not found. Skipping unit tests.", level="WARNING")
+        report.set_unit_test_result(-1, "pytest not installed. Install dev dependencies to run unit tests.")
+        return
 
     # Capture stdout/stderr
     capture = io.StringIO()

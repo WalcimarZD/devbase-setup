@@ -14,6 +14,10 @@ Version: 5.1.0
 from __future__ import annotations
 
 import atexit
+<<<<<<< HEAD
+=======
+import logging
+>>>>>>> origin/main
 import signal
 import sys
 from pathlib import Path
@@ -25,6 +29,10 @@ if TYPE_CHECKING:
 # Module-level singleton for connection reuse
 _connection: duckdb.DuckDBPyConnection | None = None
 _db_path: Path | None = None
+SCHEMA_VERSION = '5.1'
+
+# Logger for debugging schema initialization issues
+logger = logging.getLogger(__name__)
 
 
 def get_db_path() -> Path:
@@ -140,6 +148,23 @@ def init_schema(conn: duckdb.DuckDBPyConnection) -> None:
     Note: JD validation is done at runtime in Python, not SQL constraints,
     because DuckDB doesn't support SQLite's GLOB syntax.
     """
+    import duckdb
+
+    # Optimization: Early return if schema is already up to date
+    # This prevents running multiple "CREATE TABLE IF NOT EXISTS" on every CLI execution
+    try:
+        current_ver = conn.execute("SELECT version FROM schema_version").fetchone()
+        if current_ver and current_ver[0] == SCHEMA_VERSION:
+            return
+    except (duckdb.CatalogException, duckdb.ProgrammingError):
+        # Table doesn't exist, proceed with full init
+        pass
+    except Exception as e:
+        # Log unexpected errors to aid debugging, then proceed with full init
+        logger.warning(f"Unexpected error checking schema version: {e}")
+        pass
+
+
     # Schema version table (must exist first for migration checks)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS schema_version (
@@ -194,16 +219,25 @@ def init_schema(conn: duckdb.DuckDBPyConnection) -> None:
         try:
             conn.execute("PRAGMA create_fts_index('hot_fts', 'file_path', 'content', 'title', 'tags');")
         except Exception:
+<<<<<<< HEAD
             # Index creation is best-effort: ignore errors (e.g., index already exists or FTS behavior differs by version).
+=======
+>>>>>>> origin/main
             pass
 
         try:
             conn.execute("PRAGMA create_fts_index('cold_fts', 'file_path', 'content', 'title', 'tags');")
         except Exception:
+<<<<<<< HEAD
             # Same rationale as above: failures here are non-fatal and depend on DuckDB/FTS capabilities.
             pass
     except Exception:
         # FTS might not be available in some environments; continue without FTS support.
+=======
+            pass
+    except Exception:
+        # FTS might not be available in some environments
+>>>>>>> origin/main
         pass
 
     # Embeddings Tables (Hot/Cold Separation)
@@ -262,7 +296,7 @@ def init_schema(conn: duckdb.DuckDBPyConnection) -> None:
     # Insert initial schema version if not exists
     result = conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()
     if result and result[0] == 0:
-        conn.execute("INSERT INTO schema_version VALUES ('5.1')")
+        conn.execute("INSERT INTO schema_version VALUES (?)", [SCHEMA_VERSION])
 
 
 def enqueue_ai_task(

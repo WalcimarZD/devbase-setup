@@ -89,22 +89,24 @@ def find_unprotected_secrets(root: Path) -> List[Tuple[Path, str]]:
         # Modify dirs list in-place to prevent os.walk from visiting them
         dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
         
-        # recursive glob pattern
-        # If pattern starts with *, we want to match anywhere. rglob does this for filename matching in subdirs.
-        # But rglob("*pattern") matches "pattern" in any subdirectory.
+        # Scan for sensitive patterns
+        for pattern in SENSITIVE_FILE_PATTERNS:
+            for file in Path(current_root).glob(pattern):
+                if file.is_file():
+                    # Check if explicitly ignored
+                    try:
+                        relative = str(file.relative_to(root)).replace("\\", "/")
+                        is_ignored = any(
+                            git_pat in gitignore_patterns
+                            or relative.startswith(git_pat.rstrip("/"))
+                            for git_pat in gitignore_patterns
+                        )
 
-        for file in root.rglob(pattern):
-            if file.is_file():
-                # Check if explicitly ignored
-                relative = str(file.relative_to(root)).replace("\\", "/")
-                is_ignored = any(
-                    pattern in gitignore_patterns 
-                    or relative.startswith(pattern.rstrip("/"))
-                    for pattern in gitignore_patterns
-                )
-                
-                if not is_ignored:
-                    issues.append((file, f"Unprotected secret file matches pattern: {pattern}"))
+                        if not is_ignored:
+                            issues.append((file, f"Unprotected secret file matches pattern: {pattern}"))
+                    except ValueError:
+                        # Path relative_to can fail if outside root (shouldn't happen with os.walk inside root)
+                        pass
     
     return issues
 

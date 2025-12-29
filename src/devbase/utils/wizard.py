@@ -16,6 +16,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from devbase import __version__
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -327,7 +329,7 @@ def execute_setup_with_config(config: dict) -> None:
     from datetime import datetime
 
     state = state_mgr.get_state()
-    state["version"] = "4.0.0"
+    state["version"] = __version__
     state["policyVersion"] = "4.0"
     state["installedAt"] = datetime.now().isoformat()
     state["lastUpdate"] = state["installedAt"]

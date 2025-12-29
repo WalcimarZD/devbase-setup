@@ -1,6 +1,6 @@
 [project]
 name = "devbase"
-version = "5.1.0-alpha"
+version = "5.1.0-alpha.1"
 description = "DevBase - Personal Engineering Operating System"
 authors = [
     { name = "DevBase Team", email = "devbase@example.com" }
@@ -37,8 +37,11 @@ dependencies = [
     "duckdb>=0.10.0",
     "groq>=1.0.0",
     "fastembed>=0.7.4",
+<<<<<<< HEAD
     # Git operations
     "GitPython>=3.1.0",
+=======
+>>>>>>> origin/main
 ]
 
 [project.optional-dependencies]
