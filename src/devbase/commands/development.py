@@ -138,6 +138,60 @@ def new(
         raise typer.Exit(1)
 
 
+@app.command(name="list")
+def list_projects(
+    ctx: typer.Context,
+) -> None:
+    """
+    📂 List all projects.
+    
+    scans 20-29_CODE/21_monorepo_apps and displays a table of projects.
+    """
+    from datetime import datetime
+    from rich.table import Table
+    from devbase.utils.telemetry import get_telemetry
+
+    root: Path = ctx.obj["root"]
+    telemetry = get_telemetry(root)
+    
+    projects_dir = root / "20-29_CODE" / "21_monorepo_apps"
+    
+    console.print()
+    console.print("[bold]Project List[/bold]")
+    console.print(f"[dim]Location: {projects_dir}[/dim]\n")
+
+    if not projects_dir.exists():
+        console.print("[yellow]⚠ Projects folder not found.[/yellow]")
+        return
+        
+    projects = [p for p in projects_dir.iterdir() if p.is_dir()]
+    
+    if not projects:
+        console.print("[dim]No projects found.[/dim]")
+        console.print("\nCreate one with:\n  [cyan]devbase dev new <name>[/cyan]")
+        return
+        
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Name", style="cyan")
+    table.add_column("Last Modified", justify="right")
+    table.add_column("Type", justify="center")
+    
+    for p in sorted(projects, key=lambda x: x.name):
+        # Determine type
+        is_copier = (p / ".copier-answers.yml").exists() or (p / ".copier-answers.yaml").exists()
+        p_type = "[blue]Copier[/blue]" if is_copier else "[dim]Custom[/dim]"
+        
+        # Modified time
+        mtime = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+        
+        table.add_row(p.name, mtime, p_type)
+        
+    console.print(table)
+    console.print(f"\n[dim]Total: {len(projects)} projects[/dim]")
+    
+    telemetry.track("Listed projects", category="discovery", action="list_projects")
+
+
 @app.command()
 def archive(
     ctx: typer.Context,
