@@ -461,16 +461,20 @@ def list_projects(
         # Read governance from .devbase.json
         meta_file = p / ".devbase.json"
         governance = "full"
+        template = None
         
         if meta_file.exists():
             try:
                 meta = json.loads(meta_file.read_text(encoding="utf-8"))
                 governance = meta.get("governance", "full")
+                template = meta.get("template")
             except:
                 pass
         
         # Determine badge style
-        if governance == "external":
+        if template == "worktree":
+            gov_badge = "[magenta]Worktree[/magenta]"
+        elif governance == "external":
             gov_badge = "[yellow]External[/yellow]"
         elif governance == "partial":
             gov_badge = "[blue]Partial[/blue]"
@@ -481,6 +485,15 @@ def list_projects(
         mtime = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
         
         table.add_row(p.name, mtime, gov_badge)
+    
+    # Also list worktrees from 22_worktrees
+    worktrees_dir = root / "20-29_CODE" / "22_worktrees"
+    if worktrees_dir.exists():
+        for wt in sorted(worktrees_dir.iterdir(), key=lambda x: x.name):
+            if wt.is_dir():
+                mtime = datetime.fromtimestamp(wt.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+                table.add_row(wt.name, mtime, "[magenta]Worktree[/magenta]")
+                projects.append(wt)
         
     console.print(table)
     console.print(f"\n[dim]Total: {len(projects)} projects[/dim]")
@@ -889,3 +902,153 @@ def audit(
                     console.print(f"  [green]✓[/green] Renamed: {v['name']} → {v['suggestion']}")
                 except Exception as e:
                     console.print(f"  [red]✗[/red] Failed: {v['name']} - {e}")
+
+
+# ============================================================================
+# WORKTREE COMMANDS
+# ============================================================================
+
+@app.command(name="worktree-add")
+def worktree_add(
+    ctx: typer.Context,
+    project_name: Annotated[str, typer.Argument(help="Parent project name")],
+    branch: Annotated[str, typer.Argument(help="Branch name to checkout")],
+    create: Annotated[
+        bool,
+        typer.Option("--create", "-c", help="Create new branch")
+    ] = False,
+) -> None:
+    """
+    🌳 Create a new worktree for a project.
+    
+    Creates a worktree in 22_worktrees/<project>--<branch>.
+    
+    Examples:
+        devbase dev worktree-add MedSempreMVC_GIT feature/nova-rotina
+        devbase dev worktree-add MyProject feature/xyz --create
+    """
+    from devbase.utils.worktree import add_worktree, get_worktree_dir
+    from devbase.utils.vscode import generate_vscode_workspace
+
+    root: Path = ctx.obj["root"]
+    project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
+    
+    if not project_path.exists():
+        console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
+        raise typer.Exit(1)
+    
+    if not (project_path / ".git").exists():
+        console.print(f"[red]✗ Project '{project_name}' is not a git repository.[/red]")
+        raise typer.Exit(1)
+    
+    worktrees_dir = get_worktree_dir(root)
+    worktree_path = add_worktree(project_path, worktrees_dir, project_name, branch, create)
+    
+    if worktree_path:
+        # Generate workspace file
+        generate_vscode_workspace(worktree_path, worktree_path.name)
+        
+        console.print(Panel(
+            f"[bold green]✅ Worktree created![/bold green]\n\n"
+            f"Location: [cyan]{worktree_path}[/cyan]\n"
+            f"Branch: [yellow]{branch}[/yellow]\n\n"
+            f"Open with: [dim]devbase dev open {worktree_path.name}[/dim]",
+            border_style="green"
+        ))
+
+
+@app.command(name="worktree-list")
+def worktree_list(
+    ctx: typer.Context,
+    project_name: Annotated[str, typer.Argument(help="Project name to list worktrees for")] = None,
+) -> None:
+    """
+    🌳 List worktrees for a project or all projects.
+    
+    Examples:
+        devbase dev worktree-list
+        devbase dev worktree-list MedSempreMVC_GIT
+    """
+    from rich.table import Table
+    from devbase.utils.worktree import list_worktrees
+
+    root: Path = ctx.obj["root"]
+    apps_dir = root / "20-29_CODE" / "21_monorepo_apps"
+    
+    if project_name:
+        projects = [apps_dir / project_name]
+        if not projects[0].exists():
+            console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
+            raise typer.Exit(1)
+    else:
+        projects = [p for p in apps_dir.iterdir() if p.is_dir() and (p / ".git").exists()]
+    
+    table = Table(title="Git Worktrees", show_header=True, header_style="bold magenta")
+    table.add_column("Project", style="cyan")
+    table.add_column("Branch", style="yellow")
+    table.add_column("Path")
+    table.add_column("Commit", style="dim")
+    
+    total = 0
+    for project in sorted(projects, key=lambda x: x.name):
+        worktrees = list_worktrees(project)
+        for wt in worktrees:
+            # Skip main worktree (it's the project itself)
+            if Path(wt["path"]) == project:
+                continue
+            table.add_row(
+                project.name,
+                wt.get("branch", "(detached)"),
+                Path(wt["path"]).name,
+                wt.get("commit", "")
+            )
+            total += 1
+    
+    if total == 0:
+        console.print("[dim]No worktrees found.[/dim]")
+        console.print("\nCreate one with:\n  [cyan]devbase dev worktree-add <project> <branch>[/cyan]")
+    else:
+        console.print(table)
+        console.print(f"\n[dim]Total: {total} worktrees[/dim]")
+
+
+@app.command(name="worktree-remove")
+def worktree_remove(
+    ctx: typer.Context,
+    worktree_name: Annotated[str, typer.Argument(help="Worktree name (from 22_worktrees/)")],
+    force: Annotated[
+        bool,
+        typer.Option("--force", "-f", help="Force removal even with uncommitted changes")
+    ] = False,
+) -> None:
+    """
+    🌳 Remove a worktree.
+    
+    Examples:
+        devbase dev worktree-remove MedSempreMVC_GIT--feature-xyz
+        devbase dev worktree-remove MyProject--hotfix --force
+    """
+    from devbase.utils.worktree import remove_worktree, get_worktree_dir
+
+    root: Path = ctx.obj["root"]
+    worktrees_dir = get_worktree_dir(root)
+    worktree_path = worktrees_dir / worktree_name
+    
+    if not worktree_path.exists():
+        console.print(f"[red]✗ Worktree '{worktree_name}' not found.[/red]")
+        raise typer.Exit(1)
+    
+    # Extract parent project name
+    project_name = worktree_name.split("--")[0]
+    project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
+    
+    if not project_path.exists():
+        console.print(f"[yellow]⚠ Parent project '{project_name}' not found. Removing directory only.[/yellow]")
+        import shutil
+        shutil.rmtree(worktree_path)
+        console.print(f"[green]✓[/green] Removed worktree directory: {worktree_name}")
+        return
+    
+    success = remove_worktree(project_path, worktree_path, force)
+    if not success:
+        raise typer.Exit(1)

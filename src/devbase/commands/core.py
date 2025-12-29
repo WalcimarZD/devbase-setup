@@ -46,7 +46,8 @@ FOLDER_STRUCTURE = {
     ],
     "Code Templates": [
         "20-29_CODE/21_monorepo_apps",
-        "20-29_CODE/22_playground",
+        "20-29_CODE/22_worktrees",
+        "20-29_CODE/23_playground",
     ],
     "AI Integration": [
         "00-09_SYSTEM/05_templates",
@@ -421,6 +422,36 @@ def doctor(
 
             if not issues_found:
                  console.print(f"  [green]✓[/green] {proj.name}")
+
+    # Check Worktrees for stale branches
+    console.print("\n[bold]Checking Worktrees health...[/bold]")
+    worktrees_dir = root / "20-29_CODE" / "22_worktrees"
+    if worktrees_dir.exists():
+        worktrees = [w for w in worktrees_dir.iterdir() if w.is_dir()]
+        if worktrees:
+            console.print(f"  Found {len(worktrees)} worktrees.")
+            
+            for wt in worktrees:
+                # Check if worktree has uncommitted changes
+                import subprocess
+                try:
+                    result = subprocess.run(
+                        ["git", "status", "--porcelain"],
+                        cwd=str(wt),
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if result.stdout.strip():
+                        console.print(f"  [yellow]⚠[/yellow] {wt.name}: Uncommitted changes")
+                    else:
+                        console.print(f"  [green]✓[/green] {wt.name}")
+                except:
+                    console.print(f"  [dim]?[/dim] {wt.name}: Could not check status")
+        else:
+            console.print("  [dim]No worktrees found.[/dim]")
+    else:
+        console.print("  [dim]No worktrees directory.[/dim]")
 
     # === FIX-IT FLOW ===
     console.print()
