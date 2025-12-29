@@ -356,6 +356,10 @@ def info_project(
     root: Path = ctx.obj["root"]
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
 
+    # Also check worktrees
+    if not project_path.exists():
+        project_path = root / "20-29_CODE" / "22_worktrees" / project_name
+
     if not project_path.exists():
         console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
         raise typer.Exit(1)
