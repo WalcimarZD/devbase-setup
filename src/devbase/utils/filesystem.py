@@ -6,10 +6,11 @@ Minimal filesystem operations using pathlib directly.
 Replaces the over-engineered adapter layer with direct pathlib usage.
 Maintains the same interface for compatibility.
 """
+import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Union
+from typing import Union, Generator, Optional, Set
 
 
 class FileSystem:
@@ -140,3 +141,45 @@ class FileSystem:
 def get_filesystem(root_path: str, dry_run: bool = False) -> FileSystem:
     """Factory function for FileSystem."""
     return FileSystem(root_path, dry_run)
+
+
+def scan_directory(
+    root: Path,
+    extensions: Optional[Set[str]] = None,
+    ignored_dirs: Optional[Set[str]] = None
+) -> Generator[Path, None, None]:
+    """
+    Efficiently scan directory using os.walk with pruning.
+
+    Args:
+        root: Directory to scan
+        extensions: Optional set of file extensions to include (e.g. {'.py', '.md'})
+        ignored_dirs: Optional set of directory names to ignore
+
+    Yields:
+        Path objects for matching files
+    """
+    if ignored_dirs is None:
+        ignored_dirs = {'node_modules', '.git', '.venv', '__pycache__', 'dist', 'build', 'target'}
+
+    # Ensure root exists
+    if not root.exists():
+        return
+
+    for dirpath, dirnames, filenames in os.walk(root):
+        # Prune ignored directories in-place
+        # Also prune hidden directories (starting with .)
+        dirnames[:] = [
+            d for d in dirnames
+            if d not in ignored_dirs and not d.startswith('.')
+        ]
+
+        for f in filenames:
+            if f.startswith('.'):
+                continue
+
+            path = Path(dirpath) / f
+            if extensions and path.suffix not in extensions:
+                continue
+
+            yield path
