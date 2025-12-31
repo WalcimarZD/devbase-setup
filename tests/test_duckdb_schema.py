@@ -26,6 +26,11 @@ class TestDuckDBSchemaOptimization:
             MagicMock(), # CREATE TABLE notes_index
             MagicMock(), # CREATE TABLE hot_fts
             MagicMock(), # CREATE TABLE cold_fts
+            MagicMock(), # INSTALL fts; LOAD fts
+            MagicMock(), # PRAGMA create_fts_index hot
+            MagicMock(), # PRAGMA create_fts_index cold
+            MagicMock(), # CREATE TABLE hot_embeddings
+            MagicMock(), # CREATE TABLE cold_embeddings
             MagicMock(), # CREATE SEQUENCE ai_task_queue_id_seq
             MagicMock(), # CREATE TABLE ai_task_queue
             MagicMock(), # CREATE SEQUENCE events_id_seq

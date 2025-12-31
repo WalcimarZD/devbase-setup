@@ -62,7 +62,7 @@ class KnowledgeGraph:
                     file_path = root / filename
 
                     # Store relative path from workspace root for portability
-                    rel_path = str(file_path.relative_to(self.root))
+                    rel_path = file_path.relative_to(self.root).as_posix()
 
                     # Parse Frontmatter for title/tags
                     try:
@@ -102,7 +102,7 @@ class KnowledgeGraph:
         wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
 
         for file_path in files:
-            source_rel = str(file_path.relative_to(self.root))
+            source_rel = file_path.relative_to(self.root).as_posix()
 
             try:
                 content = file_path.read_text(encoding="utf-8")
@@ -121,7 +121,7 @@ class KnowledgeGraph:
                     # Resolve from current file directory
                     target_path = (file_path.parent / target_link).resolve()
                     if target_path.is_relative_to(self.root):
-                        target_rel = str(target_path.relative_to(self.root))
+                        target_rel = target_path.relative_to(self.root).as_posix()
 
                         # Check if node exists (valid internal link)
                         if self.graph.has_node(target_rel):
@@ -170,7 +170,7 @@ class KnowledgeGraph:
              path_obj = Path(note_path)
              if path_obj.is_absolute():
                  try:
-                    note_path = str(path_obj.relative_to(self.root))
+                    note_path = path_obj.relative_to(self.root).as_posix()
                  except ValueError:
                     pass
 
@@ -185,7 +185,7 @@ class KnowledgeGraph:
              path_obj = Path(note_path)
              if path_obj.is_absolute():
                  try:
-                    note_path = str(path_obj.relative_to(self.root))
+                    note_path = path_obj.relative_to(self.root).as_posix()
                  except ValueError:
                     pass
 
