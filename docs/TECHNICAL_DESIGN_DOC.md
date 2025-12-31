@@ -1,7 +1,7 @@
 # DevBase v5.1 — Technical Design Document (TDD)
 
-**Versão:** 1.2  
-**Data:** 2025-12-26  
+**Versão:** 1.3
+**Data:** 2025-12-28
 **Status:** Em Implementação
 
 ---
@@ -16,7 +16,10 @@
 | **Package Manager** | uv | 10-100x mais rápido que pip |
 | **Database** | DuckDB | OLAP embarcado, SQL nativo, zero-config |
 | **Templating** | Jinja2 + Copier | Flexibilidade + scaffolding robusto |
-| **Search** | Ripgrep (shell) + FTS5 | Velocidade + precisão |
+| **AI (Remote)** | Groq | Inferência LLM ultra-rápida (Llama 3, Mixtral) |
+| **AI (Local)** | FastEmbed | Geração de vetores local e offline |
+| **Knowledge Graph** | NetworkX | Modelagem de grafos e dependências |
+| **Search** | DuckDB FTS | Busca híbrida (Full-Text + Vector) |
 
 ---
 
@@ -45,7 +48,7 @@
 │                     Adapter Layer (I/O)                      │
 │           src/devbase/adapters/ + src/devbase/utils/         │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │Filesystem│ │  DuckDB  │ │ Ripgrep  │ │   Groq   │       │
+│  │Filesystem│ │  DuckDB  │ │VectorStore │ │   Groq   │       │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -62,53 +65,80 @@
 
 ## 3. Modelo de Dados (DuckDB)
 
+O DevBase utiliza tabelas padrão do DuckDB e a extensão `fts` para busca textual, além de tabelas específicas para vetores (embeddings).
+
 ```sql
 -- Índice principal de notas
 CREATE TABLE notes_index (
     file_path TEXT PRIMARY KEY,
     content_hash TEXT NOT NULL,
-    jd_category TEXT CHECK(jd_category GLOB '[0-9][0-9]-[0-9][0-9]_*'),
-    tags TEXT CHECK(json_valid(tags)),
+    jd_category TEXT,
+    tags TEXT,
     maturity TEXT CHECK(maturity IN ('draft', 'review', 'stable', 'deprecated')),
-    mtime_epoch INTEGER NOT NULL
+    mtime_epoch BIGINT NOT NULL
 );
 
--- FTS Hot (últimos 7 dias)
-CREATE VIRTUAL TABLE hot_fts USING fts5(
-    content, file_path UNINDEXED, jd_category UNINDEXED,
-    tokenize='porter'
+-- FTS Hot (Active Knowledge 10-19)
+CREATE TABLE hot_fts (
+    file_path TEXT PRIMARY KEY,
+    title TEXT,
+    content TEXT,
+    tags TEXT,
+    note_type TEXT,
+    mtime_epoch BIGINT
 );
 
--- FTS Cold (arquivo)
-CREATE VIRTUAL TABLE cold_fts USING fts5(
-    content, file_path UNINDEXED, jd_category UNINDEXED,
-    tokenize='porter'
+-- FTS Cold (Archived 90-99)
+CREATE TABLE cold_fts (
+    file_path TEXT PRIMARY KEY,
+    title TEXT,
+    content TEXT,
+    tags TEXT,
+    note_type TEXT,
+    mtime_epoch BIGINT
 );
 
--- View unificada de busca
-CREATE VIEW unified_search AS
-SELECT *, 1 as priority FROM hot_fts WHERE content MATCH ?
-UNION ALL
-SELECT *, 2 as priority FROM cold_fts WHERE content MATCH ?
-ORDER BY priority, rank;
+-- Índices FTS (Criados via PRAGMA)
+-- PRAGMA create_fts_index('hot_fts', 'file_path', 'content', 'title', 'tags');
+-- PRAGMA create_fts_index('cold_fts', 'file_path', 'content', 'title', 'tags');
+
+-- Embeddings (Hot/Cold Separation)
+-- Armazena vetores gerados pelo FastEmbed para busca semântica
+CREATE TABLE hot_embeddings (
+    file_path TEXT,
+    chunk_id INTEGER,
+    content_chunk TEXT,
+    embedding DOUBLE[],
+    mtime_epoch BIGINT,
+    PRIMARY KEY (file_path, chunk_id)
+);
+
+CREATE TABLE cold_embeddings (
+    file_path TEXT,
+    chunk_id INTEGER,
+    content_chunk TEXT,
+    embedding DOUBLE[],
+    mtime_epoch BIGINT,
+    PRIMARY KEY (file_path, chunk_id)
+);
 
 -- Queue de tarefas async (IA)
 CREATE TABLE ai_task_queue (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY DEFAULT nextval('ai_task_queue_id_seq'),
     task_type TEXT CHECK(task_type IN ('classify', 'synthesize', 'summarize')),
     payload TEXT NOT NULL,
     status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'done', 'failed')),
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TIMESTAMP DEFAULT current_timestamp
 );
 
 -- Telemetria local
 CREATE TABLE events (
-    id INTEGER PRIMARY KEY,
-    timestamp TEXT DEFAULT (datetime('now')),
+    id INTEGER PRIMARY KEY DEFAULT nextval('events_id_seq'),
+    timestamp TIMESTAMP DEFAULT current_timestamp,
     event_type TEXT NOT NULL,
     project TEXT,
     message TEXT,
-    metadata TEXT CHECK(json_valid(metadata) OR metadata IS NULL)
+    metadata TEXT
 );
 
 -- Versão do schema
@@ -139,15 +169,26 @@ devbase
 ├── core
 │   ├── setup [--interactive]
 │   ├── doctor [--fix]
-│   └── hydrate [--force]
+│   ├── hydrate [--force]
+│   ├── hydrate-icons
+│   └── debug
 ├── dev
 │   ├── new <name> [--template] [--no-setup]
+│   ├── blueprint <name>
+│   ├── adr-gen
+│   ├── worktree-add <name>
 │   └── audit [--fix]
 ├── ops
 │   ├── track <message> [--type]
 │   ├── stats
 │   ├── weekly [--output]
 │   └── backup
+├── ai
+│   ├── chat
+│   ├── index
+│   ├── classify
+│   ├── summarize
+│   └── routine (briefing, triage)
 ├── nav
 │   └── goto <location>
 ├── pkm

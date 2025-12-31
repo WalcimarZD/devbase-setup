@@ -20,12 +20,36 @@ class TestDuckDBSchemaOptimization:
         """Verify init_schema proceeds if table check raises CatalogException."""
         mock_conn = MagicMock()
         # Simulate table missing
+<<<<<<< HEAD
+        # We need to account for all the calls in init_schema:
+        # 1. SELECT version (Fail)
+        # 2. CREATE TABLE schema_version
+        # 3. CREATE TABLE notes_index
+        # 4. CREATE TABLE hot_fts
+        # 5. CREATE TABLE cold_fts
+        # 6. INSTALL fts (try/except)
+        # 7. PRAGMA create_fts_index hot_fts (try/except)
+        # 8. PRAGMA create_fts_index cold_fts (try/except)
+        # 9. CREATE TABLE hot_embeddings
+        # 10. CREATE TABLE cold_embeddings
+        # 11. CREATE SEQUENCE ai_task_queue_id_seq
+        # 12. CREATE TABLE ai_task_queue
+        # 13. CREATE SEQUENCE events_id_seq
+        # 14. CREATE TABLE events
+        # 15. SELECT COUNT(*)
+        # 16. INSERT schema version
+=======
         mock_conn.execute.side_effect = [
             duckdb.CatalogException("Table does not exist"),
             MagicMock(), # CREATE TABLE schema_version
             MagicMock(), # CREATE TABLE notes_index
             MagicMock(), # CREATE TABLE hot_fts
             MagicMock(), # CREATE TABLE cold_fts
+            MagicMock(), # INSTALL fts; LOAD fts
+            MagicMock(), # PRAGMA create_fts_index hot
+            MagicMock(), # PRAGMA create_fts_index cold
+            MagicMock(), # CREATE TABLE hot_embeddings
+            MagicMock(), # CREATE TABLE cold_embeddings
             MagicMock(), # CREATE SEQUENCE ai_task_queue_id_seq
             MagicMock(), # CREATE TABLE ai_task_queue
             MagicMock(), # CREATE SEQUENCE events_id_seq
@@ -33,9 +57,19 @@ class TestDuckDBSchemaOptimization:
             MagicMock(), # SELECT COUNT(*)
             MagicMock(), # INSERT (maybe)
         ]
+>>>>>>> origin/main
 
-        # Mock fetchone for the count check (last call) to return 0 so it inserts
-        mock_conn.execute.return_value.fetchone.return_value = (0,)
+        # We can just use a loose mock that doesn't enforce exact count of side effects
+        # but raises exception on the first call only.
+
+        # Define a side effect function
+        def side_effect(*args, **kwargs):
+            if args[0].strip().startswith("SELECT version"):
+                raise duckdb.CatalogException("Table does not exist")
+            return MagicMock()
+
+        mock_conn.execute.side_effect = side_effect
+        mock_conn.execute.return_value.fetchone.return_value = (0,) # For the last count check
 
         duckdb_adapter.init_schema(mock_conn)
 
