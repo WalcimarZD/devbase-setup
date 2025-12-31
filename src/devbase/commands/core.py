@@ -3,7 +3,6 @@ Core Commands: setup, doctor, hydrate
 ======================================
 Essential workspace management commands.
 """
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -11,11 +10,12 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 from typing_extensions import Annotated
 
+from devbase.commands.debug import debug_cmd
 from devbase.utils.filesystem import get_filesystem
 from devbase.utils.state import get_state_manager
-from devbase.commands.debug import debug_cmd
 
 app = typer.Typer(help="Core workspace commands")
 console = Console()
@@ -23,6 +23,7 @@ console = Console()
 app.command(name="debug")(debug_cmd)
 
 import importlib.metadata
+
 try:
     SCRIPT_VERSION = importlib.metadata.version("devbase")
 except importlib.metadata.PackageNotFoundError:
@@ -71,7 +72,7 @@ def create_governance_files(fs) -> None:
     """Create default governance files if they don't exist."""
     # .editorconfig
     if not fs.exists(".editorconfig"):
-        fs.write_atomic(".editorconfig", 
+        fs.write_atomic(".editorconfig",
             "root = true\n\n"
             "[*]\n"
             "indent_style = space\n"
@@ -106,7 +107,7 @@ def create_governance_files(fs) -> None:
 def run_setup_core(fs, policy_version=None):
     run_setup_module(fs, "Core Structure", policy_version)
     create_governance_files(fs)
-    
+
     # Create required subfolders
     root = Path(fs.root)
     required_subfolders = [
@@ -122,11 +123,11 @@ def run_setup_core(fs, policy_version=None):
         '30-39_OPERATIONS/31_backups',
         '30-39_OPERATIONS/32_automation',
     ]
-    
+
     for subfolder in required_subfolders:
         folder_path = root / subfolder
         folder_path.mkdir(parents=True, exist_ok=True)
-    
+
     # Deploy subfolder templates from core templates
     copy_built_in_templates(fs, "core/00-09_SYSTEM", "00-09_SYSTEM")
 
@@ -137,22 +138,23 @@ def run_setup_pkm(fs, policy_version=None):
 
 import shutil
 
+
 def copy_built_in_templates(fs, category: str, destination: str):
     """Copy built-in templates from package to workspace."""
     import devbase
     pkg_root = Path(devbase.__file__).parent
     tmpl_src = pkg_root / "templates" / category
-    
+
     if not tmpl_src.exists():
         return
 
     dest_path = Path(fs.root) / destination
-    
+
     for item in tmpl_src.iterdir():
         if item.name.startswith("__template-") or item.name.endswith(".template"):
             src = item
             dst = dest_path / item.name
-            
+
             if src.is_dir():
                 shutil.copytree(src, dst, dirs_exist_ok=True)
             else:
@@ -190,10 +192,10 @@ def setup(
 ) -> None:
     """
     🚀 Initialize or update DevBase workspace structure.
-    
+
     This command creates the complete Johnny.Decimal folder structure,
     governance files, templates, and configuration.
-    
+
     On first run, launches an interactive wizard to guide you through setup.
     """
     root: Path = ctx.obj["root"]
@@ -296,12 +298,12 @@ def doctor(
 ) -> None:
     """
     🏥 Check workspace health and offer fixes.
-    
+
     Verifies workspace integrity and offers to fix issues interactively.
     Use --fix to auto-fix all issues without prompting.
     """
     from rich.prompt import Confirm
-    
+
     root: Path = ctx.obj["root"]
 
     console.print()
@@ -310,7 +312,7 @@ def doctor(
 
     # Collect issues with fix actions
     issues = []
-    
+
     def add_issue(description: str, fix_action=None, fix_description: str = None):
         issues.append({
             "description": description,
@@ -421,8 +423,8 @@ def doctor(
             state = state_mgr.get_state()
             console.print(f"  [green]✓[/green] Version: {state['version']}")
             console.print(f"  [dim]  Installed: {state.get('installedAt', 'Unknown')}[/dim]")
-        except Exception as e:
-            console.print(f"  [red]✗[/red] State file corrupted")
+        except Exception:
+            console.print("  [red]✗[/red] State file corrupted")
             add_issue(
                 "Corrupted state file",
                 fix_action=lambda: state_path.unlink() if state_path.exists() else None,
@@ -435,7 +437,7 @@ def doctor(
     console.print("\n[bold]Checking templates...[/bold]")
     templates_dir = root / "20-29_CODE"
     clean_arch = templates_dir / "__template-clean-arch"
-    
+
     if clean_arch.exists():
         console.print("  [green]✓[/green] Code templates installed")
     else:
@@ -458,7 +460,7 @@ def doctor(
     if apps_dir.exists():
         projects = [p for p in apps_dir.iterdir() if p.is_dir()]
         console.print(f"  Found {len(projects)} projects.")
-        
+
         for proj in projects:
             issues_found = False
             # Check Git
@@ -466,7 +468,7 @@ def doctor(
                 console.print(f"  [red]✗[/red] {proj.name}: Missing .git")
                 issues_found = True
                 add_issue(f"Project {proj.name} not initialized", fix_description="Run 'git init' manually")
-            
+
             # Check Pre-commit (soft check)
             if not (proj / ".pre-commit-config.yaml").exists():
                 # Not necessarily an error, but a warning for governance
@@ -483,7 +485,7 @@ def doctor(
         worktrees = [w for w in worktrees_dir.iterdir() if w.is_dir()]
         if worktrees:
             console.print(f"  Found {len(worktrees)} worktrees.")
-            
+
             for wt in worktrees:
                 # Check if worktree has uncommitted changes
                 import subprocess
@@ -509,20 +511,20 @@ def doctor(
     # === FIX-IT FLOW ===
     console.print()
     console.print("=" * 50)
-    
+
     if not issues:
         console.print("[bold green]✓ DevBase is HEALTHY[/bold green]")
         return
-    
+
     # Report issues
     console.print(f"[bold yellow]Found {len(issues)} issue(s)[/bold yellow]\n")
-    
+
     fixable = [i for i in issues if i["fix_action"]]
-    
+
     if not fixable:
         console.print("[dim]No auto-fixes available. Please fix manually.[/dim]")
         return
-    
+
     # Interactive fix flow
     if fix:
         # Auto-fix mode
@@ -537,18 +539,34 @@ def doctor(
     else:
         # Interactive mode
         console.print(f"[bold]{len(fixable)} issue(s) can be auto-fixed:[/bold]\n")
+
+        table = Table(show_header=True, header_style="bold magenta", box=None)
+        table.add_column("#", style="dim", width=4)
+        table.add_column("Issue Detected", style="bold red")
+        table.add_column("Proposed Fix", style="green")
+
         for i, issue in enumerate(fixable, 1):
-            console.print(f"  {i}. {issue['description']}")
-            console.print(f"     [dim]→ {issue['fix_description']}[/dim]")
-        
+            table.add_row(str(i), issue['description'], issue['fix_description'])
+
+        console.print(table)
         console.print()
-        if Confirm.ask("[bold]Fix all issues now?[/bold]"):
-            for issue in fixable:
-                try:
-                    issue["fix_action"]()
-                    console.print(f"  [green]✓[/green] {issue['fix_description']}")
-                except Exception as e:
-                    console.print(f"  [red]✗[/red] Failed: {e}")
+
+        if Confirm.ask("[bold]Do you want to apply these fixes now?[/bold]"):
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                task = progress.add_task("Applying fixes...", total=len(fixable))
+
+                for issue in fixable:
+                    try:
+                        issue["fix_action"]()
+                        progress.console.print(f"  [green]✓[/green] {issue['fix_description']}")
+                    except Exception as e:
+                        progress.console.print(f"  [red]✗[/red] Failed: {e}")
+                    progress.advance(task)
+
             console.print("\n[green]Done![/green]")
         else:
             console.print("\n[dim]Run [cyan]devbase doctor --fix[/cyan] to auto-fix later.[/dim]")
@@ -566,7 +584,7 @@ def hydrate(
 ) -> None:
     """
     💧 Update workspace templates and configurations.
-    
+
     Syncs the latest templates from the DevBase repository
     without affecting your projects or data.
     """
@@ -609,26 +627,26 @@ def hydrate(
 def hydrate_icons_cmd(ctx: typer.Context) -> None:
     """
     🎨 Apply custom icons to Johnny.Decimal folders.
-    
+
     Uses Neo-Glassmorphism style icons from ./devbase/icons/
     to make folder navigation more intuitive.
-    
+
     Requirements:
     - Place icon files (00.ico, 10.ico, etc.) in ~/.devbase/icons/
     - Windows: .ico format
     - macOS: .icns or .png format
     - Linux: .png format
-    
+
     Example:
         devbase core hydrate-icons
     """
     root: Path = ctx.obj["root"]
-    
+
     console.print()
     console.print("[bold]Applying folder icons...[/bold]\n")
-    
-    from devbase.utils.icons import hydrate_icons, get_icon_dir
-    
+
+    from devbase.utils.icons import get_icon_dir, hydrate_icons
+
     icon_dir = get_icon_dir()
     if not icon_dir.exists():
         console.print(f"[yellow]Icon directory not found:[/yellow] [dim]{icon_dir}[/dim]")
@@ -638,9 +656,9 @@ def hydrate_icons_cmd(ctx: typer.Context) -> None:
         console.print("  3. Run this command again")
         console.print("\n[dim]Generate icons using the prompts in Style Guide.[/dim]")
         return
-    
+
     results = hydrate_icons(root)
-    
+
     applied = sum(1 for v in results.values() if v)
     console.print()
     console.print(f"[bold green]✓ Applied {applied}/{len(results)} icons[/bold green]")
