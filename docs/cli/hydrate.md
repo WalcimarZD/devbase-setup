@@ -30,6 +30,18 @@ devbase hydrate --force
 devbase hydrate --dry-run
 ```
 
+### Comandos Relacionados
+
+#### `devbase hydrate-icons`
+
+Aplica ícones personalizados às pastas do sistema Johnny.Decimal (00-99).
+
+```bash
+devbase hydrate-icons
+```
+
+*Requer que os ícones (00.ico, 10.ico, etc.) estejam em `~/.devbase/icons/`.*
+
 ## Módulos Atualizados
 
 O hydrate processa os seguintes módulos:
