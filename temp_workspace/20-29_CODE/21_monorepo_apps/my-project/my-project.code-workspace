@@ -1,0 +1,20 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/bin": true,
+      "**/obj": true,
+      "**/.git": true,
+      "**/node_modules": true,
+      "**/__pycache__": true
+    },
+    "editor.formatOnSave": true
+  },
+  "extensions": {
+    "recommendations": []
+  }
+}
