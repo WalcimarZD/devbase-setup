@@ -26,10 +26,10 @@ def find(
 ) -> None:
     """
     🔍 Fast search across knowledge base (DuckDB-powered).
-    
+
     Searches notes by title, content, tags, and type.
     First run will index all notes (~5 sec for 1000 notes).
-    
+
     Default searches only 'Active Knowledge' (10-19).
     Use --global to also search 'Archived Content' (90-99).
 
@@ -44,53 +44,53 @@ def find(
 
     root: Path = ctx.obj["root"]
     db = KnowledgeDB(root)
-    
+
     # Index if database is empty or reindex requested
     stats = db.get_stats()
     if reindex or stats["total_notes"] == 0:
         console.print("[bold]Indexing knowledge base...[/bold]")
         with console.status("[green]Scanning files..."):
             index_stats = db.index_workspace()
-        
+
         console.print(f"[green]✓[/green] Indexed {index_stats['indexed']} notes")
         if index_stats['errors'] > 0:
             console.print(f"[yellow]⚠[/yellow] {index_stats['errors']} errors")
         console.print()
-    
+
     # Search
     results = db.search(query=query, tags=tag, note_type=note_type, limit=50, global_search=global_search)
-    
+
     # Fallback: if --type returned no results, try searching by tag instead
     if not results and note_type and not tag:
         results = db.search(query=query, tags=[note_type], note_type=None, limit=50, global_search=global_search)
         if results:
             console.print(f"[dim](Searching by tag '{note_type}' instead of type)[/dim]")
-    
+
     if not results:
         console.print("[yellow]No results found[/yellow]")
         db.close()
         return
-    
+
     console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
-    
+
     for result in results:
         console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
         console.print(f"  [dim]{result['path']}[/dim]")
-        
+
         if result['type']:
             console.print(f"  Type: [yellow]{result['type']}[/yellow]", end="")
         if result['word_count']:
             console.print(f"  | Words: {result['word_count']}", end="")
-        
+
         console.print()  # Newline
-        
+
         # Preview
         if result['content_preview']:
             preview = result['content_preview'][:150].replace("\n", " ")
             console.print(f"  [dim]{preview}...[/dim]")
-        
+
         console.print()
-    
+
     db.close()
 
 
@@ -112,13 +112,13 @@ def graph(
 ) -> None:
     """
     📊 Visualize knowledge graph statistics.
-    
+
     Shows network analysis of your knowledge base using NetworkX:
     - Total nodes and connections
     - Hub notes (most connected)
     - Orphan notes (isolated)
     - Connection density
-    
+
     Supports exporting to Graphviz DOT format or interactive HTML (PyVis).
 
     Examples:
@@ -128,47 +128,48 @@ def graph(
         devbase pkm graph --html       # Interactive visualization
     """
     import networkx as nx
+
     from devbase.services.knowledge_graph import KnowledgeGraph
-    
+
     root: Path = ctx.obj["root"]
     kg = KnowledgeGraph(root, include_archive=global_scope)
-    
+
     with console.status("[bold green]Scanning knowledge base..."):
         stats = kg.scan()
-    
+
     # Display stats
-    console.print(f"[bold]Scan Results:[/bold]")
+    console.print("[bold]Scan Results:[/bold]")
     console.print(f"  Files scanned: [cyan]{stats['files']}[/cyan]")
     console.print(f"  Graph nodes: [cyan]{stats['nodes']}[/cyan]")
     console.print(f"  Connections: [cyan]{stats['links']}[/cyan]")
     if stats['errors'] > 0:
         console.print(f"  [yellow]Parse errors: {stats['errors']}[/yellow]")
-    
+
     # Graph metrics
     if kg.graph.number_of_nodes() > 0:
-        console.print(f"\n[bold]Graph Metrics:[/bold]")
+        console.print("\n[bold]Graph Metrics:[/bold]")
         console.print(f"  Connection density: [cyan]{nx.density(kg.graph):.3f}[/cyan]")
-        
+
         # Hub notes
         hubs = kg.get_hub_notes(5)
         if hubs:
-            console.print(f"\n[bold]Most Connected Notes:[/bold]")
+            console.print("\n[bold]Most Connected Notes:[/bold]")
             table = Table(show_header=True)
             table.add_column("Note", style="cyan")
             table.add_column("Links", justify="right", style="green")
-            
+
             for node, degree in hubs:
                 title = kg.graph.nodes[node].get("title", Path(node).stem)
                 table.add_row(title, str(degree))
-            
+
             console.print(table)
-        
+
         # Orphans
         orphans = kg.get_orphan_notes()
         if orphans:
             console.print(f"\n[yellow]⚠️  Found {len(orphans)} orphan note(s)[/yellow]")
             console.print("[dim]Orphans have no links (consider adding connections)[/dim]")
-    
+
     # Export options
     if export:
         output_path = root / "knowledge_graph.dot"
@@ -179,7 +180,7 @@ def graph(
             console.print(f"\n[yellow]⚠️  {str(e)}[/yellow]")
         except Exception as e:
             console.print(f"\n[red]✗[/red] Failed to export graph: {str(e)}")
-    
+
     if html:
         output_path = root / "knowledge_graph.html"
         try:
@@ -198,15 +199,14 @@ def links(
 ) -> None:
     """
     🔗 Show connections for a specific note.
-    
+
     Displays:
     - Outgoing links (notes this file references)
     - Incoming links (backlinks - who references this note)
-    
+
     Example:
         devbase pkm links til/2025-12-22-typer-context.md
     """
-    import networkx as nx
     from devbase.services.knowledge_graph import KnowledgeGraph
 
     root: Path = ctx.obj["root"]
@@ -214,11 +214,11 @@ def links(
 
     with console.status("[bold green]Scanning knowledge base..."):
         kg.scan()
-    
+
     # Get connections
     outlinks = kg.get_outlinks(note)
     backlinks = kg.get_backlinks(note)
-    
+
     # Check if note exists
     # If not found directly, try to find by resolving it same way as get_outlinks does internally
     # But since scan is done, we can just check if it's in the graph or if it's a valid path
@@ -234,9 +234,9 @@ def links(
             console.print(f"  • [cyan]{title}[/cyan] [dim]({target})[/dim]")
     else:
         console.print("[dim]→ No outgoing links[/dim]")
-    
+
     console.print()
-    
+
     # Display incoming
     if backlinks:
         console.print(f"[bold]← Linked by ({len(backlinks)}):[/bold]")
@@ -254,35 +254,36 @@ def index(
 ) -> None:
     """
     📚 Generate index/MOC (Map of Content) for a folder.
-    
+
     Creates _index.md file with:
     - Chronological list of recent notes
     - Grouping by tags
     - Metadata summary
-    
+
     Example:
         devbase pkm index til
     """
-    from datetime import datetime, date
+    from datetime import date, datetime
+
     import frontmatter
 
     root: Path = ctx.obj["root"]
-    
+
     target_dir = root / "10-19_KNOWLEDGE" / "11_public_garden" / folder
-    
+
     if not target_dir.exists():
         console.print(f"[red]✗[/red] Folder not found: {folder}")
         raise typer.Exit(1)
-    
+
     console.print()
     console.print(f"[bold]Indexing:[/bold] [cyan]{folder}[/cyan]\n")
-    
+
     # Collect all markdown files
     notes = []
     for md_file in target_dir.rglob("*.md"):
         if md_file.name.startswith("_"):  # Skip index files
             continue
-        
+
         try:
             post = frontmatter.load(md_file)
             notes.append({
@@ -293,7 +294,7 @@ def index(
             })
         except Exception:
             continue
-    
+
     # Sort by date (newest first) - normalize to datetime for comparison
     def normalize_date(d):
         if d is None:
@@ -301,9 +302,9 @@ def index(
         if isinstance(d, date) and not isinstance(d, datetime):
             return datetime.combine(d, datetime.min.time())
         return d
-    
+
     notes.sort(key=lambda x: normalize_date(x["date"]), reverse=True)
-    
+
     # Generate index content
     index_content = f"""# {folder.upper()} Index
 
@@ -314,16 +315,16 @@ def index(
 ## Recent Notes
 
 """
-    
+
     # Add recent 20
     for note in notes[:20]:
         rel_path = note["path"].relative_to(target_dir)
         date_str = note["date"].strftime("%Y-%m-%d") if note["date"] else "undated"
         index_content += f"- [{date_str}] [{note['title']}]({rel_path})\n"
-    
+
     if len(notes) > 20:
         index_content += f"\n... and {len(notes) - 20} more notes\n"
-    
+
     # Group by tags
     tag_groups = {}
     for note in notes:
@@ -331,16 +332,16 @@ def index(
             if tag not in tag_groups:
                 tag_groups[tag] = []
             tag_groups[tag].append(note)
-    
+
     if tag_groups:
         index_content += "\n## By Tag\n\n"
         for tag, tagged_notes in sorted(tag_groups.items()):
             index_content += f"### #{tag} ({len(tagged_notes)} notes)\n\n"
-    
+
     # Save index
     index_file = target_dir / "_index.md"
     index_file.write_text(index_content, encoding="utf-8")
-    
+
     console.print(f"[green]✓[/green] Index created: [cyan]{index_file}[/cyan]")
     console.print(f"[dim]Indexed {len(notes)} note(s)[/dim]")
 
@@ -349,7 +350,7 @@ def index(
 def new(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument(help="Name of the note (slugified)")],
-    note_type: Annotated[str, typer.Option("--type", "-t", help="Diataxis type (tutorial, how-to, reference, explanation)")],
+    note_type: Annotated[Optional[str], typer.Option("--type", "-t", help="Diataxis type (tutorial, how-to, reference, explanation)")] = None,
 ) -> None:
     """
     📝 Create a new note and queue for AI classification.
@@ -370,9 +371,19 @@ def new(
     """
     import json
     from datetime import datetime
+
     from devbase.adapters.storage import duckdb_adapter
 
     root: Path = ctx.obj["root"]
+
+    from rich.prompt import Prompt
+
+    if note_type is None:
+        note_type = Prompt.ask(
+            "Select note type",
+            choices=["tutorial", "how-to", "reference", "explanation", "daily", "meeting"],
+            default="reference"
+        )
 
     # Simple slugify
     slug = name.lower().replace(" ", "-")
