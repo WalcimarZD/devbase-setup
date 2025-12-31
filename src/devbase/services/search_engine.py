@@ -27,6 +27,7 @@ from fastembed import TextEmbedding
 from devbase.adapters.storage.duckdb_adapter import get_connection
 from devbase.config.taxonomy import get_jd_area_for_path
 from devbase.services.security.sanitizer import sanitize_context
+from devbase.utils.filesystem import scan_directory
 
 logger = logging.getLogger("devbase.search_engine")
 
@@ -307,18 +308,17 @@ class SearchEngine:
             workspace_root / "90-99_ARCHIVE_COLD"
         ]
 
+        extensions = {'.md', '.txt', '.py', '.rs', '.js', '.ts', '.go'}
         count = 0
+
         for target in targets:
             if not target.exists():
                 continue
 
-            for path in target.rglob("*"):
-                if path.is_file() and path.suffix in {'.md', '.txt', '.py', '.rs', '.js', '.ts', '.go'}:
-                    # Skip hidden files
-                    if any(p.startswith('.') for p in path.parts):
-                        continue
-
-                    self.index_file(path, force=True)
-                    count += 1
+            # Optimization: Use os.walk with pruning via scan_directory
+            # This avoids scanning massive directories like node_modules
+            for path in scan_directory(target, extensions=extensions):
+                self.index_file(path, force=True)
+                count += 1
 
         logger.info(f"Rebuild complete. Indexed {count} files.")

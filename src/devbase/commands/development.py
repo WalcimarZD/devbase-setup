@@ -190,7 +190,7 @@ def import_project(
         
         try:
             result = subprocess.run(
-                ["git", "clone", source, str(dest_path)],
+                ["git", "clone", "--", source, str(dest_path)],
                 capture_output=True,
                 text=True,
                 timeout=120
