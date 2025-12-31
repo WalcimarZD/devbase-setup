@@ -36,6 +36,31 @@ devbase ai chat "Suggest a project name" --temperature 1.0
 - `--model, -m`: Model to use (default: llama-3.1-8b-instant)
 - `--temperature, -t`: Creativity level 0.0-2.0 (default: 0.7)
 
+ ### `devbase ai index`
+
+ 🔍 Index knowledge base for vector search (RAG).
+
+ ```bash
+ devbase ai index
+ ```
+
+ Updates the local embeddings database for files in `10-19_KNOWLEDGE`.
+
+ ### `devbase ai routine`
+
+ 🌅 Daily AI-powered routines.
+
+ **Subcommands:**
+
+ *   `briefing`: Generates a morning briefing based on yesterday's journal and pending tasks.
+     ```bash
+     devbase ai routine briefing
+     ```
+ *   `triage`: Categorizes files in the Inbox (`00_inbox`) and suggests moving them to appropriate folders.
+     ```bash
+     devbase ai routine triage
+     ```
+
 ### `devbase ai classify`
 
 🏷️ Classify text into one of your categories.
