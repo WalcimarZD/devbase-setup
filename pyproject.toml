@@ -1,9 +1,9 @@
 [project]
 name = "devbase"
 version = "5.1.0-alpha.3"
-description = "DevBase - Personal Engineering Operating System"
+description = "The Definitive Engineering Operating System (EOS) for High-Performance Python Development. Enforces Johnny.Decimal file structure, automates environments with 'uv', and provides AI-driven workflows for 10x productivity."
 authors = [
-    { name = "DevBase Team", email = "devbase@example.com" }
+    { name = "Walcimar Zanque Denadai", email = "walcimarzd@gmail.com" }
 ]
 readme = "README.md"
 requires-python = ">=3.10"

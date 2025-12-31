@@ -1,0 +1,18 @@
+{
+  "template": "imported",
+  "governance": "internal",
+  "source": "https://github.com/WalcimarZD/devbase-setup.git",
+  "imported_at": "2025-12-29T03:04:46.879015",
+  "devbase_version": "5.1.0a3",
+  "author": "Walcimar Zanque Denadai",
+  "description": "The Definitive Engineering Operating System (EOS) for High-Performance Python Development. Enforces Johnny.Decimal file structure, automates environments with 'uv', and provides AI-driven workflows for 10x productivity.",
+  "language": "python",
+  "framework": "python-typer-rich",
+  "tags": [
+    "cli",
+    "productivity",
+    "devops",
+    "johnny-decimal",
+    "ai-assisted"
+  ]
+}

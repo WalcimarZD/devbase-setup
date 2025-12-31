@@ -249,6 +249,37 @@ Narrative:"""
             logger.error(f"Error reading journal: {e}")
             return [f"Error reading journal: {e}"]
 
+    def _scan_categories(self) -> list[str]:
+        """
+        Scan workspace for available JD categories (Level 2).
+        
+        Returns:
+            List of paths relative to root (e.g., "10-19_KNOWLEDGE/10_docs")
+        """
+        categories = []
+        areas = list_areas()
+        
+        for area in areas:
+            area_path = self.root_path / area.full
+            if not area_path.exists():
+                categories.append(area.full)  # Fallback to area root
+                continue
+                
+            # Scan for numeric categories inside area (e.g., 10_docs)
+            subdirs = [
+                d for d in area_path.iterdir() 
+                if d.is_dir() and d.name[0:2].isdigit() and "_" in d.name
+            ]
+            
+            if subdirs:
+                for d in subdirs:
+                    # Append relative path parts joined by /
+                    categories.append(f"{area.full}/{d.name}")
+            else:
+                categories.append(area.full)
+                
+        return categories
+
     def classify_inbox_item(self, content: str) -> dict[str, str]:
         """
         Classify a text item using JD taxonomy.
@@ -259,9 +290,8 @@ Narrative:"""
         Returns:
             Dict with 'category', 'reasoning'
         """
-        # Get valid categories from taxonomy
-        # We use the full names (e.g., "10-19_KNOWLEDGE") as targets
-        categories = [c.full for c in list_areas()]
+        # Get valid categories (Areas + Subcategories) for deeper precision
+        categories = self._scan_categories()
 
         # Sanitize
         sanitized = sanitize_context(content)
