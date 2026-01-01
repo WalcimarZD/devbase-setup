@@ -12,12 +12,16 @@ devbase core debug [options]
 
 ## Funcionalidades
 
-O comando `debug`:
-1.  Verifica o ambiente de execução (Python, OS, Variáveis).
-2.  Executa um "Smoke Test" criando um projeto temporário em sandbox.
-3.  Verifica a integridade dos módulos internos.
-4.  Testa a conexão com o banco de dados (DuckDB).
-5.  Gera um relatório Markdown com os resultados.
+O comando `debug` executa um diagnóstico abrangente em 3 etapas:
+
+1.  **Sanity Checks**: Verifica se todos os grupos de comandos (`core`, `dev`, `pkm`, etc.) carregam corretamente e exibem o help.
+2.  **Smoke Tests (Sandbox)**: Executa fluxos críticos em um diretório temporário isolado:
+    - `core setup`: Verifica a criação da estrutura de pastas e arquivos de governança.
+    - `dev new`: Verifica a geração de projetos a partir de templates.
+    - `ops backup`: Verifica a criação de backups.
+3.  **Unit Tests**: Executa a suíte completa de testes (`pytest`) para validar a lógica interna.
+
+Ao final, gera um relatório visual no terminal e um arquivo detalhado `debug_report.md`.
 
 ## Exemplo de Saída
 
