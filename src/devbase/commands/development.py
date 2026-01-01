@@ -271,24 +271,75 @@ def import_project(
 @app.command(name="open")
 def open_project(
     ctx: typer.Context,
-    project_name: Annotated[str, typer.Argument(help="Project name to open in VS Code")],
+    project_name: Annotated[str | None, typer.Argument(help="Project name to open in VS Code")] = None,
 ) -> None:
     """
     💻 Open a project in VS Code.
     
     Opens the project's .code-workspace file or folder in VS Code.
-    
+    If no name is provided, an interactive list is shown.
+
     Examples:
         devbase dev open MedSempreMVC_GIT
+        devbase dev open
     """
     from devbase.utils.vscode import open_in_vscode
+    from rich.prompt import Prompt
 
     root: Path = ctx.obj["root"]
-    project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
+    project_path = None
     
-    # Also check worktrees
-    if not project_path.exists():
-        project_path = root / "20-29_CODE" / "22_worktrees" / project_name
+    # If no name provided, show interactive list
+    if not project_name:
+        apps_dir = root / "20-29_CODE" / "21_monorepo_apps"
+        worktrees_dir = root / "20-29_CODE" / "22_worktrees"
+
+        candidates = []
+
+        # Collect projects
+        if apps_dir.exists():
+            candidates.extend([p for p in apps_dir.iterdir() if p.is_dir()])
+
+        # Collect worktrees
+        if worktrees_dir.exists():
+            candidates.extend([w for w in worktrees_dir.iterdir() if w.is_dir()])
+
+        if not candidates:
+            console.print("[yellow]No projects found to open.[/yellow]")
+            console.print("Create one with: [cyan]devbase dev new[/cyan]")
+            raise typer.Exit(1)
+
+        # Sort by name
+        candidates.sort(key=lambda x: x.name)
+
+        console.print("\n[bold]Select a project to open:[/bold]")
+        for i, path in enumerate(candidates, 1):
+            kind = "Worktree" if path.parent.name == "22_worktrees" else "Project"
+            color = "magenta" if kind == "Worktree" else "green"
+            console.print(f"  [bold cyan]{i}.[/bold cyan] {path.name} [{color}]({kind})[/{color}]")
+
+        console.print()
+        choice = Prompt.ask("Enter number or name", default="1")
+
+        # Handle number selection
+        if choice.isdigit():
+            idx = int(choice) - 1
+            if 0 <= idx < len(candidates):
+                project_path = candidates[idx]
+            else:
+                console.print(f"[red]Invalid selection: {choice}[/red]")
+                raise typer.Exit(1)
+        else:
+            # Handle name input
+            project_name = choice
+
+    # If project_path not set by interactive selection, resolve by name
+    if not project_path:
+        project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
+
+        # Also check worktrees
+        if not project_path.exists():
+            project_path = root / "20-29_CODE" / "22_worktrees" / project_name
     
     if not project_path.exists():
         console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
