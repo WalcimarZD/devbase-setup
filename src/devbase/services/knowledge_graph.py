@@ -5,10 +5,12 @@ Service for building and analyzing the knowledge graph from Markdown files.
 """
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Tuple
 
 import frontmatter
 import networkx as nx
+
+from devbase.utils.filesystem import scan_directory
 
 
 class KnowledgeGraph:
@@ -46,50 +48,38 @@ class KnowledgeGraph:
 
         # 1. First Pass: Collect all nodes and build file map
         for path in search_paths:
-            # os.walk is better but rglob is simpler for implementation now.
-            # Given memory constraints mention os.walk in prompt, but here for service logic
-            # I will use rglog for simplicity unless performance is hit,
-            # but user specifically asked to use os.walk in memory instructions.
-            # "File scanning implementations should use 'os.walk' with directory pruning"
-            for root, dirs, filenames in path.walk(): # using pathlib.Path.walk (Python 3.12+) or os.walk
-                # Prune hidden dirs
-                dirs[:] = [d for d in dirs if not d.startswith(".")]
+            # Optimization: Use scan_directory for centralized pruning
+            # Replaces manual path.walk() to ensure consistency with performance guidelines
+            for file_path in scan_directory(path, extensions={'.md'}):
+                # Store relative path from workspace root for portability
+                rel_path = file_path.relative_to(self.root).as_posix()
 
-                for filename in filenames:
-                    if not filename.endswith(".md"):
-                        continue
+                # Parse Frontmatter for title/tags
+                try:
+                    post = frontmatter.load(file_path)
+                    title = post.get("title", file_path.stem)
+                    tags = post.get("tags", [])
+                except Exception:
+                    errors += 1
+                    title = file_path.stem
+                    tags = []
 
-                    file_path = root / filename
+                # Add node
+                self.graph.add_node(
+                    rel_path,
+                    title=title,
+                    tags=tags,
+                    path=str(file_path)
+                )
 
-                    # Store relative path from workspace root for portability
-                    rel_path = file_path.relative_to(self.root).as_posix()
+                # Map identifiers for Wiki-link resolution
+                # 1. Filename stem (e.g. "note_a" -> "path/to/note_a.md")
+                self.file_map[file_path.stem.lower()] = rel_path
+                # 2. Title (e.g. "Note A" -> "path/to/note_a.md")
+                if title:
+                    self.file_map[title.lower()] = rel_path
 
-                    # Parse Frontmatter for title/tags
-                    try:
-                        post = frontmatter.load(file_path)
-                        title = post.get("title", file_path.stem)
-                        tags = post.get("tags", [])
-                    except Exception:
-                        errors += 1
-                        title = file_path.stem
-                        tags = []
-
-                    # Add node
-                    self.graph.add_node(
-                        rel_path,
-                        title=title,
-                        tags=tags,
-                        path=str(file_path)
-                    )
-
-                    # Map identifiers for Wiki-link resolution
-                    # 1. Filename stem (e.g. "note_a" -> "path/to/note_a.md")
-                    self.file_map[file_path.stem.lower()] = rel_path
-                    # 2. Title (e.g. "Note A" -> "path/to/note_a.md")
-                    if title:
-                        self.file_map[title.lower()] = rel_path
-
-                    files.append(file_path)
+                files.append(file_path)
 
         # 2. Second Pass: Parse links and add edges
         links_count = 0
