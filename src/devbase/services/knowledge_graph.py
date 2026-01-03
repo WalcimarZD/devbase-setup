@@ -46,6 +46,12 @@ class KnowledgeGraph:
         files: List[Path] = []
         errors = 0
 
+        # ⚡ Bolt Optimization:
+        # Cache file content during first pass to avoid re-reading files in second pass.
+        # This reduces I/O operations by 50% (O(2N) -> O(N) reads).
+        # We store the full Post object (metadata + content).
+        file_cache: Dict[Path, frontmatter.Post] = {}
+
         # 1. First Pass: Collect all nodes and build file map
         for path in search_paths:
             # Optimization: Use scan_directory for centralized pruning
@@ -56,7 +62,10 @@ class KnowledgeGraph:
 
                 # Parse Frontmatter for title/tags
                 try:
+                    # ⚡ Bolt: Read file once and cache
                     post = frontmatter.load(file_path)
+                    file_cache[file_path] = post
+
                     title = post.get("title", file_path.stem)
                     tags = post.get("tags", [])
                 except Exception:
@@ -95,7 +104,14 @@ class KnowledgeGraph:
             source_rel = file_path.relative_to(self.root).as_posix()
 
             try:
-                content = file_path.read_text(encoding="utf-8")
+                # ⚡ Bolt: Use cached content instead of reading file again
+                # Use .pop() to free memory as we go
+                post = file_cache.pop(file_path, None)
+                if post is None:
+                    # Fallback just in case (should not happen)
+                    content = file_path.read_text(encoding="utf-8")
+                else:
+                    content = post.content
             except Exception:
                 continue
 
@@ -131,6 +147,9 @@ class KnowledgeGraph:
                     if source_rel != target_rel: # Avoid self-loops
                         self.graph.add_edge(source_rel, target_rel)
                         links_count += 1
+
+        # Explicitly clear cache if anything remains
+        file_cache.clear()
 
         self._scanned = True
         return {
