@@ -39,12 +39,12 @@ class TestDuckDBSchemaOptimization:
         # 15. SELECT COUNT(*)
         # 16. INSERT schema version
 
-        # We can just use a loose mock that doesn't enforce exact count of side effects
-        # but raises exception on the first call only.
+        # We need to ensure the first call raises an exception to simulate "table missing",
+        # but subsequent calls (CREATE TABLE, etc.) succeed.
 
-        # Define a side effect function
         def side_effect(*args, **kwargs):
-            if args[0].strip().startswith("SELECT version"):
+            query = args[0].strip() if args else ""
+            if "SELECT version" in query:
                 raise duckdb.CatalogException("Table does not exist")
             return MagicMock()
 
