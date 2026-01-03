@@ -3,11 +3,11 @@ Git Worktree Utilities
 ======================
 Handles git worktree creation, listing, and management.
 """
-import subprocess
 import json
+import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
-from datetime import datetime
 
 from rich.console import Console
 
@@ -27,7 +27,7 @@ def get_worktree_dir(root: Path) -> Path:
 def list_worktrees(project_path: Path) -> List[dict]:
     """
     List all worktrees for a git repository.
-    
+
     Returns:
         List of dicts with worktree info (path, branch, commit)
     """
@@ -39,13 +39,13 @@ def list_worktrees(project_path: Path) -> List[dict]:
             text=True,
             timeout=10
         )
-        
+
         if result.returncode != 0:
             return []
-        
+
         worktrees = []
         current = {}
-        
+
         for line in result.stdout.strip().split("\n"):
             if line.startswith("worktree "):
                 if current:
@@ -57,12 +57,12 @@ def list_worktrees(project_path: Path) -> List[dict]:
                 current["branch"] = line[7:].replace("refs/heads/", "")
             elif line == "detached":
                 current["branch"] = "(detached)"
-        
+
         if current:
             worktrees.append(current)
-            
+
         return worktrees
-        
+
     except Exception:
         return []
 
@@ -76,35 +76,37 @@ def add_worktree(
 ) -> Optional[Path]:
     """
     Add a new worktree for a project.
-    
+
     Args:
         project_path: Path to main project
         worktrees_dir: Directory to create worktree in
         project_name: Name of the project
         branch: Branch name
         create_branch: If True, create a new branch
-        
+
     Returns:
         Path to created worktree, or None on failure
     """
     worktree_name = f"{project_name}--{sanitize_branch_name(branch)}"
     worktree_path = worktrees_dir / worktree_name
-    
+
     if worktree_path.exists():
         console.print(f"[yellow]⚠ Worktree already exists: {worktree_name}[/yellow]")
         return None
-    
+
     worktrees_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Simple approach: if --create, always create new branch from HEAD
     # Otherwise, try to checkout existing branch
+    # Note: Use "--" to prevent argument injection from branch names
     if create_branch:
-        cmd = ["git", "worktree", "add", "-b", branch, str(worktree_path), "HEAD"]
+        cmd = ["git", "worktree", "add", "-b", branch, "--", str(worktree_path), "HEAD"]
     else:
-        cmd = ["git", "worktree", "add", str(worktree_path), branch]
-    
+        # Use -- delimiter to prevent branch name being interpreted as an option
+        cmd = ["git", "worktree", "add", str(worktree_path), "--", branch]
+
     console.print(f"[cyan]→ git {' '.join(cmd[1:])}[/cyan]")
-    
+
     try:
         result = subprocess.run(
             cmd,
@@ -113,20 +115,20 @@ def add_worktree(
             text=True,
             timeout=30
         )
-        
+
         if result.returncode != 0:
             console.print(f"[red]✗ Failed to create worktree:[/red]\n{result.stderr}")
-            
+
             # Helpful hint for common errors
             if "invalid reference" in result.stderr and not create_branch:
                 console.print(f"[yellow]💡 Branch '{branch}' doesn't exist. Try with --create flag.[/yellow]")
             elif "already used" in result.stderr:
-                console.print(f"[yellow]💡 This branch is checked out elsewhere. Create a worktree for a different branch.[/yellow]")
-            
+                console.print("[yellow]💡 This branch is checked out elsewhere. Create a worktree for a different branch.[/yellow]")
+
             return None
-        
+
         console.print(f"[green]✓[/green] Created worktree: {worktree_name}")
-        
+
         # Create .devbase.json for the worktree
         import devbase
         metadata = {
@@ -140,9 +142,9 @@ def add_worktree(
         (worktree_path / ".devbase.json").write_text(
             json.dumps(metadata, indent=2), encoding="utf-8"
         )
-        
+
         return worktree_path
-        
+
     except subprocess.TimeoutExpired:
         console.print("[red]✗ Worktree creation timed out.[/red]")
         return None
@@ -154,20 +156,21 @@ def add_worktree(
 def remove_worktree(project_path: Path, worktree_path: Path, force: bool = False) -> bool:
     """
     Remove a worktree.
-    
+
     Args:
         project_path: Path to main project
         worktree_path: Path to worktree to remove
         force: Force removal even with uncommitted changes
-        
+
     Returns:
         True if successful
     """
     cmd = ["git", "worktree", "remove"]
     if force:
         cmd.append("--force")
+    cmd.append("--")
     cmd.append(str(worktree_path))
-    
+
     try:
         result = subprocess.run(
             cmd,
@@ -176,14 +179,14 @@ def remove_worktree(project_path: Path, worktree_path: Path, force: bool = False
             text=True,
             timeout=30
         )
-        
+
         if result.returncode != 0:
             console.print(f"[red]✗ Failed to remove worktree:[/red]\n{result.stderr}")
             return False
-        
+
         console.print(f"[green]✓[/green] Removed worktree: {worktree_path.name}")
         return True
-        
+
     except Exception as e:
         console.print(f"[red]✗ Error: {e}[/red]")
         return False
@@ -192,7 +195,7 @@ def remove_worktree(project_path: Path, worktree_path: Path, force: bool = False
 def get_stale_worktrees(project_path: Path) -> List[Path]:
     """
     Find worktrees with deleted branches.
-    
+
     Returns:
         List of paths to stale worktrees
     """
@@ -204,11 +207,11 @@ def get_stale_worktrees(project_path: Path) -> List[Path]:
             text=True,
             timeout=10
         )
-        
+
         stale = []
         current_path = None
         is_stale = False
-        
+
         for line in result.stdout.strip().split("\n"):
             if line.startswith("worktree "):
                 if current_path and is_stale:
@@ -217,11 +220,11 @@ def get_stale_worktrees(project_path: Path) -> List[Path]:
                 is_stale = False
             elif line == "prunable":
                 is_stale = True
-        
+
         if current_path and is_stale:
             stale.append(Path(current_path))
-            
+
         return stale
-        
+
     except Exception:
         return []

@@ -5,13 +5,24 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Unreleased] - In Progress
+
+### Changed
+- Modified src/devbase/main.py
+- Modified src/devbase/commands/audit.py
+
 ## [5.1.0-alpha.3] - 2025-12-28
 
 ### 📚 Documentação
 
 - **Auditoria de Consistência**: Sincronização massiva entre código e documentação.
-- **CLI Docs**: Adicionados manuais para `ai index`, `ai routine`, `dev blueprint`, `core debug` e `hydrate-icons`.
+- **CLI Docs**: Adicionados manuais para `ai index`, `ai routine`, `dev blueprint`, `core debug` (atualizado para refletir smoke tests), `hydrate-icons` e o novo módulo `pkm` (`find`, `graph`, `links`).
 - **Technical Design**: Atualizado para refletir o uso de `DuckDB Native FTS`, `FastEmbed` e tabelas de vetores (`hot/cold_embeddings`).
+- **Arquitetura**: Lista de dependências sincronizada com `pyproject.toml`.
+
+### 🐛 Corrigido
+
+- **Core Setup**: Corrigido bug onde `devbase core setup --dry-run` criava subdiretórios fisicamente mesmo em modo de simulação (refatorado para usar `fs.ensure_dir`).
 
 ## [5.1.0-alpha.1] - 2025-12-28
 
