@@ -116,7 +116,6 @@ def run_setup_core(fs, policy_version=None):
     create_governance_files(fs)
 
     # Create required subfolders
-    root = Path(fs.root)
     required_subfolders = [
         '00-09_SYSTEM/00_inbox',
         '00-09_SYSTEM/01_dotfiles',
@@ -139,8 +138,7 @@ def run_setup_core(fs, policy_version=None):
     ]
 
     for subfolder in required_subfolders:
-        folder_path = root / subfolder
-        folder_path.mkdir(parents=True, exist_ok=True)
+        fs.ensure_dir(subfolder)
 
     # Deploy subfolder templates from core templates
     copy_built_in_templates(fs, "core/00-09_SYSTEM", "00-09_SYSTEM")

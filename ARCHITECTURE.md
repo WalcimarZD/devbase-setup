@@ -52,9 +52,13 @@ graph TD
 | **Packaging** | `uv` | Orders of magnitude faster than Pip/Poetry. Simplifies venv management. |
 | **Analytics** | `duckdb` | Embedded OLAP database for fast querying of telemetry logs. |
 | **Templating** | `jinja2` | Industry standard, flexible, sandboxed. |
-| **Knowledge Graph** | `networkx` | Efficient graph algorithms for PKM linking. |
-| **Vector Search** | `fastembed` | Local, lightweight embedding generation for RAG. |
-| **LLM Interface** | `groq` | High-performance inference via Groq API. |
+| **Shell Utility** | `shellingham` | Detects shell environment for auto-completion. |
+| **Config/Data** | `toml` | Standard configuration format (pyproject.toml). |
+| **Scaffolding** | `copier` | Powerful project templating and updates. |
+| **Knowledge Graph** | `networkx` | Graph algorithms for PKM linking and analysis. |
+| **Metadata** | `python-frontmatter` | Parses YAML frontmatter in Markdown notes. |
+| **AI (Remote)** | `groq` | Ultra-fast LLM inference API. |
+| **AI (Local)** | `fastembed` | Local vector embedding generation for RAG. |
 
 ---
 
