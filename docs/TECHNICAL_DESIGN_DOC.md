@@ -174,6 +174,13 @@ devbase
 │   └── debug
 ├── dev
 │   ├── new <name> [--template] [--no-setup]
+│   ├── import <url> [--restore]
+│   ├── info <project>
+│   ├── list
+│   ├── open <project>
+│   ├── restore <project>
+│   ├── archive <project>
+│   ├── update <project>
 │   ├── blueprint <name>
 │   ├── adr-gen
 │   ├── worktree-add <name>
@@ -182,12 +189,17 @@ devbase
 │   ├── track <message> [--type]
 │   ├── stats
 │   ├── weekly [--output]
-│   └── backup
+│   ├── backup
+│   └── clean
 ├── ai
+│   ├── config
+│   ├── organize
 │   ├── chat
 │   ├── index
 │   ├── classify
 │   ├── summarize
+│   ├── insights
+│   ├── status
 │   └── routine (briefing, triage)
 ├── nav
 │   └── goto <location>
@@ -195,10 +207,19 @@ devbase
 │   ├── find <query>
 │   ├── links <file>
 │   ├── graph [--html]
+│   ├── index
 │   └── new <name> --type <diataxis>
+├── study
+│   ├── review
+│   └── synthesize
+├── analytics
+│   └── report
+├── docs
+│   └── new
 └── quick
     ├── note <message> [--edit]
-    └── sync
+    ├── sync
+    └── quickstart
 ```
 
 ### 5.2 Exit Codes

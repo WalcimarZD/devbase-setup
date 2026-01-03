@@ -349,7 +349,7 @@ def index(
 @app.command()
 def new(
     ctx: typer.Context,
-    name: Annotated[str, typer.Argument(help="Name of the note (slugified)")],
+    name: Annotated[Optional[str], typer.Argument(help="Name of the note (slugified)")] = None,
     note_type: Annotated[Optional[str], typer.Option("--type", "-t", help="Diataxis type (tutorial, how-to, reference, explanation)")] = None,
 ) -> None:
     """
@@ -377,6 +377,9 @@ def new(
     root: Path = ctx.obj["root"]
 
     from rich.prompt import Prompt
+
+    if name is None:
+        name = Prompt.ask("Enter note name")
 
     if note_type is None:
         note_type = Prompt.ask(
