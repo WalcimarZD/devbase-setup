@@ -347,3 +347,66 @@ def log_event(
         """,
         [event_type, project, message, metadata]
     )
+
+
+def get_recent_events(limit: int = 50, conn: duckdb.DuckDBPyConnection | None = None) -> list[dict]:
+    """
+    Get recent telemetry events.
+
+    Args:
+        limit: Max events to return
+        conn: Optional connection
+
+    Returns:
+        List of dicts
+    """
+    if conn is None:
+        conn = get_connection()
+
+    # Fetch as dicts
+    df = conn.execute(
+        """
+        SELECT 
+            timestamp,
+            event_type,
+            project,
+            message,
+            metadata
+        FROM events
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """,
+        [limit]
+    ).fetchdf()
+    
+    # Convert dataframe to list of dicts with isoformat timestamps
+    events = []
+    for _, row in df.iterrows():
+        events.append({
+            "timestamp": row['timestamp'].isoformat() if hasattr(row['timestamp'], 'isoformat') else str(row['timestamp']),
+            "event_type": row['event_type'],
+            "category": row['event_type'], # compat
+            "project": row['project'],
+            "message": row['message'],
+            "metadata": row['metadata']
+        })
+    return events
+
+
+def get_event_counts(days: int = 7, conn: duckdb.DuckDBPyConnection | None = None) -> list[tuple[str, int]]:
+    """
+    Get event counts by type for the last N days.
+    """
+    if conn is None:
+        conn = get_connection()
+
+    return conn.execute(
+        """
+        SELECT event_type, COUNT(*) as count
+        FROM events
+        where timestamp >= current_date - CAST(? AS INTEGER)
+        GROUP BY event_type
+        ORDER BY count DESC
+        """,
+        [days]
+    ).fetchall()

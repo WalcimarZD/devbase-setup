@@ -52,6 +52,12 @@ Updates workspace templates from the DevBase source without touching your data.
 devbase core hydrate
 ```
 
+#### `core hydrate-icons`
+Updates workspace folder icons (requires custom icons in `~/.devbase/icons`).
+```bash
+devbase core hydrate-icons
+```
+
 ### `devbase dev`
 *Create and manage code projects.*
 
@@ -114,6 +120,38 @@ devbase dev restore MyProject --solution MyProject.Web.sln
 ```
 Downloads `nuget.exe` automatically if not present.
 
+#### `dev archive`
+Archive a project to `90-99_ARCHIVE_COLD`.
+```bash
+devbase dev archive my-project
+```
+
+#### `dev update`
+Update a project from its template (using Copier).
+```bash
+devbase dev update my-project
+```
+
+#### `dev blueprint`
+Generate project file structure using AI based on a description.
+```bash
+devbase dev blueprint "A FastAPi service with Celery"
+```
+
+#### `dev adr-gen`
+Generate an Architecture Decision Record (ADR) draft based on telemetry events.
+```bash
+devbase dev adr-gen
+```
+
+#### `dev audit`
+Enforces structure and naming conventions (kebab-case).
+```bash
+devbase dev audit
+# Auto-rename violators (use with caution!)
+devbase dev audit --fix
+```
+
 #### Worktree Commands
 Manage git worktrees for parallel development.
 ```bash
@@ -129,14 +167,6 @@ devbase dev worktree-list my-project  # For specific project
 devbase dev worktree-remove my-project--feature-new-feature
 ```
 Worktrees are stored in `22_worktrees/` and shown in `dev list` with `[Worktree]` badge.
-
-#### `dev audit`
-Enforces structure and naming conventions (kebab-case).
-```bash
-devbase dev audit
-# Auto-rename violators (use with caution!)
-devbase dev audit --fix
-```
 
 ### `devbase nav`
 *Navigate quickly.*
@@ -189,6 +219,12 @@ Creates an incremental backup of essential data (ignoring `node_modules`, `.venv
 devbase ops backup
 ```
 
+#### `ops clean`
+Clean up temporary files and caches.
+```bash
+devbase ops clean
+```
+
 ### `devbase quick`
 *High-speed macros.*
 
@@ -208,12 +244,33 @@ The "Monday Morning" command. Runs Doctor, Hydrate, and Backup in sequence.
 devbase quick sync
 ```
 
+#### `quick quickstart`
+Runs the Getting Started tutorial.
+```bash
+devbase quick quickstart
+```
+
+### `devbase docs`
+*Documentation management.*
+
+#### `docs new`
+Create a new documentation file.
+```bash
+devbase docs new
+```
+
 ---
 
 ## 🔵 Advanced Group (Power Users)
 
 ### `devbase pkm`
 *Personal Knowledge Management graph tools.*
+
+#### `pkm new`
+Create a new note with Diataxis structure.
+```bash
+devbase pkm new --type tutorial "How to use DuckDB"
+```
 
 #### `pkm find`
 Fast, full-text search across your markdown notes.
@@ -233,6 +290,36 @@ Displays network statistics and hub identification.
 devbase pkm graph
 # Generate HTML visualization
 devbase pkm graph --html
+```
+
+#### `pkm index`
+Manually re-index the knowledge base.
+```bash
+devbase pkm index
+```
+
+### `devbase study`
+*Learning and spaced repetition.*
+
+#### `study review`
+Review flashcards or notes.
+```bash
+devbase study review
+```
+
+#### `study synthesize`
+Synthesize notes into a summary.
+```bash
+devbase study synthesize
+```
+
+### `devbase analytics`
+*Advanced productivity insights.*
+
+#### `analytics report`
+Generate a comprehensive productivity report.
+```bash
+devbase analytics report
 ```
 
 ### `devbase ai`
@@ -263,6 +350,30 @@ devbase ai chat "Como eu implemento um adaptador de armazenamento no DevBase?"
 Rebuilds the semantic search index for your local files.
 ```bash
 devbase ai index --rebuild
+```
+
+#### `ai classify`
+Classify content using AI.
+```bash
+devbase ai classify <path>
+```
+
+#### `ai summarize`
+Summarize content using AI.
+```bash
+devbase ai summarize <path>
+```
+
+#### `ai insights`
+Generate insights from your data.
+```bash
+devbase ai insights
+```
+
+#### `ai status`
+Check the status of AI services.
+```bash
+devbase ai status
 ```
 
 #### `ai routine`
@@ -302,3 +413,8 @@ To create a local custom template:
 1. Copy an existing template folder in `src/devbase/templates`.
 2. Modify `copier.yml` (if using Copier) or the Jinja2 files.
 3. Use it via `--template my-custom-template`.
+
+
+## Undocumented Commands (Auto-detected)
+- `devbase ai classify`
+- `devbase ai summarize`

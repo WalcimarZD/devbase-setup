@@ -102,7 +102,8 @@ def add_worktree(
     if create_branch:
         cmd = ["git", "worktree", "add", "-b", branch, "--", str(worktree_path), "HEAD"]
     else:
-        cmd = ["git", "worktree", "add", "--", str(worktree_path), branch]
+        # Use -- delimiter to prevent branch name being interpreted as an option
+        cmd = ["git", "worktree", "add", str(worktree_path), "--", branch]
 
     console.print(f"[cyan]→ git {' '.join(cmd[1:])}[/cyan]")
 
