@@ -413,3 +413,8 @@ To create a local custom template:
 1. Copy an existing template folder in `src/devbase/templates`.
 2. Modify `copier.yml` (if using Copier) or the Jinja2 files.
 3. Use it via `--template my-custom-template`.
+
+
+## Undocumented Commands (Auto-detected)
+- `devbase ai classify`
+- `devbase ai summarize`
