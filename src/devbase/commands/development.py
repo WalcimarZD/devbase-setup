@@ -102,7 +102,7 @@ def new(
 
         # 2. Golden Path Setup
         if setup:
-            setup_service.run_golden_path(dest_path, name)
+            setup_service.run_golden_path(dest_path, name, interactive=interactive)
         else:
             console.print("\n[dim]Skipping setup steps (--no-setup)[/dim]")
             console.print(f"\nNext steps:\n  cd {dest_path}\n  git init\n  code .")
