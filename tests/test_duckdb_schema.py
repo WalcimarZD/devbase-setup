@@ -19,6 +19,7 @@ class TestDuckDBSchemaOptimization:
     def test_init_schema_cold_start_exception(self):
         """Verify init_schema proceeds if table check raises CatalogException."""
         mock_conn = MagicMock()
+        # Simulate table missing
 
         # We need to account for all the calls in init_schema:
         # 1. SELECT version (Fail)

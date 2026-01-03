@@ -5,6 +5,7 @@ Commands for creating and managing code projects.
 """
 import re
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -18,7 +19,7 @@ console = Console()
 @app.command()
 def new(
     ctx: typer.Context,
-    name: Annotated[str, typer.Argument(help="Project name (kebab-case)")],
+    name: Annotated[Optional[str], typer.Argument(help="Project name (kebab-case)")] = None,
     template: Annotated[
         str,
         typer.Option("--template", "-t", help="Template name"),
@@ -47,6 +48,11 @@ def new(
     Use --no-setup to only generate files.
     """
     root: Path = ctx.obj["root"]
+
+    # Interactive Prompt for Name (Micro-UX Improvement)
+    if name is None:
+        from rich.prompt import Prompt
+        name = Prompt.ask("Project name (kebab-case)")
 
     # Validate project name (kebab-case)
     if not re.match(r'^[a-z0-9]+([-.][a-z0-9]+)*$', name):

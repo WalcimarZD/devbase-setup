@@ -1,0 +1,22 @@
+# Clean Architecture Rules
+
+## Dependências
+
+- domain/ NUNCA importa de infrastructure/
+- domain/ NUNCA importa de presentation/
+- application/ pode importar de domain/
+- infrastructure/ implementa interfaces de application/
+- presentation/ usa application/ (use cases)
+
+## Naming
+
+- Entities: PascalCase, sufixo opcional
+- Use Cases: PascalCase + UseCase suffix
+- Repositories: I + Name + Repository (interface)
+- DTOs: Name + DTO
+
+## Testes
+
+- Unit tests para domain/ e application/
+- Integration tests para infrastructure/
+- E2E tests para presentation/
