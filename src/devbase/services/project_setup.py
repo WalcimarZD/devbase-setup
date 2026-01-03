@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from rich.console import Console
+from rich.prompt import Confirm
 
 console = Console()
 
@@ -17,7 +18,7 @@ class ProjectSetupService:
     def __init__(self, root: Path):
         self.root = root
 
-    def run_golden_path(self, project_path: Path, project_name: str) -> bool:
+    def run_golden_path(self, project_path: Path, project_name: str, interactive: bool = True) -> bool:
         """
         Run the full "Golden Path" setup for a generated project.
         
@@ -34,7 +35,7 @@ class ProjectSetupService:
         self._git_init(project_path)
         
         # 2. Dependencies
-        self._install_dependencies(project_path)
+        self._install_dependencies(project_path, interactive=interactive)
         
         # 3. Pre-commit
         self._setup_pre_commit(project_path)
@@ -55,32 +56,48 @@ class ProjectSetupService:
         except Exception:
             console.print("  [yellow]⚠[/yellow] Git init failed")
 
-    def _install_dependencies(self, path: Path):
-        """Polyglot dependency installation."""
+    def _install_dependencies(self, path: Path, interactive: bool = True):
+        """
+        Polyglot dependency installation.
+
+        Security: Asks for confirmation before running install scripts unless not interactive.
+        """
         
+        # Helper to confirm execution
+        def confirm_exec(command_desc: str) -> bool:
+            if not interactive:
+                return True
+            return Confirm.ask(f"Run [bold cyan]{command_desc}[/bold cyan]?", default=True)
+
         # Python (uv) - Priority
         if (path / "pyproject.toml").exists():
             if shutil.which("uv"):
-                try:
-                    with console.status("[bold cyan]Installing Python dependencies (uv)...[/bold cyan]"):
-                        subprocess.run(["uv", "sync"], cwd=path, check=True, capture_output=True)
-                    console.print("  [green]✓[/green] Python deps (uv)")
-                    return
-                except subprocess.CalledProcessError:
-                    console.print("  [red]✗[/red] uv sync failed")
+                if confirm_exec("uv sync"):
+                    try:
+                        with console.status("[bold cyan]Installing Python dependencies (uv)...[/bold cyan]"):
+                            subprocess.run(["uv", "sync"], cwd=path, check=True, capture_output=True)
+                        console.print("  [green]✓[/green] Python deps (uv)")
+                        return
+                    except subprocess.CalledProcessError:
+                        console.print("  [red]✗[/red] uv sync failed")
+                else:
+                     console.print("  [dim]Skipped uv sync[/dim]")
             else:
                 console.print("  [yellow]⚠[/yellow] uv not found")
         
         # Node.js (npm)
         elif (path / "package.json").exists():
             if shutil.which("npm"):
-                try:
-                    with console.status("[bold cyan]Installing Node dependencies (npm)...[/bold cyan]"):
-                        subprocess.run(["npm", "install"], cwd=path, check=True, capture_output=True)
-                    console.print("  [green]✓[/green] Node deps (npm)")
-                    return
-                except subprocess.CalledProcessError:
-                    console.print("  [red]✗[/red] npm install failed")
+                if confirm_exec("npm install"):
+                    try:
+                        with console.status("[bold cyan]Installing Node dependencies (npm)...[/bold cyan]"):
+                            subprocess.run(["npm", "install"], cwd=path, check=True, capture_output=True)
+                        console.print("  [green]✓[/green] Node deps (npm)")
+                        return
+                    except subprocess.CalledProcessError:
+                        console.print("  [red]✗[/red] npm install failed")
+                else:
+                    console.print("  [dim]Skipped npm install[/dim]")
             else:
                 console.print("  [yellow]⚠[/yellow] npm not found")
         
@@ -88,27 +105,33 @@ class ProjectSetupService:
             # Go (go.mod)
             if (path / "go.mod").exists():
                 if shutil.which("go"):
-                    try:
-                        with console.status("[bold cyan]Downloading Go modules...[/bold cyan]"):
-                            subprocess.run(["go", "mod", "download"], cwd=path, check=True, capture_output=True)
-                        console.print("  [green]✓[/green] Go deps (go mod)")
-                        return
-                    except subprocess.CalledProcessError:
-                        console.print("  [red]✗[/red] go mod download failed")
+                    if confirm_exec("go mod download"):
+                        try:
+                            with console.status("[bold cyan]Downloading Go modules...[/bold cyan]"):
+                                subprocess.run(["go", "mod", "download"], cwd=path, check=True, capture_output=True)
+                            console.print("  [green]✓[/green] Go deps (go mod)")
+                            return
+                        except subprocess.CalledProcessError:
+                            console.print("  [red]✗[/red] go mod download failed")
+                    else:
+                        console.print("  [dim]Skipped go mod download[/dim]")
                 else:
                     console.print("  [yellow]⚠[/yellow] go not found")
 
             # Rust (Cargo.toml)
             elif (path / "Cargo.toml").exists():
                 if shutil.which("cargo"):
-                    try:
-                        # minimal check, build usually fetches deps
-                        with console.status("[bold cyan]Fetching Rust dependencies...[/bold cyan]"):
-                            subprocess.run(["cargo", "fetch"], cwd=path, check=True, capture_output=True)
-                        console.print("  [green]✓[/green] Rust deps (cargo)")
-                        return
-                    except subprocess.CalledProcessError:
-                        console.print("  [red]✗[/red] cargo fetch failed")
+                    if confirm_exec("cargo fetch"):
+                        try:
+                            # minimal check, build usually fetches deps
+                            with console.status("[bold cyan]Fetching Rust dependencies...[/bold cyan]"):
+                                subprocess.run(["cargo", "fetch"], cwd=path, check=True, capture_output=True)
+                            console.print("  [green]✓[/green] Rust deps (cargo)")
+                            return
+                        except subprocess.CalledProcessError:
+                            console.print("  [red]✗[/red] cargo fetch failed")
+                    else:
+                        console.print("  [dim]Skipped cargo fetch[/dim]")
                 else:
                     console.print("  [yellow]⚠[/yellow] cargo not found")
             

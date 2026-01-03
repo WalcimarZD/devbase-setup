@@ -14,7 +14,7 @@ import typer
 from rich.console import Console
 from typing_extensions import Annotated
 
-from devbase.commands import core, development, navigation, operations, quick, docs, pkm, study, analytics, ai
+from devbase.commands import core, development, navigation, operations, quick, docs, pkm, study, analytics, ai, audit
 from devbase.utils.workspace import detect_workspace_root
 
 # Initialize Typer app with rich help
@@ -53,6 +53,12 @@ app.add_typer(
 )
 
 # 🟡 DAILY WORKFLOW - After mastering essentials (Week 2-3)
+app.add_typer(
+    audit.app,
+    name="audit",
+    help="🛡️ Consistency & Health",
+    rich_help_panel="🟡 Daily Workflow",
+)
 app.add_typer(
     operations.app,
     name="ops",
