@@ -4,15 +4,14 @@ Knowledge Database Service
 Handles indexing and searching of knowledge base notes.
 Indexes content into DuckDB 'hot_fts' (10-19) and 'cold_fts' (90-99).
 """
-import hashlib
-import os
-import frontmatter
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
+import frontmatter
 from rich.console import Console
 
 from devbase.adapters.storage import duckdb_adapter
+from devbase.utils.filesystem import scan_directory
 
 console = Console()
 
@@ -43,55 +42,72 @@ class KnowledgeDB:
         - 90-99_ARCHIVE_COLD -> cold_fts
 
         Returns:
-            Dict with 'indexed' count and 'errors' count.
+            Dict with 'indexed', 'skipped', and 'errors' count.
         """
-        stats = {"indexed": 0, "errors": 0}
+        stats = {"indexed": 0, "skipped": 0, "errors": 0}
 
         # 1. Index Active Knowledge (Hot)
         hot_path = self.root / "10-19_KNOWLEDGE"
         if hot_path.exists():
-            self._scan_directory(hot_path, "hot_fts", stats)
+            existing_mtimes = self._get_existing_mtimes("hot_fts")
+            self._scan_directory(hot_path, "hot_fts", stats, existing_mtimes)
 
         # 2. Index Archived Knowledge (Cold)
         cold_path = self.root / "90-99_ARCHIVE_COLD"
         if cold_path.exists():
-            self._scan_directory(cold_path, "cold_fts", stats)
+            existing_mtimes = self._get_existing_mtimes("cold_fts")
+            self._scan_directory(cold_path, "cold_fts", stats, existing_mtimes)
 
         return stats
 
-    def _scan_directory(self, path: Path, table: str, stats: Dict[str, int]) -> None:
+    def _get_existing_mtimes(self, table: str) -> Dict[str, int]:
+        """Fetch existing mtime_epoch for all files in the table."""
+        try:
+            rows = self.conn.execute(f"SELECT file_path, mtime_epoch FROM {table}").fetchall()
+            return {row[0]: row[1] for row in rows}
+        except Exception:
+            return {}
+
+    def _scan_directory(
+        self,
+        path: Path,
+        table: str,
+        stats: Dict[str, int],
+        existing_mtimes: Dict[str, int]
+    ) -> None:
         """
         Recursive scan of a directory with batched inserts.
 
-        ⚡ Bolt: Batch processing improves indexing performance by ~3-5x
-        compared to row-by-row inserts.
+        ⚡ Bolt: Optimized with:
+        1. Batch processing (improves insert performance by ~3-5x)
+        2. Incremental indexing (skips parsing/reading unchanged files)
+        3. Efficient directory scanning (prunes node_modules etc)
         """
         batch_data = []
         BATCH_SIZE = 500
 
-        for root, _, files in os.walk(path):
-            for file in files:
-                if not file.endswith(".md"):
+        # Optimization: Use scan_directory for centralized pruning
+        for file_path in scan_directory(path, extensions={'.md'}):
+            try:
+                # Optimization: Skip if file hasn't changed
+                current_mtime = int(file_path.stat().st_mtime)
+                file_path_str = str(file_path)
+
+                if file_path_str in existing_mtimes and current_mtime <= existing_mtimes[file_path_str]:
+                    stats["skipped"] += 1
                     continue
 
-                file_path = Path(root) / file
+                data = self._process_file_data(file_path, current_mtime)
+                batch_data.append(data)
 
-                # Skip hidden files
-                if file.startswith("."):
-                    continue
+                if len(batch_data) >= BATCH_SIZE:
+                    self._flush_batch(table, batch_data)
+                    stats["indexed"] += len(batch_data)
+                    batch_data = []
 
-                try:
-                    data = self._process_file_data(file_path)
-                    batch_data.append(data)
-
-                    if len(batch_data) >= BATCH_SIZE:
-                        self._flush_batch(table, batch_data)
-                        stats["indexed"] += len(batch_data)
-                        batch_data = []
-
-                except Exception as e:
-                    # console.print(f"[red]Error indexing {file_path}: {e}[/red]")
-                    stats["errors"] += 1
+            except Exception:
+                # console.print(f"[red]Error indexing {file_path}: {e}[/red]")
+                stats["errors"] += 1
 
         # Flush remaining
         if batch_data:
@@ -101,7 +117,7 @@ class KnowledgeDB:
             except Exception:
                 stats["errors"] += len(batch_data)
 
-    def _process_file_data(self, path: Path) -> tuple:
+    def _process_file_data(self, path: Path, mtime: int) -> tuple:
         """Parse file and return data tuple for batch insertion."""
         post = frontmatter.load(path)
         content = post.content
@@ -110,7 +126,6 @@ class KnowledgeDB:
         title = metadata.get("title", path.stem)
         tags = ",".join(metadata.get("tags", [])) if isinstance(metadata.get("tags"), list) else str(metadata.get("tags", ""))
         note_type = metadata.get("type", "note")
-        mtime = int(path.stat().st_mtime)
 
         return (str(path), title, content, tags, note_type, mtime)
 
