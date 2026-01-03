@@ -20,7 +20,7 @@ class TestDuckDBSchemaOptimization:
         """Verify init_schema proceeds if table check raises CatalogException."""
         mock_conn = MagicMock()
         # Simulate table missing
-<<<<<<< HEAD
+
         # We need to account for all the calls in init_schema:
         # 1. SELECT version (Fail)
         # 2. CREATE TABLE schema_version
@@ -38,33 +38,13 @@ class TestDuckDBSchemaOptimization:
         # 14. CREATE TABLE events
         # 15. SELECT COUNT(*)
         # 16. INSERT schema version
-=======
-        mock_conn.execute.side_effect = [
-            duckdb.CatalogException("Table does not exist"),
-            MagicMock(), # CREATE TABLE schema_version
-            MagicMock(), # CREATE TABLE notes_index
-            MagicMock(), # CREATE TABLE hot_fts
-            MagicMock(), # CREATE TABLE cold_fts
-            MagicMock(), # INSTALL fts; LOAD fts
-            MagicMock(), # PRAGMA create_fts_index hot
-            MagicMock(), # PRAGMA create_fts_index cold
-            MagicMock(), # CREATE TABLE hot_embeddings
-            MagicMock(), # CREATE TABLE cold_embeddings
-            MagicMock(), # CREATE SEQUENCE ai_task_queue_id_seq
-            MagicMock(), # CREATE TABLE ai_task_queue
-            MagicMock(), # CREATE SEQUENCE events_id_seq
-            MagicMock(), # CREATE TABLE events
-            MagicMock(), # SELECT COUNT(*)
-            MagicMock(), # INSERT (maybe)
-        ]
->>>>>>> origin/main
 
-        # We can just use a loose mock that doesn't enforce exact count of side effects
-        # but raises exception on the first call only.
+        # We need to ensure the first call raises an exception to simulate "table missing",
+        # but subsequent calls (CREATE TABLE, etc.) succeed.
 
-        # Define a side effect function
         def side_effect(*args, **kwargs):
-            if args[0].strip().startswith("SELECT version"):
+            query = args[0].strip() if args else ""
+            if "SELECT version" in query:
                 raise duckdb.CatalogException("Table does not exist")
             return MagicMock()
 

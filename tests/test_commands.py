@@ -93,9 +93,10 @@ def test_dev_new_project(tmp_path):
     runner.invoke(app, ["--root", str(tmp_path), "core", "setup", "--no-interactive"])
     
     # Create a simple project (no template, just structure)
+    # Added --no-interactive to prevent prompts causing EOFError
     result = runner.invoke(
         app, 
-        ["--root", str(tmp_path), "dev", "new", "my-test-project", "--no-setup"],
+        ["--root", str(tmp_path), "dev", "new", "my-test-project", "--no-setup", "--no-interactive"],
         input="\n"  # Accept defaults
     )
     
