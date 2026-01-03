@@ -21,6 +21,24 @@ class TestDuckDBSchemaOptimization:
         mock_conn = MagicMock()
         # Simulate table missing
 
+        # We need to account for all the calls in init_schema:
+        # 1. SELECT version (Fail)
+        # 2. CREATE TABLE schema_version
+        # 3. CREATE TABLE notes_index
+        # 4. CREATE TABLE hot_fts
+        # 5. CREATE TABLE cold_fts
+        # 6. INSTALL fts (try/except)
+        # 7. PRAGMA create_fts_index hot_fts (try/except)
+        # 8. PRAGMA create_fts_index cold_fts (try/except)
+        # 9. CREATE TABLE hot_embeddings
+        # 10. CREATE TABLE cold_embeddings
+        # 11. CREATE SEQUENCE ai_task_queue_id_seq
+        # 12. CREATE TABLE ai_task_queue
+        # 13. CREATE SEQUENCE events_id_seq
+        # 14. CREATE TABLE events
+        # 15. SELECT COUNT(*)
+        # 16. INSERT schema version
+
         # We need to ensure the first call raises an exception to simulate "table missing",
         # but subsequent calls (CREATE TABLE, etc.) succeed.
 

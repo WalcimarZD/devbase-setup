@@ -52,6 +52,9 @@ graph TD
 | **Packaging** | `uv` | Orders of magnitude faster than Pip/Poetry. Simplifies venv management. |
 | **Analytics** | `duckdb` | Embedded OLAP database for fast querying of telemetry logs. |
 | **Templating** | `jinja2` | Industry standard, flexible, sandboxed. |
+| **Knowledge Graph** | `networkx` | Efficient graph algorithms for PKM linking. |
+| **Vector Search** | `fastembed` | Local, lightweight embedding generation for RAG. |
+| **LLM Interface** | `groq` | High-performance inference via Groq API. |
 
 ---
 

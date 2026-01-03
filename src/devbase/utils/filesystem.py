@@ -151,6 +151,11 @@ def scan_directory(
     """
     Efficiently scan directory using os.walk with pruning.
 
+    Optimization Note (Bolt):
+    - Uses str comparison for extension checking to avoid Path object creation overhead.
+    - Path object is only instantiated when yielding.
+    - Yields Path objects for matching files.
+
     Args:
         root: Directory to scan
         extensions: Optional set of file extensions to include (e.g. {'.py', '.md'})
@@ -165,6 +170,10 @@ def scan_directory(
     # Ensure root exists
     if not root.exists():
         return
+
+    # Convert extensions to lower case for case-insensitive comparison if needed,
+    # but strictly matching user input is safer.
+    # Assuming user provides correct case or we stick to exact match.
 
     for dirpath, dirnames, filenames in os.walk(root):
         # Prune ignored directories in-place
