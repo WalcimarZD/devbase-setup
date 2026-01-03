@@ -54,8 +54,15 @@ FOLDER_STRUCTURE = {
         "00-09_SYSTEM/05_templates",
     ],
     "Operations": [
-        "30-39_OPERATIONS/31_backup",
+        "30-39_OPERATIONS/31_backups",
         "30-39_OPERATIONS/32_automation",
+    ],
+    "Media Assets": [
+        "40-49_MEDIA_ASSETS/40_images",
+        "40-49_MEDIA_ASSETS/41_videos",
+        "40-49_MEDIA_ASSETS/42_audio",
+        "40-49_MEDIA_ASSETS/43_fonts",
+        "40-49_MEDIA_ASSETS/44_design_sources",
     ],
 }
 
@@ -114,14 +121,21 @@ def run_setup_core(fs, policy_version=None):
         '00-09_SYSTEM/00_inbox',
         '00-09_SYSTEM/01_dotfiles',
         '00-09_SYSTEM/07_documentation',
-        '10-19_KNOWLEDGE/10_references',
+        '10-19_KNOWLEDGE/10_guides_and_references',
         '10-19_KNOWLEDGE/11_public_garden',
         '10-19_KNOWLEDGE/12_private_vault',
+        '10-19_KNOWLEDGE/13_architecture_and_specs',
+        '10-19_KNOWLEDGE/14_library',
         '20-29_CODE/21_monorepo_apps',
         '20-29_CODE/22_worktrees',
         '20-29_CODE/23_playground',
         '30-39_OPERATIONS/31_backups',
         '30-39_OPERATIONS/32_automation',
+        '40-49_MEDIA_ASSETS/40_images',
+        '40-49_MEDIA_ASSETS/41_videos',
+        '40-49_MEDIA_ASSETS/42_audio',
+        '40-49_MEDIA_ASSETS/43_fonts',
+        '40-49_MEDIA_ASSETS/44_design_sources',
     ]
 
     for subfolder in required_subfolders:
@@ -162,7 +176,7 @@ def copy_built_in_templates(fs, category: str, destination: str):
 
 def run_setup_code(fs, policy_version=None):
     run_setup_module(fs, "Code Templates", policy_version)
-    copy_built_in_templates(fs, "code", "20-29_CODE")
+    copy_built_in_templates(fs, "code", "00-09_SYSTEM/05_templates")
 
 
 
@@ -172,6 +186,10 @@ def run_setup_ai(fs, policy_version=None):
 
 def run_setup_operations(fs, policy_version=None):
     run_setup_module(fs, "Operations", policy_version)
+
+
+def run_setup_media(fs, policy_version=None):
+    run_setup_module(fs, "Media Assets", policy_version)
 
 
 @app.command()
@@ -245,6 +263,7 @@ def setup(
         ("Code Templates", run_setup_code),
         ("AI Integration", run_setup_ai),
         ("Operations", run_setup_operations),
+        ("Media Assets", run_setup_media),
     ]
 
     with Progress(
@@ -371,6 +390,47 @@ def doctor(
                 fix_description=f"Create {subfolder}"
             )
 
+    # STRICT AUDIT: Check for convention violations (hyphens, duplicates)
+    console.print("\n[bold]Running strict structure audit...[/bold]")
+    import re
+    jd_pattern = re.compile(r"^\d{2}_[a-z0-9_]+$")
+    
+    for area in required_areas:
+        area_path = root / area
+        if not area_path.exists(): continue
+        
+        seen_ids = {} # map id -> name
+        
+        for item in area_path.iterdir():
+            if not item.is_dir(): continue
+            if item.name.startswith("."): continue # skip hidden
+            
+            # Check naming convention
+            if not jd_pattern.match(item.name):
+                console.print(f"  [yellow]⚠[/yellow] {area}/{item.name} [dim](Invalid Naming)[/dim]")
+                if "-" in item.name:
+                    fixed_name = item.name.replace("-", "_")
+                    add_issue(
+                        f"Naming violation: {item.name} (hyphens detected)",
+                        fix_action=lambda src=item, dst=area_path/fixed_name: src.rename(dst),
+                        fix_description=f"Rename to {fixed_name}"
+                    )
+                else:
+                    add_issue(f"Naming violation: {item.name}", fix_description="Rename manually to XX_snake_case")
+                continue
+
+            # Check Duplicates
+            cat_id = item.name[:2]
+            if cat_id in seen_ids:
+                prev = seen_ids[cat_id]
+                console.print(f"  [red]✗[/red] Duplicate ID {cat_id}: {prev} vs {item.name}")
+                add_issue(
+                    f"Duplicate ID {cat_id} in {area}",
+                    fix_description=f"Resolve duplicate: {prev} vs {item.name}"
+                )
+            else:
+                seen_ids[cat_id] = item.name
+
     # Check governance files
     console.print("\n[bold]Checking governance files...[/bold]")
     required_files = [
@@ -435,18 +495,31 @@ def doctor(
 
     # Check Templates
     console.print("\n[bold]Checking templates...[/bold]")
-    templates_dir = root / "20-29_CODE"
-    clean_arch = templates_dir / "__template-clean-arch"
+    templates_dir = root / "00-09_SYSTEM" / "05_templates"
+    
+    required_templates = ["__template-clean-arch", "__template-bi", "__template-db"]
+    missing_templates = []
 
-    if clean_arch.exists():
-        console.print("  [green]✓[/green] Code templates installed")
-    else:
-        console.print("  [red]✗[/red] Templates missing in 20-29_CODE")
-        add_issue(
-            "Missing default code templates",
-            fix_action=lambda: run_setup_code(get_filesystem(str(root), dry_run=False)),
-            fix_description="Hydrate code templates"
-        )
+    for tmpl in required_templates:
+        if (templates_dir / tmpl).exists():
+            console.print(f"  [green]✓[/green] {tmpl}")
+        else:
+            missing_templates.append(tmpl)
+            console.print(f"  [red]✗[/red] {tmpl} [dim]- NOT FOUND[/dim]")
+
+    if missing_templates:
+        # Only __template-clean-arch is currently built-in and fixable via hydration
+        if "__template-clean-arch" in missing_templates:
+            add_issue(
+                "Missing default code templates",
+                fix_action=lambda: run_setup_code(get_filesystem(str(root), dry_run=False)),
+                fix_description="Hydrate code templates"
+            )
+        else:
+             add_issue(
+                f"Missing custom templates: {', '.join(t for t in missing_templates if t != '__template-clean-arch')}",
+                fix_description="Restore templates manually or from backup"
+            )
 
     # Run security checks
     from devbase.commands.security_check import run_security_checks
