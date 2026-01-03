@@ -67,95 +67,22 @@ def stats(ctx: typer.Context) -> None:
     
     Displays summary of tracked activities by type and recent events.
     """
-    root: Path = ctx.obj["root"]
-    events_file = root / ".telemetry" / "events.jsonl"
-
-    if not events_file.exists():
-        console.print("[yellow]⚠️  No telemetry data found[/yellow]")
-        console.print("[dim]Run 'devbase ops track \"message\"' to start tracking.[/dim]")
-        return
-
-    # Load events
-    events = []
-    with open(events_file, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    events.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
-
-    if not events:
-        console.print("[yellow]⚠️  No events recorded[/yellow]")
-        return
+    from devbase.adapters.storage.duckdb_adapter import get_recent_events, get_event_counts
 
     console.print()
     console.print("[bold]Activity Statistics[/bold]")
-    console.print(f"Total events: [cyan]{len(events)}[/cyan]\n")
-
-    # Count by type
-    today = datetime.now()
-    week_start = today - timedelta(days=today.weekday())
     
-    # 1. Analyze Telemetry (New)
-    # from collections import Counter # Already imported
-    # import json # Already imported
+    counts = get_event_counts(days=7)
+    total_events = sum(c[1] for c in counts)
     
-    telemetry_file = root / ".telemetry" / "events.jsonl"
-    
-    project_creates = 0
-    templates_used = Counter()
-    
-    if telemetry_file.exists():
-        try:
-            with open(telemetry_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        event = json.loads(line)
-                        if event.get("action") == "create_project_success":
-                            project_creates += 1
-                            # Try to extract template from metadata if present
-                            # We might need to look back at the start event for template info
-                            # or update success event to include it. 
-                            # For simplicity, let's assume metadata has it or we just count generic success
-                            # If metadata has path, we can't infer template easily without looking detailed
-                            pass
-                        
-                        # Better approach: check create_project_start for template popularity
-                        if event.get("action") == "create_project_start":
-                            tmpl = event.get("metadata", {}).get("template", "unknown")
-                            templates_used[tmpl] += 1
-                            
-                    except json.JSONDecodeError:
-                        pass
-        except Exception:
-            pass
+    console.print(f"Total events (last 7 days): [cyan]{total_events}[/cyan]\n")
 
     # Display Metrics
-    grid = Table.grid(expand=True)
-    grid.add_column()
-    grid.add_column(justify="right")
-    
-    grid.add_row("[bold]Weekly Activity[/bold]", "")
-    grid.add_row("Projects Created (Total)", f"[cyan]{project_creates}[/cyan]")
-    
-    if templates_used:
-        grid.add_row("", "")
-        grid.add_row("[bold]Popular Templates[/bold]", "")
-        for tmpl, count in templates_used.most_common(3):
-            grid.add_row(f"  {tmpl}",str(count))
-
-    console.print(Panel(grid, title="DevBase Stats", border_style="blue"))
-    console.print()
-
-    # Original "Count by type" logic, adapted to be "Weekly Log"
-    type_counts = Counter(e.get("category") or e.get("type", "unknown") for e in events)
-    table = Table(title="Events by Type") # Changed title to "Events by Type" to match original intent
+    table = Table(title="Events by Type (Last 7 Days)")
     table.add_column("Type", style="cyan")
     table.add_column("Count", justify="right", style="green")
 
-    for event_type, count in type_counts.most_common():
+    for event_type, count in counts:
         table.add_row(event_type, str(count))
 
     console.print(table)
@@ -163,10 +90,14 @@ def stats(ctx: typer.Context) -> None:
     # Recent activity
     console.print()
     console.print("[bold]Recent Activity:[/bold]")
-    for event in events[-5:]:
-        ts = event.get("timestamp", "")[:10]
+    
+    recent = get_recent_events(limit=5)
+    for event in recent:
+        ts = event.get("timestamp", "")[:16].replace("T", " ")
         msg = event.get("message", "")[:60]
-        console.print(f"  [dim]{ts}[/dim] {msg}")
+        cat = event.get("event_type", "unknown")
+        console.print(f"  [dim]{ts}[/dim] [[cyan]{cat}[/cyan]] {msg}")
+
 
 
 @app.command()
@@ -188,48 +119,46 @@ def weekly(
     - --output C:\\path\\report.md: saves to absolute path (escapes workspace)
     """
     from devbase.utils.paths import resolve_workspace_path
+    from devbase.adapters.storage.duckdb_adapter import get_recent_events
     
     root: Path = ctx.obj["root"]
-    events_file = root / ".telemetry" / "events.jsonl"
 
-    if not events_file.exists():
-        console.print("[yellow]⚠️  No telemetry data found[/yellow]")
-        return
-
+    # Get events from DB (limit 500 should cover a week context)
+    events = get_recent_events(limit=500)
+    
     # Filter last week
     week_ago = datetime.now() - timedelta(days=7)
-    events = []
+    weekly_events = []
 
-    with open(events_file, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    event = json.loads(line)
-                    ts = datetime.fromisoformat(event.get("timestamp", ""))
-                    if ts >= week_ago:
-                        events.append(event)
-                except (json.JSONDecodeError, ValueError):
-                    pass
+    for event in events:
+        try:
+            ts = datetime.fromisoformat(event.get("timestamp", ""))
+            if ts >= week_ago:
+                weekly_events.append(event)
+        except (ValueError, TypeError):
+            pass
+
+    if not weekly_events:
+        console.print("[yellow]⚠️  No telemetry data found for last 7 days[/yellow]")
+        return
 
     # Generate report
     report = f"""# Weekly Report
 
 **Period**: {week_ago.strftime('%Y-%m-%d')} to {datetime.now().strftime('%Y-%m-%d')}  
-**Total activities**: {len(events)}
+**Total activities**: {len(weekly_events)}
 
 ## Activities
 
 """
-    for event in events:
-        ts = event.get("timestamp", "")[:10]
+    for event in weekly_events:
+        ts = event.get("timestamp", "")[:16]
         msg = event.get("message", "")
-        # v2 uses 'category', v1 uses 'type'
-        cat = event.get("category") or event.get("type", "unknown")
-        # Ensure project is shown if available (v2 context)
-        ctx_data = event.get("context", {})
-        if isinstance(ctx_data, dict) and ctx_data.get("project"):
-            cat = f"{cat}:{ctx_data['project']}"
+        cat = event.get("event_type", "unknown")
+        project = event.get("project")
+        
+        if project:
+            cat = f"{cat}:{project}"
             
         report += f"- [{ts}] **{cat}**: {msg}\n"
 
