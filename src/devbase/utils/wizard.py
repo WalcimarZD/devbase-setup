@@ -16,13 +16,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-from devbase import __version__
-
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
+
+from devbase import __version__
 
 console = Console()
 
@@ -30,7 +30,7 @@ console = Console()
 def check_python_version() -> tuple[bool, str]:
     """
     Check if Python version meets minimum requirements (>=3.8).
-    
+
     Returns:
         tuple: (is_valid, message)
     """
@@ -50,7 +50,7 @@ def check_python_version() -> tuple[bool, str]:
 def check_git_installed() -> tuple[bool, str]:
     """
     Check if Git is installed and accessible.
-    
+
     Returns:
         tuple: (is_installed, message)
     """
@@ -74,7 +74,7 @@ def check_git_installed() -> tuple[bool, str]:
 def run_prerequisite_checks() -> bool:
     """
     Run all prerequisite checks and display results.
-    
+
     Returns:
         bool: True if all checks pass
     """
@@ -109,10 +109,10 @@ def run_prerequisite_checks() -> bool:
 def validate_workspace_path(path: Path) -> tuple[bool, str]:
     """
     Validate proposed workspace path.
-    
+
     Args:
         path: Proposed workspace path
-        
+
     Returns:
         tuple: (is_valid, error_message)
     """
@@ -147,7 +147,7 @@ def validate_workspace_path(path: Path) -> tuple[bool, str]:
 def run_interactive_wizard() -> dict:
     """
     Run the complete interactive setup wizard.
-    
+
     Returns:
         dict: Configuration choices made by user
     """
@@ -241,7 +241,7 @@ def run_interactive_wizard() -> dict:
         "📝 Configure [bold]VS Code[/bold] workspace settings?",
         default=True
     )
-    
+
     console.print(f"\n[green]✓[/green] Environment: {'Git, ' if git_init else ''}{'VS Code' if vscode_config else ''}\n")
 
     # Step 6: Confirmation
@@ -276,7 +276,7 @@ def run_interactive_wizard() -> dict:
 def execute_setup_with_config(config: dict) -> None:
     """
     Execute setup with wizard configuration.
-    
+
     Args:
         config: Configuration from wizard
     """
@@ -284,8 +284,6 @@ def execute_setup_with_config(config: dict) -> None:
     console.print("[bold cyan]Creating workspace...[/bold cyan]\n")
 
     # Import setup modules from core (where stubs are defined)
-    from devbase.utils.filesystem import get_filesystem
-    from devbase.utils.state import get_state_manager
     from devbase.commands.core import (
         run_setup_ai,
         run_setup_code,
@@ -293,6 +291,8 @@ def execute_setup_with_config(config: dict) -> None:
         run_setup_operations,
         run_setup_pkm,
     )
+    from devbase.utils.filesystem import get_filesystem
+    from devbase.utils.state import get_state_manager
 
     root = config["path"]
     fs = get_filesystem(str(root), dry_run=False)
@@ -340,7 +340,8 @@ def execute_setup_with_config(config: dict) -> None:
     if config.get("git_init"):
         console.print("\n[bold]Initializing Git repository...[/bold]")
         try:
-            subprocess.run(["git", "init", str(root)], check=True, capture_output=True)
+            # Use -- delimiter for path arguments to prevent option injection
+            subprocess.run(["git", "init", "--", str(root)], check=True, capture_output=True)
             subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
             subprocess.run(["git", "-C", str(root), "commit", "-m", "chore: initial workspace setup"], check=True, capture_output=True)
             console.print("  [green]✓[/green] Git initialized and initial commit created")
@@ -352,15 +353,15 @@ def execute_setup_with_config(config: dict) -> None:
         console.print("\n[bold]Configuring VS Code...[/bold]")
         vscode_dir = root / ".vscode"
         vscode_dir.mkdir(exist_ok=True)
-        
+
         settings = vscode_dir / "settings.json"
         if not settings.exists():
             settings.write_text('{\n    "files.exclude": {\n        "**/__pycache__": true,\n        "**/.DS_Store": true\n    },\n    "editor.formatOnSave": true,\n    "python.analysis.typeCheckingMode": "basic"\n}', encoding="utf-8")
-        
+
         extensions = vscode_dir / "extensions.json"
         if not extensions.exists():
             extensions.write_text('{\n    "recommendations": [\n        "ms-python.python",\n        "tamasfe.even-better-toml",\n        "yzhang.markdown-all-in-one"\n    ]\n}', encoding="utf-8")
-            
+
         console.print("  [green]✓[/green] .vscode settings created")
 
     # Success message
