@@ -98,8 +98,9 @@ def add_worktree(
 
     # Simple approach: if --create, always create new branch from HEAD
     # Otherwise, try to checkout existing branch
+    # Note: Use "--" to prevent argument injection from branch names
     if create_branch:
-        cmd = ["git", "worktree", "add", "-b", branch, str(worktree_path), "HEAD"]
+        cmd = ["git", "worktree", "add", "-b", branch, "--", str(worktree_path), "HEAD"]
     else:
         # Use -- delimiter to prevent branch name being interpreted as an option
         cmd = ["git", "worktree", "add", str(worktree_path), "--", branch]
@@ -167,6 +168,7 @@ def remove_worktree(project_path: Path, worktree_path: Path, force: bool = False
     cmd = ["git", "worktree", "remove"]
     if force:
         cmd.append("--force")
+    cmd.append("--")
     cmd.append(str(worktree_path))
 
     try:
