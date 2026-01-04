@@ -1,0 +1,9 @@
+# DevBase
+.devbase_state.json
+__pycache__/
+*.pyc
+.DS_Store
+
+# Security
+12_private_vault/
+*.env

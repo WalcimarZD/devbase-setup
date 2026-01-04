@@ -289,6 +289,8 @@ def open_project(
         devbase dev open MedSempreMVC_GIT
         devbase dev open
     """
+    from datetime import datetime
+    from rich.table import Table
     from devbase.utils.vscode import open_in_vscode
     from rich.prompt import Prompt
 
@@ -315,15 +317,31 @@ def open_project(
             console.print("Create one with: [cyan]devbase dev new[/cyan]")
             raise typer.Exit(1)
 
-        # Sort by name
-        candidates.sort(key=lambda x: x.name)
+        # Sort by Recently Modified (descending)
+        candidates.sort(key=lambda x: x.stat().st_mtime, reverse=True)
 
+        # Display selection table
         console.print("\n[bold]Select a project to open:[/bold]")
+
+        table = Table(show_header=True, header_style="bold magenta", box=None)
+        table.add_column("#", style="dim", width=4)
+        table.add_column("Project", style="cyan")
+        table.add_column("Type", width=10)
+        table.add_column("Last Modified", style="dim", justify="right")
+
         for i, path in enumerate(candidates, 1):
             kind = "Worktree" if path.parent.name == "22_worktrees" else "Project"
-            color = "magenta" if kind == "Worktree" else "green"
-            console.print(f"  [bold cyan]{i}.[/bold cyan] {path.name} [{color}]({kind})[/{color}]")
+            kind_style = "magenta" if kind == "Worktree" else "green"
+            mtime = datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
 
+            table.add_row(
+                str(i),
+                path.name,
+                f"[{kind_style}]{kind}[/{kind_style}]",
+                mtime
+            )
+
+        console.print(table)
         console.print()
         choice = Prompt.ask("Enter number or name", default="1")
 
