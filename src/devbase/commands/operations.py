@@ -3,16 +3,13 @@ Operations Commands: track, stats, weekly, backup, clean
 =========================================================
 Operational and productivity commands.
 """
-import json
 import shutil
-from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 from typing_extensions import Annotated
 
@@ -31,9 +28,9 @@ def track(
 ) -> None:
     """
     📝 Track an activity or task.
-    
+
     Logs activities to telemetry for later analysis with stats/weekly commands.
-    
+
     AUTO-DETECTION:
     - If you're inside a project folder, it auto-tags with project name
     - Activity type is inferred from your location:
@@ -41,7 +38,7 @@ def track(
       * knowledge → "learning"
       * vault → "personal"
       * ai → "ai"
-    
+
     Example:
         cd 20-29_CODE/21_monorepo_apps/my-api
         devbase ops track "Implemented OAuth2"
@@ -50,7 +47,7 @@ def track(
     root: Path = ctx.obj["root"]
 
     from devbase.utils.telemetry import get_telemetry
-    
+
     telemetry = get_telemetry(root)
     event = telemetry.track(
         message=message,
@@ -64,17 +61,17 @@ def track(
 def stats(ctx: typer.Context) -> None:
     """
     📊 Show activity statistics.
-    
+
     Displays summary of tracked activities by type and recent events.
     """
-    from devbase.adapters.storage.duckdb_adapter import get_recent_events, get_event_counts
+    from devbase.adapters.storage.duckdb_adapter import get_event_counts, get_recent_events
 
     console.print()
     console.print("[bold]Activity Statistics[/bold]")
-    
+
     counts = get_event_counts(days=7)
     total_events = sum(c[1] for c in counts)
-    
+
     console.print(f"Total events (last 7 days): [cyan]{total_events}[/cyan]\n")
 
     # Display Metrics
@@ -90,7 +87,7 @@ def stats(ctx: typer.Context) -> None:
     # Recent activity
     console.print()
     console.print("[bold]Recent Activity:[/bold]")
-    
+
     recent = get_recent_events(limit=5)
     for event in recent:
         ts = event.get("timestamp", "")[:16].replace("T", " ")
@@ -110,22 +107,22 @@ def weekly(
 ) -> None:
     """
     📅 Generate weekly activity report.
-    
+
     Creates a markdown report of the last 7 days of activities.
-    
+
     Output paths are relative to workspace by default:
     - No --output: saves to journal/weekly-YYYY-MM-DD.md
     - --output report.md: saves to journal/report.md
     - --output C:\\path\\report.md: saves to absolute path (escapes workspace)
     """
-    from devbase.utils.paths import resolve_workspace_path
     from devbase.adapters.storage.duckdb_adapter import get_recent_events
-    
+    from devbase.utils.paths import resolve_workspace_path
+
     root: Path = ctx.obj["root"]
 
     # Get events from DB (limit 500 should cover a week context)
     events = get_recent_events(limit=500)
-    
+
     # Filter last week
     week_ago = datetime.now() - timedelta(days=7)
     weekly_events = []
@@ -145,7 +142,7 @@ def weekly(
     # Generate report
     report = f"""# Weekly Report
 
-**Period**: {week_ago.strftime('%Y-%m-%d')} to {datetime.now().strftime('%Y-%m-%d')}  
+**Period**: {week_ago.strftime('%Y-%m-%d')} to {datetime.now().strftime('%Y-%m-%d')}
 **Total activities**: {len(weekly_events)}
 
 ## Activities
@@ -156,25 +153,25 @@ def weekly(
         msg = event.get("message", "")
         cat = event.get("event_type", "unknown")
         project = event.get("project")
-        
+
         if project:
             cat = f"{cat}:{project}"
-            
+
         report += f"- [{ts}] **{cat}**: {msg}\n"
 
     # Determine output path (workspace-relative by default)
     default_subdir = "10-19_KNOWLEDGE/12_private_vault/journal"
-    
+
     if output is None:
         # Auto-generate filename
         filename = f"weekly-{datetime.now().strftime('%Y-%m-%d')}.md"
         final_path = root / default_subdir / filename
     else:
         final_path = resolve_workspace_path(output, root, default_subdir)
-    
+
     # Ensure directory exists
     final_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Save
     final_path.write_text(report, encoding="utf-8")
     console.print(f"[green]✓[/green] Report saved to: [cyan]{final_path}[/cyan]")
@@ -184,7 +181,7 @@ def weekly(
 def backup(ctx: typer.Context) -> None:
     """
     💾 Create workspace backup (3-2-1 strategy).
-    
+
     Creates a local backup excluding common build artifacts.
     """
     root: Path = ctx.obj["root"]
@@ -209,7 +206,7 @@ def backup(ctx: typer.Context) -> None:
         '.pypirc', '.npmrc', '.aws', '.ssh', '.gnupg',
         # Note: Individual secret files with extensions are handled by pattern matching below
     }
-    
+
     # Additional patterns for secret files
     secret_patterns = {'.pem', '.key', '.p12', '.pfx', 'id_rsa', 'id_ed25519', '.crt'}
 
@@ -243,26 +240,56 @@ def backup(ctx: typer.Context) -> None:
 def clean(ctx: typer.Context) -> None:
     """
     🧹 Clean temporary files from workspace.
-    
+
     Removes common temporary file patterns (*.log, *.tmp, etc.).
     """
+    from devbase.utils.filesystem import scan_directory
     root: Path = ctx.obj["root"]
 
     console.print()
     console.print("[bold]Cleaning temporary files...[/bold]\n")
 
+    # Patterns to match against filename (fnmatch style)
+    # Using fnmatch for flexibility with patterns like '*~'
+    import fnmatch
+
     patterns = ['*.log', '*.tmp', '*~', 'Thumbs.db', '.DS_Store']
     cleaned = 0
 
-    for pattern in patterns:
-        for file in root.rglob(pattern):
-            if file.is_file():
-                try:
-                    file.unlink()
+    # ⚡ Bolt Optimization:
+    # Use scan_directory instead of multiple rglob calls.
+    # 1. Single pass through directory tree (O(N) vs O(M*N) where M is patterns)
+    # 2. Prunes ignored directories (node_modules, .git) avoiding wasted scans
+    # 3. Uses os.walk (faster) instead of creating Path objects for every file
+
+    # We pass extensions=None to scan everything (except pruned dirs),
+    # then match specific patterns manually.
+
+    # Pre-filter extensions for scan_directory if possible to reduce yields?
+    # scan_directory only supports strict extension matching (e.g. '.log').
+    # Patterns like '*~' or 'Thumbs.db' don't map cleanly to simple extensions.
+    # So we scan all (pruned) files and filter here.
+
+    for file_path in scan_directory(root):
+        name = file_path.name
+
+        # Check if file matches any pattern
+        # Optimization: Check exact matches first (faster than fnmatch)
+        if name in {'Thumbs.db', '.DS_Store'}:
+             matched = True
+        elif any(fnmatch.fnmatch(name, p) for p in patterns):
+             matched = True
+        else:
+             matched = False
+
+        if matched:
+            try:
+                if file_path.is_file():
+                    file_path.unlink()
                     cleaned += 1
-                    console.print(f"  [dim]Removed: {file.name}[/dim]")
-                except Exception:
-                    pass
+                    console.print(f"  [dim]Removed: {name}[/dim]")
+            except Exception:
+                pass
 
     console.print()
     console.print(f"[green]✓[/green] Removed {cleaned} temporary file(s)")
