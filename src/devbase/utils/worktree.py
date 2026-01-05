@@ -72,7 +72,8 @@ def add_worktree(
     worktrees_dir: Path,
     project_name: str,
     branch: str,
-    create_branch: bool = False
+    create_branch: bool = False,
+    custom_name: Optional[str] = None
 ) -> Optional[Path]:
     """
     Add a new worktree for a project.
@@ -83,11 +84,17 @@ def add_worktree(
         project_name: Name of the project
         branch: Branch name
         create_branch: If True, create a new branch
+        custom_name: Optional custom name for the worktree folder
 
     Returns:
         Path to created worktree, or None on failure
     """
-    worktree_name = f"{project_name}--{sanitize_branch_name(branch)}"
+    if custom_name:
+        worktree_name = custom_name
+    else:
+        # User requested single dash separator (ref: Step 44)
+        worktree_name = f"{project_name}-{sanitize_branch_name(branch)}"
+    
     worktree_path = worktrees_dir / worktree_name
 
     if worktree_path.exists():

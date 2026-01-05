@@ -978,15 +978,20 @@ def worktree_add(
         bool,
         typer.Option("--create", "-c", help="Create new branch")
     ] = False,
+    name: Annotated[
+        Optional[str],
+        typer.Option("--name", "-n", help="Custom worktree folder name")
+    ] = None,
 ) -> None:
     """
     🌳 Create a new worktree for a project.
     
-    Creates a worktree in 22_worktrees/<project>--<branch>.
+    Creates a worktree in 22_worktrees/<project>-<branch> (default).
     
     Examples:
         devbase dev worktree-add MedSempreMVC_GIT feature/nova-rotina
         devbase dev worktree-add MyProject feature/xyz --create
+        devbase dev worktree-add MyProject feature/xyz --name "my-feature-xyz"
     """
     from devbase.utils.worktree import add_worktree, get_worktree_dir
     from devbase.utils.vscode import generate_vscode_workspace
@@ -1003,7 +1008,7 @@ def worktree_add(
         raise typer.Exit(1)
     
     worktrees_dir = get_worktree_dir(root)
-    worktree_path = add_worktree(project_path, worktrees_dir, project_name, branch, create)
+    worktree_path = add_worktree(project_path, worktrees_dir, project_name, branch, create, custom_name=name)
     
     if worktree_path:
         # Generate workspace file
@@ -1099,8 +1104,21 @@ def worktree_remove(
         console.print(f"[red]✗ Worktree '{worktree_name}' not found.[/red]")
         raise typer.Exit(1)
     
-    # Extract parent project name
-    project_name = worktree_name.split("--")[0]
+    # Try to determine parent project from metadata
+    project_name = None
+    meta_file = worktree_path / ".devbase.json"
+    
+    if meta_file.exists():
+        try:
+            import json
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+            project_name = meta.get("parent_project")
+        except:
+            pass
+            
+    # Fallback to legacy naming convention
+    if not project_name:
+        project_name = worktree_name.split("--")[0]
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
     
     if not project_path.exists():
