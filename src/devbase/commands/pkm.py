@@ -505,10 +505,7 @@ status: active
     else:
         # Open in editor (VS Code)
         console.print(f"Opening [cyan]{filename}[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
-        else:
-            subprocess.run(f"code {file_path}", shell=True)
+        subprocess.run(["code", str(file_path)])
 
 
 @app.command()
@@ -564,7 +561,4 @@ def icebox(
     else:
          # Open in editor
         console.print(f"Opening [cyan]icebox.md[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
-        else:
-            subprocess.run(f"code {file_path}", shell=True)
+        subprocess.run(["code", str(file_path)])
