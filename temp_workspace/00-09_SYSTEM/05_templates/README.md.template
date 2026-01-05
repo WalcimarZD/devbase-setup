@@ -1,0 +1,139 @@
+# Code (20-29)
+
+> Área de código fonte - Clean Architecture + DDD
+
+## 🎯 Propósito
+
+A área CODE contém todo o código fonte dos seus projetos. Está organizada para suportar:
+- **Monorepos** - Múltiplos projetos relacionados
+- **Packages compartilhados** - Bibliotecas reutilizáveis
+- **Templates** - Estrutura padrão para novos projetos
+
+## 📁 Estrutura
+
+```
+20-29_CODE/
+├── 21_monorepo_apps/       # Aplicações principais
+│   ├── my-app/             # Exemplo de aplicação
+│   └── another-app/        # Outra aplicação
+│
+├── 22_monorepo_packages/   # Bibliotecas compartilhadas
+│   ├── shared-types/       # Tipos TypeScript compartilhados
+│   ├── shared-utils/       # Utilitários comuns
+│   └── ui-components/      # Componentes de UI reutilizáveis
+│
+├── 23_worktrees/           # Git worktrees para branches paralelas
+│   └── feature-x/          # Worktree para feature específica
+│
+└── __template-clean-arch/  # Template para novos projetos
+    ├── src/
+    │   ├── domain/
+    │   ├── application/
+    │   ├── infrastructure/
+    │   └── presentation/
+    └── README.md
+```
+
+## 🚀 Criar Novo Projeto
+
+### Via CLI (recomendado)
+```powershell
+# Cria projeto a partir do template
+devbase new -Name meu-projeto
+
+# Com opções
+devbase new -Name meu-projeto -Template clean-arch -Language typescript
+```
+
+### Manualmente
+```powershell
+# Copiar template
+Copy-Item -Recurse __template-clean-arch 21_monorepo_apps/meu-projeto
+
+# Renomear placeholders
+# Substituir {{PROJECT_NAME}} pelo nome real no código
+```
+
+## 🏗️ Clean Architecture
+
+O template segue **Clean Architecture** (também conhecida como Onion Architecture ou Hexagonal):
+
+```
+┌─────────────────────────────────────────────┐
+│              PRESENTATION                    │
+│         (Controllers, Views, API)           │
+├─────────────────────────────────────────────┤
+│              APPLICATION                     │
+│        (Use Cases, DTOs, Services)          │
+├─────────────────────────────────────────────┤
+│                 DOMAIN                       │
+│    (Entities, Value Objects, Interfaces)    │
+├─────────────────────────────────────────────┤
+│             INFRASTRUCTURE                   │
+│      (Database, APIs, File System)          │
+└─────────────────────────────────────────────┘
+```
+
+### Regra de Dependência
+**Dependências apontam PARA DENTRO:**
+- ✅ Infrastructure → Domain
+- ✅ Application → Domain
+- ✅ Presentation → Application
+- ❌ Domain → Infrastructure (NUNCA!)
+
+### Camadas
+
+| Camada | Conteúdo | Exemplo |
+|--------|----------|---------|
+| **Domain** | Entidades, Value Objects, Interfaces de Repository | `User`, `Email`, `IUserRepository` |
+| **Application** | Use Cases, DTOs, Services de aplicação | `CreateUserUseCase`, `UserDTO` |
+| **Infrastructure** | Implementações, Database, APIs externas | `SqlUserRepository`, `EmailService` |
+| **Presentation** | Controllers, Views, Endpoints de API | `UserController`, `UserView` |
+
+## 📦 Git Worktrees
+
+Worktrees permitem trabalhar em múltiplas branches simultaneamente sem trocar de branch:
+
+```bash
+# Criar worktree para uma feature
+git worktree add ../23_worktrees/feature-auth feature/auth
+
+# Listar worktrees
+git worktree list
+
+# Remover worktree
+git worktree remove ../23_worktrees/feature-auth
+```
+
+**Quando usar:**
+- Code review enquanto trabalha em outra feature
+- Testar branch de produção sem perder contexto local
+- Comparar implementações side-by-side
+
+## 📐 Convenções
+
+### Nomenclatura de Arquivos
+- **kebab-case** para arquivos e pastas: `user-repository.ts`
+- Exceção: Classes seguem PascalCase no código interno
+
+### Commits
+Siga [Conventional Commits](../05_templates/patterns/padroes-git.md):
+```bash
+feat(user): add email validation
+fix(auth): resolve token refresh issue
+```
+
+### Testes
+```
+src/
+├── domain/
+│   └── user.ts
+└── domain/__tests__/
+    └── user.test.ts
+```
+
+## 📚 Documentação Adicional
+
+- [Template Clean Architecture](__template-clean-arch/README.md)
+- [Git Patterns](../05_templates/patterns/padroes-git.md)
+- [System Prompt para Dev](../05_templates/prompts/system-prompt-dev.md)
