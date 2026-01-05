@@ -10,6 +10,7 @@ import sys
 import toml
 import inspect
 import subprocess
+import re
 from pathlib import Path
 from typing import List, Set, Dict, Any
 from datetime import datetime, timedelta
@@ -76,19 +77,19 @@ def consistency_audit(
     console.print("\n[bold underline]Audit Summary:[/bold underline]\n")
 
     if report["updated"]:
-        table = Table(title="✅ Updated Files", show_header=False, box=None)
+        table = Table(title="✅ Documentation files updated", show_header=False, box=None)
         for item in report["updated"]:
             table.add_row(f"✅ {item}")
         console.print(table)
 
     if report["warnings"]:
-        table = Table(title="⚠️ Inconsistencies Found", show_header=False, box=None, style="yellow")
+        table = Table(title="⚠️ Inconsistencies found requiring human decision", show_header=False, box=None, style="yellow")
         for item in report["warnings"]:
             table.add_row(f"⚠️ {item}")
         console.print(table)
 
     if report["suggestions"]:
-        table = Table(title="📝 Suggestions", show_header=False, box=None, style="blue")
+        table = Table(title="📝 Suggestions for improvement", show_header=False, box=None, style="blue")
         for item in report["suggestions"]:
             table.add_row(f"📝 {item}")
         console.print(table)
@@ -181,47 +182,92 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
 
 def _verify_cli_consistency(root: Path, report: Dict[str, List[str]], fix: bool):
     """Check CLI commands vs Documentation"""
-    # 1. Gather all commands from code
-    # This is tricky without importing everything. We can inspect the command files.
-    # Or import the app. But importing might have side effects or be slow.
-    # Let's simple parse files in src/devbase/commands for @app.command or similar.
-
     commands_dir = root / "src" / "devbase" / "commands"
-    found_commands = {} # module -> list of command names
+    docs_cli_dir = root / "docs" / "cli"
+
+    # 1. Gather all commands and flags from code
+    found_commands = {} # module -> list of {name, flags}
 
     for cmd_file in commands_dir.glob("*.py"):
         if cmd_file.name == "__init__.py": continue
 
+        module_name = cmd_file.stem
         content = cmd_file.read_text()
-        import re
-        # Match @app.command("name") or @cli.command("name")
-        matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
-        if matches:
-            found_commands[cmd_file.stem] = matches
 
-    # 2. Check Docs
-    usage_guide = root / "USAGE-GUIDE.md" # or docs/cli/
+        # Regex to find command definitions and potentially options inside
+        # Note: This is a static approximation. Robust parsing would need AST.
+        # Finding command blocks: @app.command(...) def name(...): ...
+
+        # Simple approach: Find all command names, and find all options in the file
+        # Ideally we map options to commands, but per-file (per-module) scanning is a good start.
+
+        cmd_matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
+
+        # Find all flags: typer.Option(..., "--flag-name" or "-f")
+        # Matches: "--some-flag"
+        flag_matches = re.findall(r'typer\.Option\(.*?"(--[\w-]+)"', content)
+        short_flag_matches = re.findall(r'typer\.Option\(.*?"(-[\w])"', content)
+
+        all_flags = set(flag_matches + short_flag_matches)
+
+        if cmd_matches:
+            found_commands[module_name] = {
+                "commands": cmd_matches,
+                "flags": list(all_flags)
+            }
+
+    # 2. Check Docs (USAGE-GUIDE.md and docs/cli/*.md)
+    usage_guide = root / "USAGE-GUIDE.md"
     usage_content = usage_guide.read_text() if usage_guide.exists() else ""
 
     missing_docs = []
+    missing_flags = []
 
-    for module, cmds in found_commands.items():
+    for module, data in found_commands.items():
+        cmds = data["commands"]
+        flags = data["flags"]
+
+        # Check module-specific doc existence
+        module_doc = docs_cli_dir / f"{module}.md"
+        if not module_doc.exists():
+            report["warnings"].append(f"Missing CLI documentation file: docs/cli/{module}.md")
+            if fix:
+                # Create stub
+                docs_cli_dir.mkdir(parents=True, exist_ok=True)
+                stub_content = f"# `devbase {module}`\n\nCommands for {module}.\n\n"
+                for cmd in cmds:
+                    stub_content += f"## `{cmd}`\n\nDescription here.\n\n"
+                module_doc.write_text(stub_content)
+                report["updated"].append(f"Created docs/cli/{module}.md")
+
+        # Check USAGE-GUIDE.md for commands
         for cmd in cmds:
-            # Check if command is mentioned in USAGE-GUIDE.md
-            # Heuristic: "devbase <module> <cmd>" or just the command name if unique
             full_cmd = f"{module} {cmd}"
+            # Check if command is mentioned
             if full_cmd not in usage_content and cmd not in usage_content:
                 missing_docs.append(f"{module} {cmd}")
+
+        # Check USAGE-GUIDE.md for flags (global check, or specific if context allows)
+        # This is loose, just checking if the flag string exists in the doc
+        for flag in flags:
+            if flag not in usage_content:
+                # Also check module doc
+                if module_doc.exists() and flag in module_doc.read_text():
+                    continue
+                missing_flags.append(f"{module}: {flag}")
 
     if missing_docs:
         report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_docs)}")
         if fix and usage_guide.exists():
-            # Append a todo section
             with open(usage_guide, "a") as f:
                 f.write("\n\n## Undocumented Commands (Auto-detected)\n")
                 for cmd in missing_docs:
                     f.write(f"- `devbase {cmd}`\n")
             report["updated"].append("USAGE-GUIDE.md (added list of undocumented commands)")
+
+    if missing_flags:
+        report["suggestions"].append(f"Potential undocumented flags: {', '.join(missing_flags)}")
+
 
 def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
     """Check DB Code vs Technical Docs"""
@@ -240,8 +286,6 @@ def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
     db_content = db_file.read_text()
 
     # Extract table names from DB code using basic regex for SQL patterns
-    # Matches: INSERT INTO table_name, FROM table_name, CREATE TABLE table_name
-    import re
     table_patterns = [
         r'INSERT INTO\s+([a-zA-Z0-9_]+)',
         r'FROM\s+([a-zA-Z0-9_]+)',
@@ -253,9 +297,7 @@ def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
         matches = re.findall(pattern, db_content, re.IGNORECASE)
         found_tables.update(matches)
 
-    # Filter out likely SQL keywords or temp aliases if regex is too loose,
-    # but strictly looking for prompt's specific concern: hot_fts, cold_fts
-    # We filter for tables that seem "significant" (e.g., have 'fts' or 'embeddings' or are 'notes')
+    # Filter for significant tables
     significant_tables = {t for t in found_tables if 'fts' in t or 'embeddings' in t or 'notes' in t}
 
     missing_in_doc = []
@@ -286,8 +328,6 @@ def _check_changelog(root: Path, report: Dict[str, List[str]], changes: List[str
             if len(changes) > 5:
                 new_section += f"- ... and {len(changes)-5} more files.\n"
 
-            # Simple prepend (risky if format is strict, better to append or insert after header)
-            # Assuming standard Keep A Changelog format
             lines = content.splitlines()
             # Find first h2
             insert_idx = 0
@@ -300,3 +340,6 @@ def _check_changelog(root: Path, report: Dict[str, List[str]], changes: List[str
                 lines.insert(insert_idx, new_section)
                 changelog.write_text("\n".join(lines))
                 report["updated"].append("CHANGELOG.md (added Unreleased section)")
+
+if __name__ == "__main__":
+    app()
