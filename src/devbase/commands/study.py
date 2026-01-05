@@ -15,6 +15,8 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from typing_extensions import Annotated
 
+from devbase.utils.filesystem import scan_directory
+
 app = typer.Typer(help="Learning \u0026 knowledge retention commands")
 console = Console()
 
@@ -61,7 +63,8 @@ def review(
     
     # Collect all markdown files
     notes = []
-    for md_file in knowledge_base.rglob("*.md"):
+    # Bolt Optimization: Use scan_directory for efficient scanning and pruning
+    for md_file in scan_directory(knowledge_base, extensions={'.md'}):
         if md_file.name.startswith("_"):  # Skip indexes
             continue
         
@@ -188,7 +191,8 @@ def synthesize(
     
     # Collect eligible notes (TIL, concepts)
     notes = []
-    for md_file in knowledge_base.rglob("*.md"):
+    # Bolt Optimization: Use scan_directory for efficient scanning and pruning
+    for md_file in scan_directory(knowledge_base, extensions={'.md'}):
         if md_file.name.startswith("_"):
             continue
         
