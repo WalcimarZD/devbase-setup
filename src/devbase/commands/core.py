@@ -3,6 +3,7 @@ Core Commands: setup, doctor, hydrate
 ======================================
 Essential workspace management commands.
 """
+
 from datetime import datetime
 from pathlib import Path
 
@@ -74,24 +75,25 @@ def run_setup_module(fs, module_name: str, policy_version=None) -> None:
         fs.ensure_dir(folder)
 
 
-
 def create_governance_files(fs) -> None:
     """Create default governance files if they don't exist."""
     # .editorconfig
     if not fs.exists(".editorconfig"):
-        fs.write_atomic(".editorconfig",
+        fs.write_atomic(
+            ".editorconfig",
             "root = true\n\n"
             "[*]\n"
             "indent_style = space\n"
             "indent_size = 4\n"
             "charset = utf-8\n"
             "trim_trailing_whitespace = true\n"
-            "insert_final_newline = true\n"
+            "insert_final_newline = true\n",
         )
 
     # .gitignore
     if not fs.exists(".gitignore"):
-        fs.write_atomic(".gitignore",
+        fs.write_atomic(
+            ".gitignore",
             "# DevBase\n"
             ".devbase_state.json\n"
             "__pycache__/\n"
@@ -99,14 +101,14 @@ def create_governance_files(fs) -> None:
             ".DS_Store\n\n"
             "# Security\n"
             "12_private_vault/\n"
-            "*.env\n"
+            "*.env\n",
         )
 
     # 00.00_index.md
     if not fs.exists("00-09_SYSTEM/00.00_index.md"):
-        fs.write_atomic("00-09_SYSTEM/00.00_index.md",
-            "# Johnny.Decimal Index\n\n"
-            "Master index of the workspace.\n"
+        fs.write_atomic(
+            "00-09_SYSTEM/00.00_index.md",
+            "# Johnny.Decimal Index\n\nMaster index of the workspace.\n",
         )
 
 
@@ -117,24 +119,24 @@ def run_setup_core(fs, policy_version=None):
 
     # Create required subfolders
     required_subfolders = [
-        '00-09_SYSTEM/00_inbox',
-        '00-09_SYSTEM/01_dotfiles',
-        '00-09_SYSTEM/07_documentation',
-        '10-19_KNOWLEDGE/10_guides_and_references',
-        '10-19_KNOWLEDGE/11_public_garden',
-        '10-19_KNOWLEDGE/12_private_vault',
-        '10-19_KNOWLEDGE/13_architecture_and_specs',
-        '10-19_KNOWLEDGE/14_library',
-        '20-29_CODE/21_monorepo_apps',
-        '20-29_CODE/22_worktrees',
-        '20-29_CODE/23_playground',
-        '30-39_OPERATIONS/31_backups',
-        '30-39_OPERATIONS/32_automation',
-        '40-49_MEDIA_ASSETS/40_images',
-        '40-49_MEDIA_ASSETS/41_videos',
-        '40-49_MEDIA_ASSETS/42_audio',
-        '40-49_MEDIA_ASSETS/43_fonts',
-        '40-49_MEDIA_ASSETS/44_design_sources',
+        "00-09_SYSTEM/00_inbox",
+        "00-09_SYSTEM/01_dotfiles",
+        "00-09_SYSTEM/07_documentation",
+        "10-19_KNOWLEDGE/10_guides_and_references",
+        "10-19_KNOWLEDGE/11_public_garden",
+        "10-19_KNOWLEDGE/12_private_vault",
+        "10-19_KNOWLEDGE/13_architecture_and_specs",
+        "10-19_KNOWLEDGE/14_library",
+        "20-29_CODE/21_monorepo_apps",
+        "20-29_CODE/22_worktrees",
+        "20-29_CODE/23_playground",
+        "30-39_OPERATIONS/31_backups",
+        "30-39_OPERATIONS/32_automation",
+        "40-49_MEDIA_ASSETS/40_images",
+        "40-49_MEDIA_ASSETS/41_videos",
+        "40-49_MEDIA_ASSETS/42_audio",
+        "40-49_MEDIA_ASSETS/43_fonts",
+        "40-49_MEDIA_ASSETS/44_design_sources",
     ]
 
     for subfolder in required_subfolders:
@@ -154,6 +156,7 @@ import shutil
 def copy_built_in_templates(fs, category: str, destination: str):
     """Copy built-in templates from package to workspace."""
     import devbase
+
     pkg_root = Path(devbase.__file__).parent
     tmpl_src = pkg_root / "templates" / category
 
@@ -172,10 +175,10 @@ def copy_built_in_templates(fs, category: str, destination: str):
             else:
                 shutil.copy2(src, dst)
 
+
 def run_setup_code(fs, policy_version=None):
     run_setup_module(fs, "Code Templates", policy_version)
     copy_built_in_templates(fs, "code", "00-09_SYSTEM/05_templates")
-
 
 
 def run_setup_ai(fs, policy_version=None):
@@ -234,11 +237,13 @@ def setup(
 
     # Standard setup (non-interactive or update)
     console.print()
-    console.print(Panel.fit(
-        f"[bold cyan]DevBase Setup v{SCRIPT_VERSION}[/bold cyan]\n"
-        f"Workspace: [yellow]{root}[/yellow]",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold cyan]DevBase Setup v{SCRIPT_VERSION}[/bold cyan]\n"
+            f"Workspace: [yellow]{root}[/yellow]",
+            border_style="cyan",
+        )
+    )
     console.print()
 
     if dry_run:
@@ -265,9 +270,7 @@ def setup(
     ]
 
     with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console
+        SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console
     ) as progress:
         for name, run_func in modules:
             task = progress.add_task(f"Setting up {name}...", total=None)
@@ -311,7 +314,9 @@ Next steps:
 @app.command()
 def doctor(
     ctx: typer.Context,
-    fix: Annotated[bool, typer.Option("--fix", "-f", help="Auto-fix issues without prompting")] = False,
+    fix: Annotated[
+        bool, typer.Option("--fix", "-f", help="Auto-fix issues without prompting")
+    ] = False,
 ) -> None:
     """
     🏥 Check workspace health and offer fixes.
@@ -331,21 +336,23 @@ def doctor(
     issues = []
 
     def add_issue(description: str, fix_action=None, fix_description: str = None):
-        issues.append({
-            "description": description,
-            "fix_action": fix_action,
-            "fix_description": fix_description or "Auto-fix available"
-        })
+        issues.append(
+            {
+                "description": description,
+                "fix_action": fix_action,
+                "fix_description": fix_description or "Auto-fix available",
+            }
+        )
 
     # Check areas
     console.print("[bold]Checking folder structure...[/bold]")
     required_areas = [
-        '00-09_SYSTEM',
-        '10-19_KNOWLEDGE',
-        '20-29_CODE',
-        '30-39_OPERATIONS',
-        '40-49_MEDIA_ASSETS',
-        '90-99_ARCHIVE_COLD'
+        "00-09_SYSTEM",
+        "10-19_KNOWLEDGE",
+        "20-29_CODE",
+        "30-39_OPERATIONS",
+        "40-49_MEDIA_ASSETS",
+        "90-99_ARCHIVE_COLD",
     ]
 
     for area in required_areas:
@@ -357,23 +364,23 @@ def doctor(
             add_issue(
                 f"Missing folder: {area}",
                 fix_action=lambda p=area_path: p.mkdir(parents=True, exist_ok=True),
-                fix_description=f"Create {area}"
+                fix_description=f"Create {area}",
             )
 
     # Check required subfolders (Johnny.Decimal categories)
     console.print("\n[bold]Checking required subfolders...[/bold]")
     required_subfolders = [
-        '00-09_SYSTEM/00_inbox',
-        '00-09_SYSTEM/01_dotfiles',
-        '00-09_SYSTEM/07_documentation',
-        '10-19_KNOWLEDGE/10_references',
-        '10-19_KNOWLEDGE/11_public_garden',
-        '10-19_KNOWLEDGE/12_private_vault',
-        '20-29_CODE/21_monorepo_apps',
-        '20-29_CODE/22_worktrees',
-        '20-29_CODE/23_playground',
-        '30-39_OPERATIONS/31_backups',
-        '30-39_OPERATIONS/32_automation',
+        "00-09_SYSTEM/00_inbox",
+        "00-09_SYSTEM/01_dotfiles",
+        "00-09_SYSTEM/07_documentation",
+        '10-19_KNOWLEDGE/10_guides_and_references',
+        "10-19_KNOWLEDGE/11_public_garden",
+        "10-19_KNOWLEDGE/12_private_vault",
+        "20-29_CODE/21_monorepo_apps",
+        "20-29_CODE/22_worktrees",
+        "20-29_CODE/23_playground",
+        "30-39_OPERATIONS/31_backups",
+        "30-39_OPERATIONS/32_automation",
     ]
 
     for subfolder in required_subfolders:
@@ -385,36 +392,45 @@ def doctor(
             add_issue(
                 f"Missing subfolder: {subfolder}",
                 fix_action=lambda p=folder_path: p.mkdir(parents=True, exist_ok=True),
-                fix_description=f"Create {subfolder}"
+                fix_description=f"Create {subfolder}",
             )
 
     # STRICT AUDIT: Check for convention violations (hyphens, duplicates)
     console.print("\n[bold]Running strict structure audit...[/bold]")
     import re
+
     jd_pattern = re.compile(r"^\d{2}_[a-z0-9_]+$")
-    
+
     for area in required_areas:
         area_path = root / area
-        if not area_path.exists(): continue
-        
-        seen_ids = {} # map id -> name
-        
+        if not area_path.exists():
+            continue
+
+        seen_ids = {}  # map id -> name
+
         for item in area_path.iterdir():
-            if not item.is_dir(): continue
-            if item.name.startswith("."): continue # skip hidden
-            
+            if not item.is_dir():
+                continue
+            if item.name.startswith(".") or item.name.startswith("__"):
+                continue  # skip hidden and special
+
             # Check naming convention
             if not jd_pattern.match(item.name):
-                console.print(f"  [yellow]⚠[/yellow] {area}/{item.name} [dim](Invalid Naming)[/dim]")
+                console.print(
+                    f"  [yellow]⚠[/yellow] {area}/{item.name} [dim](Invalid Naming)[/dim]"
+                )
                 if "-" in item.name:
                     fixed_name = item.name.replace("-", "_")
                     add_issue(
                         f"Naming violation: {item.name} (hyphens detected)",
-                        fix_action=lambda src=item, dst=area_path/fixed_name: src.rename(dst),
-                        fix_description=f"Rename to {fixed_name}"
+                        fix_action=lambda src=item, dst=area_path / fixed_name: src.rename(dst),
+                        fix_description=f"Rename to {fixed_name}",
                     )
                 else:
-                    add_issue(f"Naming violation: {item.name}", fix_description="Rename manually to XX_snake_case")
+                    add_issue(
+                        f"Naming violation: {item.name}",
+                        fix_description="Rename manually to XX_snake_case",
+                    )
                 continue
 
             # Check Duplicates
@@ -424,7 +440,7 @@ def doctor(
                 console.print(f"  [red]✗[/red] Duplicate ID {cat_id}: {prev} vs {item.name}")
                 add_issue(
                     f"Duplicate ID {cat_id} in {area}",
-                    fix_description=f"Resolve duplicate: {prev} vs {item.name}"
+                    fix_description=f"Resolve duplicate: {prev} vs {item.name}",
                 )
             else:
                 seen_ids[cat_id] = item.name
@@ -432,10 +448,10 @@ def doctor(
     # Check governance files
     console.print("\n[bold]Checking governance files...[/bold]")
     required_files = [
-        '.editorconfig',
-        '.gitignore',
-        '00-09_SYSTEM/00.00_index.md',
-        '.devbase_state.json'
+        ".editorconfig",
+        ".gitignore",
+        "00-09_SYSTEM/00.00_index.md",
+        ".devbase_state.json",
     ]
 
     for file in required_files:
@@ -445,11 +461,13 @@ def doctor(
         else:
             console.print(f"  [yellow]⚠[/yellow] {file} [dim]- NOT FOUND[/dim]")
             # Some files can be auto-created
-            if file == '.editorconfig':
+            if file == ".editorconfig":
                 add_issue(
                     f"Missing: {file}",
-                    fix_action=lambda p=file_path: p.write_text("root = true\n\n[*]\nindent_style = space\nindent_size = 4\n"),
-                    fix_description="Create default .editorconfig"
+                    fix_action=lambda p=file_path: p.write_text(
+                        "root = true\n\n[*]\nindent_style = space\nindent_size = 4\n"
+                    ),
+                    fix_description="Create default .editorconfig",
                 )
 
     # Check Air-Gap
@@ -466,8 +484,10 @@ def doctor(
                 console.print("  [red]✗[/red] Private Vault NOT in .gitignore!")
                 add_issue(
                     "Private Vault exposed to Git",
-                    fix_action=lambda: gitignore.write_text(content + "\n# Private vault (security)\n12_private_vault/\n"),
-                    fix_description="Add 12_private_vault to .gitignore"
+                    fix_action=lambda: gitignore.write_text(
+                        content + "\n# Private vault (security)\n12_private_vault/\n"
+                    ),
+                    fix_description="Add 12_private_vault to .gitignore",
                 )
         else:
             console.print("  [yellow]⚠[/yellow] No .gitignore found")
@@ -486,7 +506,7 @@ def doctor(
             add_issue(
                 "Corrupted state file",
                 fix_action=lambda: state_path.unlink() if state_path.exists() else None,
-                fix_description="Reset state file (will be recreated on next setup)"
+                fix_description="Reset state file (will be recreated on next setup)",
             )
     else:
         console.print("  [yellow]⚠[/yellow] State file not found")
@@ -494,8 +514,8 @@ def doctor(
     # Check Templates
     console.print("\n[bold]Checking templates...[/bold]")
     templates_dir = root / "00-09_SYSTEM" / "05_templates"
-    
-    required_templates = ["__template-clean-arch", "__template-bi", "__template-db"]
+
+    required_templates = ["__template-clean-arch"]
     missing_templates = []
 
     for tmpl in required_templates:
@@ -511,16 +531,17 @@ def doctor(
             add_issue(
                 "Missing default code templates",
                 fix_action=lambda: run_setup_code(get_filesystem(str(root), dry_run=False)),
-                fix_description="Hydrate code templates"
+                fix_description="Hydrate code templates",
             )
         else:
-             add_issue(
+            add_issue(
                 f"Missing custom templates: {', '.join(t for t in missing_templates if t != '__template-clean-arch')}",
-                fix_description="Restore templates manually or from backup"
+                fix_description="Restore templates manually or from backup",
             )
 
     # Run security checks
     from devbase.commands.security_check import run_security_checks
+
     security_ok = run_security_checks(root)
     if not security_ok:
         add_issue("Security issues detected", fix_description="Review security audit above")
@@ -538,7 +559,10 @@ def doctor(
             if not (proj / ".git").exists():
                 console.print(f"  [red]✗[/red] {proj.name}: Missing .git")
                 issues_found = True
-                add_issue(f"Project {proj.name} not initialized", fix_description="Run 'git init' manually")
+                add_issue(
+                    f"Project {proj.name} not initialized",
+                    fix_description="Run 'git init' manually",
+                )
 
             # Check Pre-commit (soft check)
             if not (proj / ".pre-commit-config.yaml").exists():
@@ -547,7 +571,7 @@ def doctor(
                 pass
 
             if not issues_found:
-                 console.print(f"  [green]✓[/green] {proj.name}")
+                console.print(f"  [green]✓[/green] {proj.name}")
 
     # Check Worktrees for stale branches
     console.print("\n[bold]Checking Worktrees health...[/bold]")
@@ -560,13 +584,14 @@ def doctor(
             for wt in worktrees:
                 # Check if worktree has uncommitted changes
                 import subprocess
+
                 try:
                     result = subprocess.run(
                         ["git", "status", "--porcelain"],
                         cwd=str(wt),
                         capture_output=True,
                         text=True,
-                        timeout=5
+                        timeout=5,
                     )
                     if result.stdout.strip():
                         console.print(f"  [yellow]⚠[/yellow] {wt.name}: Uncommitted changes")
@@ -588,12 +613,27 @@ def doctor(
         return
 
     # Report issues
-    console.print(f"[bold yellow]Found {len(issues)} issue(s)[/bold yellow]\n")
+    console.print(f"[bold yellow]Diagnostic Report: {len(issues)} issue(s) found[/bold yellow]\n")
 
     fixable = [i for i in issues if i["fix_action"]]
+    manual_issues = [i for i in issues if not i["fix_action"]]
+
+    # Display Unified Table
+    table = Table(show_header=True, header_style="bold magenta", box=None)
+    table.add_column("Type", width=12)
+    table.add_column("Issue Detected", style="bold red")
+    table.add_column("Recommended Action", style="cyan")
+
+    for issue in issues:
+        is_auto = issue["fix_action"] is not None
+        type_str = "[green]AUTO-FIX[/green]" if is_auto else "[yellow]MANUAL[/yellow]"
+        table.add_row(type_str, issue["description"], issue["fix_description"])
+
+    console.print(table)
+    console.print()
 
     if not fixable:
-        console.print("[dim]No auto-fixes available. Please fix manually.[/dim]")
+        console.print("[dim]No auto-fixes available. Please address manual issues above.[/dim]")
         return
 
     # Interactive fix flow
@@ -606,27 +646,20 @@ def doctor(
                 console.print(f"  [green]✓[/green] {issue['fix_description']}")
             except Exception as e:
                 console.print(f"  [red]✗[/red] Failed: {issue['fix_description']} ({e})")
+
+        if manual_issues:
+            console.print(
+                f"\n[yellow]⚠️  {len(manual_issues)} manual issue(s) still require attention.[/yellow]"
+            )
+
         console.print("\n[green]Done! Run [cyan]devbase doctor[/cyan] again to verify.[/green]")
     else:
         # Interactive mode
-        console.print(f"[bold]{len(fixable)} issue(s) can be auto-fixed:[/bold]\n")
-
-        table = Table(show_header=True, header_style="bold magenta", box=None)
-        table.add_column("#", style="dim", width=4)
-        table.add_column("Issue Detected", style="bold red")
-        table.add_column("Proposed Fix", style="green")
-
-        for i, issue in enumerate(fixable, 1):
-            table.add_row(str(i), issue['description'], issue['fix_description'])
-
-        console.print(table)
-        console.print()
-
-        if Confirm.ask("[bold]Do you want to apply these fixes now?[/bold]"):
+        if Confirm.ask(f"[bold]Do you want to apply the {len(fixable)} auto-fixes now?[/bold]"):
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
-                console=console
+                console=console,
             ) as progress:
                 task = progress.add_task("Applying fixes...", total=len(fixable))
 
@@ -639,10 +672,12 @@ def doctor(
                     progress.advance(task)
 
             console.print("\n[green]Done![/green]")
+            if manual_issues:
+                console.print(
+                    f"\n[yellow]⚠️  Don't forget to address the {len(manual_issues)} manual issue(s) listed above.[/yellow]"
+                )
         else:
             console.print("\n[dim]Run [cyan]devbase doctor --fix[/cyan] to auto-fix later.[/dim]")
-
-
 
 
 @app.command()
@@ -678,9 +713,7 @@ def hydrate(
     ]
 
     with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console
+        SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console
     ) as progress:
         for name, run_func in modules_to_run:
             task = progress.add_task(f"Hydrating {name}...", total=None)
@@ -733,4 +766,3 @@ def hydrate_icons_cmd(ctx: typer.Context) -> None:
     applied = sum(1 for v in results.values() if v)
     console.print()
     console.print(f"[bold green]✓ Applied {applied}/{len(results)} icons[/bold green]")
-
