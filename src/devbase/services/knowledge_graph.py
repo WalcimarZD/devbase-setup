@@ -43,26 +43,60 @@ class KnowledgeGraph:
         self.file_map.clear()
 
         search_paths = self._get_search_paths()
-        files: List[Path] = []
         errors = 0
+        links_count = 0
 
-        # 1. First Pass: Collect all nodes and build file map
+        # Regex for Markdown links: [text](link)
+        # We ignore external links (http/https)
+        md_link_pattern = re.compile(r"\[.*?\]\((.*?)\)")
+
+        # Regex for Wiki-links: [[link]] or [[link|text]]
+        wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
+
+        # Store extracted links to avoid re-reading files in Pass 2
+        # List of (source_rel, file_path, extracted_links)
+        # where extracted_links is list of (type, match)
+        pending_links: List[Tuple[str, Path, List[Tuple[str, str]]]] = []
+
+        # 1. First Pass: Collect nodes, build file map, and extract links (Single IO pass)
         for path in search_paths:
             # Optimization: Use scan_directory for centralized pruning
-            # Replaces manual path.walk() to ensure consistency with performance guidelines
             for file_path in scan_directory(path, extensions={'.md'}):
                 # Store relative path from workspace root for portability
                 rel_path = file_path.relative_to(self.root).as_posix()
+                content = None
 
-                # Parse Frontmatter for title/tags
                 try:
+                    # Load frontmatter and content once
                     post = frontmatter.load(file_path)
                     title = post.get("title", file_path.stem)
                     tags = post.get("tags", [])
+                    content = post.content
                 except Exception:
+                    # Fallback: parsing failed (bad YAML), try reading as raw text
+                    # to ensure we still index content links if possible.
                     errors += 1
                     title = file_path.stem
                     tags = []
+                    try:
+                        content = file_path.read_text(encoding="utf-8")
+                    except Exception:
+                         content = None
+
+                # Extract links immediately while content is in memory
+                if content:
+                    extracted_links = []
+
+                    # Extract MD links
+                    for match in md_link_pattern.findall(content):
+                        extracted_links.append(('md', match))
+
+                    # Extract Wiki links
+                    for match in wiki_link_pattern.findall(content):
+                        extracted_links.append(('wiki', match))
+
+                    if extracted_links:
+                        pending_links.append((rel_path, file_path, extracted_links))
 
                 # Add node
                 self.graph.add_node(
@@ -73,68 +107,47 @@ class KnowledgeGraph:
                 )
 
                 # Map identifiers for Wiki-link resolution
-                # 1. Filename stem (e.g. "note_a" -> "path/to/note_a.md")
                 self.file_map[file_path.stem.lower()] = rel_path
-                # 2. Title (e.g. "Note A" -> "path/to/note_a.md")
                 if title:
                     self.file_map[title.lower()] = rel_path
 
-                files.append(file_path)
+        # 2. Second Pass: Resolve links (CPU bound, no File I/O)
+        for source_rel, file_path, links in pending_links:
+            for link_type, match in links:
+                if link_type == 'md':
+                    target_link = match.split(" ")[0] # handle [text](link "title")
 
-        # 2. Second Pass: Parse links and add edges
-        links_count = 0
+                    if target_link.startswith(("http://", "https://", "mailto:")):
+                        continue
 
-        # Regex for Markdown links: [text](link)
-        # We ignore external links (http/https)
-        md_link_pattern = re.compile(r"\[.*?\]\((.*?)\)")
+                    # Resolve relative link
+                    try:
+                        # Resolve from current file directory
+                        target_path = (file_path.parent / target_link).resolve()
+                        if target_path.is_relative_to(self.root):
+                            target_rel = target_path.relative_to(self.root).as_posix()
 
-        # Regex for Wiki-links: [[link]] or [[link|text]]
-        wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
+                            # Check if node exists (valid internal link)
+                            if self.graph.has_node(target_rel):
+                                self.graph.add_edge(source_rel, target_rel)
+                                links_count += 1
+                    except (ValueError, RuntimeError):
+                        continue
 
-        for file_path in files:
-            source_rel = file_path.relative_to(self.root).as_posix()
+                elif link_type == 'wiki':
+                    # Handle [[Link|Text]]
+                    target_name = match.split("|")[0].strip().lower()
 
-            try:
-                content = file_path.read_text(encoding="utf-8")
-            except Exception:
-                continue
-
-            # Extract Markdown links
-            for match in md_link_pattern.findall(content):
-                target_link = match.split(" ")[0] # handle [text](link "title")
-
-                if target_link.startswith(("http://", "https://", "mailto:")):
-                    continue
-
-                # Resolve relative link
-                try:
-                    # Resolve from current file directory
-                    target_path = (file_path.parent / target_link).resolve()
-                    if target_path.is_relative_to(self.root):
-                        target_rel = target_path.relative_to(self.root).as_posix()
-
-                        # Check if node exists (valid internal link)
-                        if self.graph.has_node(target_rel):
+                    # Try to find target in map
+                    if target_name in self.file_map:
+                        target_rel = self.file_map[target_name]
+                        if source_rel != target_rel: # Avoid self-loops
                             self.graph.add_edge(source_rel, target_rel)
                             links_count += 1
-                except (ValueError, RuntimeError):
-                    continue
-
-            # Extract Wiki-links
-            for match in wiki_link_pattern.findall(content):
-                # Handle [[Link|Text]]
-                target_name = match.split("|")[0].strip().lower()
-
-                # Try to find target in map
-                if target_name in self.file_map:
-                    target_rel = self.file_map[target_name]
-                    if source_rel != target_rel: # Avoid self-loops
-                        self.graph.add_edge(source_rel, target_rel)
-                        links_count += 1
 
         self._scanned = True
         return {
-            "files": len(files),
+            "files": self.graph.number_of_nodes(),
             "nodes": self.graph.number_of_nodes(),
             "links": links_count,
             "errors": errors
