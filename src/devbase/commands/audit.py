@@ -8,6 +8,7 @@ Ensures no "Documentation Debt" accumulates.
 import os
 import sys
 import toml
+import ast
 import inspect
 import subprocess
 from pathlib import Path
@@ -181,47 +182,129 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
 
 def _verify_cli_consistency(root: Path, report: Dict[str, List[str]], fix: bool):
     """Check CLI commands vs Documentation"""
-    # 1. Gather all commands from code
-    # This is tricky without importing everything. We can inspect the command files.
-    # Or import the app. But importing might have side effects or be slow.
-    # Let's simple parse files in src/devbase/commands for @app.command or similar.
-
     commands_dir = root / "src" / "devbase" / "commands"
-    found_commands = {} # module -> list of command names
+    docs_cli_dir = root / "docs" / "cli"
+    usage_guide = root / "USAGE-GUIDE.md"
+
+    # 1. Gather all commands and flags from code using AST
+    # Structure: module -> { command_name -> [flags] }
+    code_structure = {}
 
     for cmd_file in commands_dir.glob("*.py"):
         if cmd_file.name == "__init__.py": continue
 
-        content = cmd_file.read_text()
-        import re
-        # Match @app.command("name") or @cli.command("name")
-        matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
-        if matches:
-            found_commands[cmd_file.stem] = matches
+        commands = _extract_commands_via_ast(cmd_file)
+        if commands:
+            code_structure[cmd_file.stem] = commands
 
-    # 2. Check Docs
-    usage_guide = root / "USAGE-GUIDE.md" # or docs/cli/
+    # 2. Check Documentation
     usage_content = usage_guide.read_text() if usage_guide.exists() else ""
 
-    missing_docs = []
+    missing_cmds = []
+    missing_flags = []
 
-    for module, cmds in found_commands.items():
-        for cmd in cmds:
-            # Check if command is mentioned in USAGE-GUIDE.md
-            # Heuristic: "devbase <module> <cmd>" or just the command name if unique
+    for module, cmds in code_structure.items():
+        # Check specific module doc in docs/cli/{module}.md
+        module_doc_path = docs_cli_dir / f"{module}.md"
+        module_doc_content = ""
+        if module_doc_path.exists():
+            module_doc_content = module_doc_path.read_text()
+
+        for cmd, flags in cmds.items():
             full_cmd = f"{module} {cmd}"
-            if full_cmd not in usage_content and cmd not in usage_content:
-                missing_docs.append(f"{module} {cmd}")
 
-    if missing_docs:
-        report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_docs)}")
-        if fix and usage_guide.exists():
-            # Append a todo section
-            with open(usage_guide, "a") as f:
-                f.write("\n\n## Undocumented Commands (Auto-detected)\n")
-                for cmd in missing_docs:
-                    f.write(f"- `devbase {cmd}`\n")
-            report["updated"].append("USAGE-GUIDE.md (added list of undocumented commands)")
+            # Check if command is documented
+            # Priority: docs/cli/{module}.md -> USAGE-GUIDE.md
+            is_documented = (cmd in module_doc_content) or (full_cmd in usage_content)
+
+            if not is_documented:
+                missing_cmds.append(full_cmd)
+                if fix:
+                    _append_to_docs(module_doc_path, usage_guide, module, cmd, flags)
+                    report["updated"].append(f"Added {full_cmd} to documentation")
+            else:
+                # Check flags if command is documented
+                for flag in flags:
+                    flag_documented = (flag in module_doc_content) or (flag in usage_content)
+                    if not flag_documented:
+                        missing_flags.append(f"{full_cmd} {flag}")
+                        if fix:
+                            # Try to append flag to module doc if exists
+                            if module_doc_path.exists():
+                                with open(module_doc_path, "a") as f:
+                                    f.write(f"\n- Flag `{flag}` detected in code but missing in docs.\n")
+                                report["updated"].append(f"Updated {module}.md with flag {flag}")
+
+    if missing_cmds:
+        report["warnings"].append(f"Undocumented commands: {', '.join(missing_cmds)}")
+
+    if missing_flags:
+        report["warnings"].append(f"Undocumented flags: {', '.join(missing_flags)}")
+
+
+def _extract_commands_via_ast(file_path: Path) -> Dict[str, List[str]]:
+    """
+    Extracts command names and their flags from source code using AST.
+    Returns dict: command_name -> list of flags (e.g. ['--fix', '--days'])
+    """
+    try:
+        tree = ast.parse(file_path.read_text())
+    except Exception:
+        return {}
+
+    commands = {}
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            # Check decorators for @app.command("name") or @cli.command("name")
+            cmd_name = None
+            for decorator in node.decorator_list:
+                if isinstance(decorator, ast.Call) and \
+                   hasattr(decorator.func, 'attr') and \
+                   decorator.func.attr == 'command':
+                    # Extract command name from args
+                    if decorator.args:
+                        arg = decorator.args[0]
+                        if isinstance(arg, ast.Constant): # Python 3.8+
+                             cmd_name = arg.value
+                        elif isinstance(arg, ast.Str): # Python <3.8
+                             cmd_name = arg.s
+
+            if cmd_name:
+                flags = []
+                # Check arguments defaults for typer.Option
+                for default in node.args.defaults:
+                    if isinstance(default, ast.Call) and \
+                       hasattr(default.func, 'attr') and \
+                       default.func.attr == 'Option':
+                        # Check args of Option for flags
+                        for arg in default.args:
+                            val = None
+                            if isinstance(arg, ast.Constant):
+                                val = arg.value
+                            elif isinstance(arg, ast.Str):
+                                val = arg.s
+
+                            if val and isinstance(val, str) and val.startswith('--'):
+                                flags.append(val)
+                commands[cmd_name] = flags
+
+    return commands
+
+def _append_to_docs(module_doc_path: Path, usage_guide: Path, module: str, cmd: str, flags: List[str]):
+    """Helper to append missing docs"""
+    content = f"\n\n### `{module} {cmd}`\n\n*(Auto-detected)*\n"
+    if flags:
+        content += "Flags:\n"
+        for flag in flags:
+            content += f"- `{flag}`\n"
+
+    if module_doc_path.exists():
+        with open(module_doc_path, "a") as f:
+            f.write(content)
+    elif usage_guide.exists():
+         with open(usage_guide, "a") as f:
+            f.write(content)
 
 def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
     """Check DB Code vs Technical Docs"""
