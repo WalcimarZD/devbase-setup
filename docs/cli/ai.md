@@ -143,3 +143,5 @@ Available Groq models:
 - `llama-3.1-8b-instant` - Fast, good for most tasks
 - `llama-3.1-70b-versatile` - More capable, slower
 - `mixtral-8x7b-32768` - Large context window
+- `--rebuild`: TODO document this flag.
+- `--apply`: TODO document this flag.
