@@ -8,17 +8,16 @@ Ensures no "Documentation Debt" accumulates.
 import os
 import sys
 import toml
-import inspect
+import re
 import subprocess
 from pathlib import Path
-from typing import List, Set, Dict, Any
+from typing import List, Set, Dict, Any, Tuple
 from datetime import datetime, timedelta
 
 import typer
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.text import Text
 
 console = Console()
 app = typer.Typer()
@@ -41,8 +40,8 @@ def consistency_audit(
 
     console.print(Panel("[bold blue]DevBase Consistency Audit[/bold blue]", subtitle="v5.1 Alpha"))
 
-    # 1. Diff Analysis (Simulated/Best Effort)
-    # ----------------------------------------
+    # 1. Diff Analysis
+    # ----------------
     console.print("[bold]1. Analyzing Changes...[/bold]")
     changes = _analyze_changes(root, days)
     if changes:
@@ -106,8 +105,6 @@ def _analyze_changes(root: Path, days: int) -> List[str]:
 
     # Try git first
     try:
-        # Get files changed in last N days
-        # git log --since="1 day ago" --name-only --pretty=format: src/devbase
         since_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
         result = subprocess.run(
             ["git", "log", f"--since={since_date}", "--name-only", "--pretty=format:", str(src_path)],
@@ -125,7 +122,10 @@ def _analyze_changes(root: Path, days: int) -> List[str]:
     for path in src_path.rglob("*"):
         if path.is_file():
             if path.stat().st_mtime > cutoff:
-                changed_files.append(str(path.relative_to(root)))
+                try:
+                    changed_files.append(str(path.relative_to(root)))
+                except ValueError:
+                    changed_files.append(str(path))
 
     return changed_files
 
@@ -142,21 +142,17 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
     try:
         pyproject = toml.load(pyproject_path)
         deps = pyproject.get("project", {}).get("dependencies", [])
-        # Extract package names (basic parsing)
         pkg_names = []
         for dep in deps:
-            # Handle "package>=version" or "package"
             name = dep.split(">")[0].split("<")[0].split("=")[0].strip()
             pkg_names.append(name)
 
-        # Check docs
         arch_content = arch_path.read_text() if arch_path.exists() else ""
         readme_content = readme_path.read_text() if readme_path.exists() else ""
 
         missing_in_arch = []
         missing_in_readme = []
 
-        # Dependencies to ignore (standard or very common tools that might not need explicit arch docs)
         ignore_libs = ["toml", "jinja2", "shellingham", "python-frontmatter", "copier"]
 
         for pkg in pkg_names:
@@ -166,7 +162,6 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
             if pkg not in arch_content:
                 missing_in_arch.append(pkg)
 
-            # README usually doesn't list all deps, but prompt says "mentioned in ARCHITECTURE.md and README.md"
             if pkg not in readme_content:
                 missing_in_readme.append(pkg)
 
@@ -180,91 +175,160 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
         report["warnings"].append(f"Failed to verify dependencies: {e}")
 
 def _verify_cli_consistency(root: Path, report: Dict[str, List[str]], fix: bool):
-    """Check CLI commands vs Documentation"""
-    # 1. Gather all commands from code
-    # This is tricky without importing everything. We can inspect the command files.
-    # Or import the app. But importing might have side effects or be slow.
-    # Let's simple parse files in src/devbase/commands for @app.command or similar.
-
+    """Check CLI commands vs Documentation (USAGE-GUIDE and docs/cli/)"""
     commands_dir = root / "src" / "devbase" / "commands"
-    found_commands = {} # module -> list of command names
+    docs_cli_dir = root / "docs" / "cli"
+    usage_guide = root / "USAGE-GUIDE.md"
 
+    found_commands: Dict[str, List[Tuple[str, List[str]]]] = {}
+    # structure: module_name -> [(command_name, [flags])]
+
+    # 1. Parse Commands and Flags
     for cmd_file in commands_dir.glob("*.py"):
         if cmd_file.name == "__init__.py": continue
 
+        module_name = cmd_file.stem
         content = cmd_file.read_text()
-        import re
-        # Match @app.command("name") or @cli.command("name")
-        matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
-        if matches:
-            found_commands[cmd_file.stem] = matches
+
+        # Regex to find command definitions
+        # Matches: @app.command("name") ... def func(... flag: ... = typer.Option(..., "--flag") ...)
+        # This is complex to do with one regex. We will split by command definition.
+
+        # Split content roughly by command decorators
+        parts = re.split(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
+
+        # parts[0] is header, then alternating command_name, command_body
+        if len(parts) > 1:
+            found_commands[module_name] = []
+            for i in range(1, len(parts), 2):
+                cmd_name = parts[i]
+                cmd_body = parts[i+1]
+
+                # Find flags in the body (typer.Option with --)
+                # Matches: typer.Option(..., "--flag", ...) or typer.Option(..., "-f", "--flag")
+                flags = re.findall(r'typer\.Option\(.*?"(--[\w-]+)"', cmd_body, re.DOTALL)
+                found_commands[module_name].append((cmd_name, flags))
 
     # 2. Check Docs
-    usage_guide = root / "USAGE-GUIDE.md" # or docs/cli/
     usage_content = usage_guide.read_text() if usage_guide.exists() else ""
 
-    missing_docs = []
+    missing_docs_cli = []
 
     for module, cmds in found_commands.items():
-        for cmd in cmds:
-            # Check if command is mentioned in USAGE-GUIDE.md
-            # Heuristic: "devbase <module> <cmd>" or just the command name if unique
-            full_cmd = f"{module} {cmd}"
-            if full_cmd not in usage_content and cmd not in usage_content:
-                missing_docs.append(f"{module} {cmd}")
+        doc_file = docs_cli_dir / f"{module}.md"
+        doc_content = ""
+        if doc_file.exists():
+            doc_content = doc_file.read_text()
 
-    if missing_docs:
-        report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_docs)}")
-        if fix and usage_guide.exists():
-            # Append a todo section
-            with open(usage_guide, "a") as f:
-                f.write("\n\n## Undocumented Commands (Auto-detected)\n")
-                for cmd in missing_docs:
-                    f.write(f"- `devbase {cmd}`\n")
-            report["updated"].append("USAGE-GUIDE.md (added list of undocumented commands)")
+        doc_updated = False
+        new_doc_content = doc_content
+
+        if not doc_file.exists() and fix:
+             # Create base file
+             new_doc_content = f"# {module.capitalize()} Commands\n\n"
+             doc_updated = True
+
+        for cmd, flags in cmds:
+            full_cmd = f"devbase {module if module != 'main' else ''} {cmd}".replace("  ", " ")
+
+            # Check USAGE-GUIDE.md (Legacy/Overview)
+            if cmd not in usage_content and module not in usage_content:
+                 pass # Warning handled below for specific docs? or global one?
+                 # We prioritize docs/cli now as per prompt instructions
+
+            # Check docs/cli/<module>.md
+            if cmd not in new_doc_content:
+                report["warnings"].append(f"Command '{cmd}' missing in docs/cli/{module}.md")
+                if fix:
+                    new_doc_content += f"\n## `{cmd}`\n\nTODO: Add description.\n"
+                    doc_updated = True
+
+            for flag in flags:
+                if flag not in new_doc_content:
+                    report["warnings"].append(f"Flag '{flag}' for command '{cmd}' missing in docs/cli/{module}.md")
+                    if fix:
+                         new_doc_content += f"- `{flag}`: TODO document this flag.\n"
+                         doc_updated = True
+
+        if fix and doc_updated:
+            if not doc_file.parent.exists():
+                doc_file.parent.mkdir(parents=True)
+            doc_file.write_text(new_doc_content)
+            report["updated"].append(f"docs/cli/{module}.md")
+
+    # Update USAGE-GUIDE if needed (Global check)
+    # The prompt says: "Atualiza automaticamente os ficheiros correspondentes em docs/cli/ ou o USAGE-GUIDE.md"
+    # We handled docs/cli above. We can check if any *new* modules appeared that are not in USAGE-GUIDE.
+
+    if fix and usage_guide.exists():
+        updated_usage = False
+        with open(usage_guide, "a") as f:
+            for module in found_commands:
+                if module not in usage_content:
+                    f.write(f"\n- `devbase {module}`: See `docs/cli/{module}.md`\n")
+                    report["warnings"].append(f"Module '{module}' missing in USAGE-GUIDE.md")
+                    updated_usage = True
+        if updated_usage:
+            report["updated"].append("USAGE-GUIDE.md (added missing modules)")
+
 
 def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
-    """Check DB Code vs Technical Docs"""
+    """Check DB Code (Adapter & KnowledgeDB) vs Technical Docs"""
     tech_doc = root / "docs" / "TECHNICAL_DESIGN_DOC.md"
-    db_file = root / "src" / "devbase" / "services" / "knowledge_db.py"
+    db_files = [
+        root / "src" / "devbase" / "services" / "knowledge_db.py",
+        root / "src" / "devbase" / "adapters" / "storage" / "duckdb_adapter.py"
+    ]
 
     if not tech_doc.exists():
         report["warnings"].append("TECHNICAL_DESIGN_DOC.md not found.")
         return
 
-    if not db_file.exists():
-        report["warnings"].append("knowledge_db.py not found.")
-        return
-
     tech_content = tech_doc.read_text()
-    db_content = db_file.read_text()
-
-    # Extract table names from DB code using basic regex for SQL patterns
-    # Matches: INSERT INTO table_name, FROM table_name, CREATE TABLE table_name
-    import re
-    table_patterns = [
-        r'INSERT INTO\s+([a-zA-Z0-9_]+)',
-        r'FROM\s+([a-zA-Z0-9_]+)',
-        r'CREATE TABLE\s+([a-zA-Z0-9_]+)'
-    ]
 
     found_tables = set()
-    for pattern in table_patterns:
-        matches = re.findall(pattern, db_content, re.IGNORECASE)
-        found_tables.update(matches)
 
-    # Filter out likely SQL keywords or temp aliases if regex is too loose,
-    # but strictly looking for prompt's specific concern: hot_fts, cold_fts
-    # We filter for tables that seem "significant" (e.g., have 'fts' or 'embeddings' or are 'notes')
-    significant_tables = {t for t in found_tables if 'fts' in t or 'embeddings' in t or 'notes' in t}
+    for db_file in db_files:
+        if not db_file.exists(): continue
+        content = db_file.read_text()
 
+        # Regex to find tables
+        patterns = [
+            r'CREATE TABLE(?:\s+IF NOT EXISTS)?\s+([a-zA-Z0-9_]+)',
+            r'PRAGMA create_fts_index\(\s*[\'"]([a-zA-Z0-9_]+)[\'"]',
+            r'FROM\s+([a-zA-Z0-9_]+)',
+            r'INSERT INTO\s+([a-zA-Z0-9_]+)'
+        ]
+
+        for p in patterns:
+            matches = re.findall(p, content, re.IGNORECASE)
+            found_tables.update(matches)
+
+    # Specific check for hot_fts and cold_fts as requested
+    required_tables = {"hot_fts", "cold_fts"}
+
+    # Also check if they were found in code
+    missing_in_code = required_tables - found_tables
+    if missing_in_code:
+        report["warnings"].append(f"Expected tables {missing_in_code} not found in code!")
+
+    # Check if found tables are in docs
     missing_in_doc = []
+
+    # Check all found tables that seem significant (ignoring aliases or common words matched by loose regex)
+    # Filter for things that look like our tables
+    known_prefixes = ["hot_", "cold_", "notes_", "ai_", "events", "schema_"]
+
+    significant_tables = {t for t in found_tables if any(t.startswith(p) or t == p.rstrip("_") for p in known_prefixes)}
+    # Add specifically hot_fts and cold_fts if they exist in found_tables
+    significant_tables.update({t for t in found_tables if t in required_tables})
+
     for table in significant_tables:
         if table not in tech_content:
             missing_in_doc.append(table)
 
     if missing_in_doc:
-        report["warnings"].append(f"Tables found in code but missing in TECHNICAL_DESIGN_DOC.md: {', '.join(missing_in_doc)}")
+        report["warnings"].append(f"Tables in code but missing in TECHNICAL_DESIGN_DOC.md: {', '.join(missing_in_doc)}")
 
 def _check_changelog(root: Path, report: Dict[str, List[str]], changes: List[str], fix: bool):
     """Check if CHANGELOG.md covers recent changes"""
@@ -274,29 +338,29 @@ def _check_changelog(root: Path, report: Dict[str, List[str]], changes: List[str
 
     content = changelog.read_text()
 
-    # If there are changes but no "Unreleased" or "In Progress" section, warn
     if "Unreleased" not in content and "In Progress" not in content:
-        report["suggestions"].append("CHANGELOG.md might need an 'Unreleased' section for new changes.")
+        report["suggestions"].append("CHANGELOG.md missing 'Unreleased' or 'In Progress' section.")
 
         if fix:
-            # Prepend a draft section
-            new_section = "## [Unreleased] - In Progress\n\n### Changed\n"
-            for change in changes[:5]: # limit to 5
-                new_section += f"- Modified {change}\n"
-            if len(changes) > 5:
-                new_section += f"- ... and {len(changes)-5} more files.\n"
-
-            # Simple prepend (risky if format is strict, better to append or insert after header)
-            # Assuming standard Keep A Changelog format
             lines = content.splitlines()
-            # Find first h2
             insert_idx = 0
             for i, line in enumerate(lines):
                 if line.startswith("## "):
                     insert_idx = i
                     break
 
+            new_section = [
+                "## [Unreleased] - In Progress",
+                "",
+                "### Changed",
+            ]
+            for change in changes[:5]:
+                new_section.append(f"- Modified {change}")
+            if len(changes) > 5:
+                new_section.append(f"- ... and {len(changes)-5} more files.")
+            new_section.append("")
+
             if insert_idx > 0:
-                lines.insert(insert_idx, new_section)
+                lines[insert_idx:insert_idx] = new_section
                 changelog.write_text("\n".join(lines))
                 report["updated"].append("CHANGELOG.md (added Unreleased section)")
