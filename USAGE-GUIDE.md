@@ -418,3 +418,7 @@ To create a local custom template:
 ## Undocumented Commands (Auto-detected)
 - `devbase ai classify`
 - `devbase ai summarize`
+
+
+## New Commands in core
+- `hydrate_icons_cmd`: 🎨 Apply custom icons to Johnny.Decimal folders.
