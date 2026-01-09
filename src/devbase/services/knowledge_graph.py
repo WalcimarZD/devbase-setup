@@ -43,8 +43,17 @@ class KnowledgeGraph:
         self.file_map.clear()
 
         search_paths = self._get_search_paths()
-        files: List[Path] = []
         errors = 0
+
+        # Regex for Markdown links: [text](link)
+        # We ignore external links (http/https)
+        md_link_pattern = re.compile(r"\[.*?\]\((.*?)\)")
+
+        # Regex for Wiki-links: [[link]] or [[link|text]]
+        wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
+
+        # Store extracted links for second pass: (source_rel, file_path, md_links, wiki_links)
+        pending_links: List[Tuple[str, Path, List[str], List[str]]] = []
 
         # 1. First Pass: Collect all nodes and build file map
         for path in search_paths:
@@ -54,15 +63,22 @@ class KnowledgeGraph:
                 # Store relative path from workspace root for portability
                 rel_path = file_path.relative_to(self.root).as_posix()
 
+                content = ""
                 # Parse Frontmatter for title/tags
                 try:
                     post = frontmatter.load(file_path)
                     title = post.get("title", file_path.stem)
                     tags = post.get("tags", [])
+                    content = post.content
                 except Exception:
                     errors += 1
                     title = file_path.stem
                     tags = []
+                    # Fallback: Try to read content as plain text if frontmatter parsing fails
+                    try:
+                        content = file_path.read_text(encoding="utf-8")
+                    except Exception:
+                        content = ""
 
                 # Add node
                 self.graph.add_node(
@@ -79,28 +95,17 @@ class KnowledgeGraph:
                 if title:
                     self.file_map[title.lower()] = rel_path
 
-                files.append(file_path)
+                # Extract links immediately to avoid re-reading file in Pass 2
+                md_links = md_link_pattern.findall(content) if content else []
+                wiki_links = wiki_link_pattern.findall(content) if content else []
+                pending_links.append((rel_path, file_path, md_links, wiki_links))
 
-        # 2. Second Pass: Parse links and add edges
+        # 2. Second Pass: Resolve links and add edges
         links_count = 0
 
-        # Regex for Markdown links: [text](link)
-        # We ignore external links (http/https)
-        md_link_pattern = re.compile(r"\[.*?\]\((.*?)\)")
-
-        # Regex for Wiki-links: [[link]] or [[link|text]]
-        wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
-
-        for file_path in files:
-            source_rel = file_path.relative_to(self.root).as_posix()
-
-            try:
-                content = file_path.read_text(encoding="utf-8")
-            except Exception:
-                continue
-
+        for source_rel, file_path, md_links, wiki_links in pending_links:
             # Extract Markdown links
-            for match in md_link_pattern.findall(content):
+            for match in md_links:
                 target_link = match.split(" ")[0] # handle [text](link "title")
 
                 if target_link.startswith(("http://", "https://", "mailto:")):
@@ -121,7 +126,7 @@ class KnowledgeGraph:
                     continue
 
             # Extract Wiki-links
-            for match in wiki_link_pattern.findall(content):
+            for match in wiki_links:
                 # Handle [[Link|Text]]
                 target_name = match.split("|")[0].strip().lower()
 
@@ -134,7 +139,7 @@ class KnowledgeGraph:
 
         self._scanned = True
         return {
-            "files": len(files),
+            "files": len(pending_links),
             "nodes": self.graph.number_of_nodes(),
             "links": links_count,
             "errors": errors
@@ -188,15 +193,15 @@ class KnowledgeGraph:
         try:
             from networkx.drawing.nx_pydot import write_dot
             write_dot(self.graph, str(output_path))
-        except ImportError:
-            raise ImportError("Graphviz support requires 'pydot'. Install with 'pip install pydot'.")
+        except ImportError as err:
+            raise ImportError("Graphviz support requires 'pydot'. Install with 'pip install pydot'.") from err
 
     def export_to_pyvis(self, output_path: Path) -> None:
         """Generates an interactive HTML graph using PyVis."""
         try:
             from pyvis.network import Network
-        except ImportError:
-            raise ImportError("PyVis is not installed. Install with 'pip install devbase[viz]'.")
+        except ImportError as err:
+            raise ImportError("PyVis is not installed. Install with 'pip install devbase[viz]'.") from err
 
         net = Network(height="750px", width="100%", bgcolor="#222222", font_color="white", select_menu=True)
 
