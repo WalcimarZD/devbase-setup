@@ -112,3 +112,34 @@ devbase pkm new <NAME> [OPTIONS]
 ```bash
 devbase pkm new my-new-concept --type explanation
 ```
+
+
+## Auto-Detected Commands
+
+### `journal`
+📔 Add entry to weekly journal (auto-created).
+
+If entry text is provided:
+- Appends to '10-19_KNOWLEDGE/12_private-vault/journal/weekly-YYYY-Www.md'
+- Tracks telemetry
+
+If no text:
+- Opens the file in editor
+
+Example:
+    devbase pkm journal "Learned about DuckDB today"
+**Arguments/Flags:** ctx, entry
+
+### `icebox`
+🧊 Add item to Icebox (02_planning/icebox.md).
+
+If idea text is provided:
+- Appends to Icebox file
+- Tracks telemetry
+
+If no text:
+- Opens the file in editor
+
+Example:
+    devbase pkm icebox "Migrate to localized dates"
+**Arguments/Flags:** ctx, idea, tag

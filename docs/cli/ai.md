@@ -143,3 +143,14 @@ Available Groq models:
 - `llama-3.1-8b-instant` - Fast, good for most tasks
 - `llama-3.1-70b-versatile` - More capable, slower
 - `mixtral-8x7b-32768` - Large context window
+
+
+## Auto-Detected Commands
+
+### `organize`
+Suggest organization for a file using AI.
+**Arguments/Flags:** path, auto, ctx
+
+### `insights`
+Generate insights about workspace structure.
+**Arguments/Flags:** path, ctx
