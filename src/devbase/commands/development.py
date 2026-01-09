@@ -703,22 +703,26 @@ def update(
 @app.command(name="blueprint")
 def blueprint(
     ctx: typer.Context,
-    description: Annotated[str, typer.Argument(help="Descrição do projeto (ex: 'API FastAPI com Redis')")],
+    description: Annotated[Optional[str], typer.Argument(help="Project description (e.g. 'FastAPI API with Redis')")] = None,
 ) -> None:
     """
-    🏗️ Generate Dynamic Project Blueprint (IA).
+    🏗️ Generate Dynamic Project Blueprint (AI).
 
-    Usa IA para gerar uma estrutura de projeto baseada na descrição,
-    inspirada em Clean Architecture.
+    Uses AI to generate a project structure based on the description,
+    inspired by Clean Architecture.
     """
     import json
     from rich.tree import Tree
-    from rich.prompt import Confirm
+    from rich.prompt import Confirm, Prompt
     from devbase.adapters.ai.groq_adapter import GroqProvider
     from devbase.services.security.sanitizer import sanitize_context
     from devbase.services.project_setup import get_project_setup
 
     root: Path = ctx.obj["root"]
+
+    # Interactive Prompt (Micro-UX Improvement)
+    if description is None:
+        description = Prompt.ask("Describe the project you want to build")
 
     console.print()
     console.print(Panel.fit(
