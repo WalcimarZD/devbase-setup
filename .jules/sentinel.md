@@ -11,3 +11,8 @@
 **Vulnerability:** `ProjectSetupService` executed package manager commands (`npm install`, `uv sync`, etc.) automatically when detecting configuration files. If a user was tricked into generating a project from a malicious template (Supply Chain Attack), this could trigger arbitrary code execution via `postinstall` scripts without explicit user consent.
 **Learning:** Automation is convenient but dangerous when it involves executing untrusted code or scripts. "Golden Path" features should not sacrifice security for zero-friction.
 **Prevention:** Always require user confirmation (interactive prompt) before executing commands that can run arbitrary code, especially in context of setup/installation scripts. Added `interactive` flag and `Confirm.ask` guard.
+
+## 2025-10-27 - Unsafe Shell Execution in Editor Integration
+**Vulnerability:** The `pkm` commands (`journal`, `icebox`) were using `subprocess.run(f'code "{path}"', shell=True)` to open files in VS Code. While the input paths were largely controlled (generated from timestamps), using `shell=True` is unsafe as it invokes a full shell environment and relies on manual quoting which can be bypassed.
+**Learning:** Convenience functions often default to insecure patterns (`shell=True` handling space in paths) instead of using the robust list-based argument passing which handles escaping automatically.
+**Prevention:** Always use list-based arguments for `subprocess` calls (e.g., `["code", str(path)]`) and avoid `shell=True` unless absolutely necessary and rigorously sanitized.
