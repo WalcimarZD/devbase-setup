@@ -50,3 +50,38 @@ Audita o projeto atual em busca de violações de convenção (ex: nomes de arqu
 ```bash
 devbase dev audit
 ```
+
+
+### `import-project`
+
+*(Auto-detected command)*
+
+
+### `open-project`
+
+*(Auto-detected command)*
+
+
+### `restore-packages`
+
+*(Auto-detected command)*
+
+
+### `info-project`
+
+*(Auto-detected command)*
+
+
+### `list-projects`
+
+*(Auto-detected command)*
+
+
+### `archive`
+
+*(Auto-detected command)*
+
+
+### `update`
+
+*(Auto-detected command)*

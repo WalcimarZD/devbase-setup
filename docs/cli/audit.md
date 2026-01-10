@@ -101,3 +101,5 @@ Crie um arquivo `.devbaseignore` na raiz do workspace para excluir diretórios:
 
 - [doctor](doctor.md) - Verificação completa do workspace
 
+
+- `--days`: (Auto-detected flag)

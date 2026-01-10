@@ -112,3 +112,13 @@ devbase pkm new <NAME> [OPTIONS]
 ```bash
 devbase pkm new my-new-concept --type explanation
 ```
+
+
+### `journal`
+
+*(Auto-detected command)*
+
+
+### `icebox`
+
+*(Auto-detected command)*

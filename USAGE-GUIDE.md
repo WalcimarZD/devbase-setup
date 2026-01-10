@@ -418,3 +418,8 @@ To create a local custom template:
 ## Undocumented Commands (Auto-detected)
 - `devbase ai classify`
 - `devbase ai summarize`
+
+
+### `hydrate-icons-cmd`
+
+*(Auto-detected command)*
