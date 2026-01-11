@@ -15,6 +15,7 @@ from typing import List, Set, Dict, Any
 from datetime import datetime, timedelta
 
 import typer
+from devbase.utils.filesystem import scan_directory
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -122,10 +123,11 @@ def _analyze_changes(root: Path, days: int) -> List[str]:
 
     # Fallback to mtime
     cutoff = datetime.now().timestamp() - (days * 86400)
-    for path in src_path.rglob("*"):
-        if path.is_file():
-            if path.stat().st_mtime > cutoff:
-                changed_files.append(str(path.relative_to(root)))
+    # Optimization (Bolt): Use scan_directory instead of rglob to prune ignored directories
+    # and avoid unnecessary Path instantiation for ignored files.
+    for path in scan_directory(src_path):
+        if path.stat().st_mtime > cutoff:
+            changed_files.append(str(path.relative_to(root)))
 
     return changed_files
 
