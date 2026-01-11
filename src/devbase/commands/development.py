@@ -21,9 +21,9 @@ def new(
     ctx: typer.Context,
     name: Annotated[Optional[str], typer.Argument(help="Project name (kebab-case)")] = None,
     template: Annotated[
-        str,
-        typer.Option("--template", "-t", help="Template name"),
-    ] = "clean-arch",
+        Optional[str],
+        typer.Option("--template", "-t", help="Template name (default: clean-arch)"),
+    ] = None,
     interactive: Annotated[
         bool,
         typer.Option("--interactive/--no-interactive", help="Customize project details"),
@@ -81,6 +81,27 @@ def new(
     from devbase.services.project_setup import get_project_setup
     from devbase.utils.telemetry import get_telemetry
     from devbase.services.adr_generator import get_ghostwriter
+
+    # Interactive Template Selection (Micro-UX Improvement)
+    if template is None:
+        if interactive:
+            available = list_available_templates(root)
+            if available:
+                # Move 'clean-arch' to top if present
+                if "clean-arch" in available:
+                    available.remove("clean-arch")
+                    available.insert(0, "clean-arch")
+
+                from rich.prompt import Prompt
+                template = Prompt.ask(
+                    "Select template",
+                    choices=available,
+                    default=available[0]
+                )
+            else:
+                template = "clean-arch"
+        else:
+            template = "clean-arch"
 
     telemetry = get_telemetry(root)
     setup_service = get_project_setup(root)
