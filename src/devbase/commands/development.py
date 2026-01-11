@@ -35,16 +35,16 @@ def new(
 ) -> None:
     """
     📦 Create a new project from template.
-    
+
     Creates a customized project in 21_monorepo_apps/ using the specified template.
-    
+
     Golden Path (Default):
     - Generates files
     - Initializes Git repo
     - Installs dependencies (uv/pip)
     - Sets up pre-commit hooks
     - Opens in VS Code
-    
+
     Use --no-setup to only generate files.
     """
     root: Path = ctx.obj["root"]
@@ -77,10 +77,17 @@ def new(
             raise typer.Exit(1)
 
     # Use template engine
-    from devbase.utils.templates import generate_project_from_template, list_available_templates
     from devbase.services.project_setup import get_project_setup
+    from devbase.utils.security import validate_project_name
     from devbase.utils.telemetry import get_telemetry
-    from devbase.services.adr_generator import get_ghostwriter
+    from devbase.utils.templates import generate_project_from_template, list_available_templates
+
+    # Security: Validate name strictly
+    try:
+        validate_project_name(name)
+    except ValueError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        raise typer.Exit(1)
 
     telemetry = get_telemetry(root)
     setup_service = get_project_setup(root)
@@ -118,7 +125,7 @@ def new(
             f"Location: [cyan]{dest_path}[/cyan]",
             border_style="green"
         ))
-        
+
         # Success telemetry
         telemetry.track(
             f"Created project {name}",
@@ -159,19 +166,20 @@ def import_project(
 ) -> None:
     """
     📥 Import an existing project (brownfield).
-    
+
     Clones a Git repository or copies a local project into the DevBase workspace.
     Imported projects are marked as 'external' and exempt from governance rules.
-    
+
     Examples:
         devbase dev import https://github.com/user/repo.git
         devbase dev import https://github.com/user/dotnet-app.git --restore
         devbase dev import D:\\Projects\\legacy-app --name legacy
     """
-    import subprocess
     import json
     import shutil
+    import subprocess
     from datetime import datetime
+
     import devbase
 
     root: Path = ctx.obj["root"]
@@ -180,20 +188,34 @@ def import_project(
 
     # Determine if source is URL or path
     is_url = source.startswith("http://") or source.startswith("https://") or source.startswith("git@")
-    
+
+    from devbase.utils.security import sanitize_filename
+
     if is_url:
-        # Extract repo name from URL
-        repo_name = name or source.rstrip("/").split("/")[-1].replace(".git", "")
+        # Extract repo name from URL and sanitize
+        raw_name = name or source.rstrip("/").split("/")[-1].replace(".git", "")
+        repo_name = sanitize_filename(raw_name)
+
+        if name and name != repo_name:
+            console.print(f"[yellow]⚠ Warning: Project name sanitized from '{name}' to '{repo_name}' for security.[/yellow]")
+
         dest_path = apps_dir / repo_name
-        
+
+        # Double check path safety (paranoid check)
+        try:
+            dest_path.resolve().relative_to(apps_dir.resolve())
+        except ValueError:
+            console.print(f"[red]✗ Security Error: Invalid path destination '{dest_path}'[/red]")
+            raise typer.Exit(1)
+
         if dest_path.exists():
             console.print(f"[red]✗ Project '{repo_name}' already exists.[/red]")
             raise typer.Exit(1)
-        
-        console.print(f"\n[bold]Importing project from Git...[/bold]")
+
+        console.print("\n[bold]Importing project from Git...[/bold]")
         console.print(f"[dim]Source: {source}[/dim]")
         console.print(f"[dim]Destination: {dest_path}[/dim]\n")
-        
+
         try:
             result = subprocess.run(
                 ["git", "clone", "--", source, str(dest_path)],
@@ -204,7 +226,7 @@ def import_project(
             if result.returncode != 0:
                 console.print(f"[red]✗ Git clone failed:[/red]\n{result.stderr}")
                 raise typer.Exit(1)
-            console.print(f"[green]✓[/green] Repository cloned successfully")
+            console.print("[green]✓[/green] Repository cloned successfully")
         except FileNotFoundError:
             console.print("[red]✗ Git not found. Please install Git.[/red]")
             raise typer.Exit(1)
@@ -217,25 +239,35 @@ def import_project(
         if not source_path.exists():
             console.print(f"[red]✗ Source path not found: {source}[/red]")
             raise typer.Exit(1)
-        
-        project_name = name or source_path.name
+
+        # Sanitize project name
+        raw_name = name or source_path.name
+        project_name = sanitize_filename(raw_name)
+
         dest_path = apps_dir / project_name
-        
+
+        # Double check path safety
+        try:
+            dest_path.resolve().relative_to(apps_dir.resolve())
+        except ValueError:
+            console.print(f"[red]✗ Security Error: Invalid path destination '{dest_path}'[/red]")
+            raise typer.Exit(1)
+
         if dest_path.exists():
             console.print(f"[red]✗ Project '{project_name}' already exists.[/red]")
             raise typer.Exit(1)
-        
-        console.print(f"\n[bold]Importing local project...[/bold]")
+
+        console.print("\n[bold]Importing local project...[/bold]")
         console.print(f"[dim]Source: {source_path}[/dim]")
         console.print(f"[dim]Destination: {dest_path}[/dim]\n")
-        
+
         try:
             shutil.copytree(source_path, dest_path)
-            console.print(f"[green]✓[/green] Project copied successfully")
+            console.print("[green]✓[/green] Project copied successfully")
         except Exception as e:
             console.print(f"[red]✗ Copy failed: {e}[/red]")
             raise typer.Exit(1)
-    
+
     # Create .devbase.json with external governance
     metadata = {
         "template": "imported",
@@ -244,11 +276,11 @@ def import_project(
         "imported_at": datetime.now().isoformat(),
         "devbase_version": devbase.__version__
     }
-    
+
     meta_file = dest_path / ".devbase.json"
     meta_file.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-    console.print(f"[green]✓[/green] Created .devbase.json (governance: external)")
-    
+    console.print("[green]✓[/green] Created .devbase.json (governance: external)")
+
     console.print(Panel(
         f"[bold green]✅ Import Complete![/bold green]\n\n"
         f"Project: [cyan]{dest_path.name}[/cyan]\n"
@@ -256,10 +288,10 @@ def import_project(
         f"[dim]This project is marked as 'external' and exempt from governance rules.[/dim]",
         border_style="green"
     ))
-    
+
     # Optional: NuGet restore
     if restore:
-        from devbase.utils.nuget import nuget_restore, is_dotnet_project
+        from devbase.utils.nuget import is_dotnet_project, nuget_restore
         if is_dotnet_project(dest_path):
             console.print()
             nuget_restore(dest_path, root=root)
@@ -281,7 +313,7 @@ def open_project(
 ) -> None:
     """
     💻 Open a project in VS Code.
-    
+
     Opens the project's .code-workspace file or folder in VS Code.
     If no name is provided, an interactive list is shown.
 
@@ -289,12 +321,13 @@ def open_project(
         devbase dev open MedSempreMVC_GIT
         devbase dev open
     """
-    from devbase.utils.vscode import open_in_vscode
     from rich.prompt import Prompt
+
+    from devbase.utils.vscode import open_in_vscode
 
     root: Path = ctx.obj["root"]
     project_path = None
-    
+
     # If no name provided, show interactive list
     if not project_name:
         apps_dir = root / "20-29_CODE" / "21_monorepo_apps"
@@ -346,11 +379,11 @@ def open_project(
         # Also check worktrees
         if not project_path.exists():
             project_path = root / "20-29_CODE" / "22_worktrees" / project_name
-    
+
     if not project_path.exists():
         console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
         raise typer.Exit(1)
-    
+
     open_in_vscode(project_path)
 
 
@@ -365,31 +398,31 @@ def restore_packages(
 ) -> None:
     """
     📦 Restore NuGet packages for a .NET project.
-    
+
     Downloads nuget.exe automatically if needed and runs restore.
-    
+
     Examples:
         devbase dev restore MedSempreMVC_GIT
         devbase dev restore MyProject --solution MyProject.Web.sln
     """
-    from devbase.utils.nuget import nuget_restore, is_dotnet_project
+    from devbase.utils.nuget import is_dotnet_project, nuget_restore
 
     root: Path = ctx.obj["root"]
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
-    
+
     # Also check worktrees
     if not project_path.exists():
         project_path = root / "20-29_CODE" / "22_worktrees" / project_name
-    
+
     if not project_path.exists():
         console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
         raise typer.Exit(1)
-    
+
     if not is_dotnet_project(project_path):
         console.print(f"[yellow]⚠ '{project_name}' does not appear to be a .NET project.[/yellow]")
         console.print("[dim]No .sln or packages.config found.[/dim]")
         raise typer.Exit(1)
-    
+
     success = nuget_restore(project_path, solution, root=root)
     if not success:
         raise typer.Exit(1)
@@ -402,11 +435,12 @@ def info_project(
 ) -> None:
     """
     ℹ️ Show project details.
-    
+
     Displays template used, creation date, and metadata.
     """
     import json
     from datetime import datetime
+
     from rich.panel import Panel
     from rich.table import Table
 
@@ -424,25 +458,24 @@ def info_project(
     # Gather Info
     meta_file = project_path / ".devbase.json"
     copier_file = project_path / ".copier-answers.yml"
-    
+
     metadata = {}
-    
+
     # Strategy 1: .devbase.json (New standard)
     if meta_file.exists():
         try:
             metadata = json.loads(meta_file.read_text(encoding="utf-8"))
         except:
             pass
-            
+
     # Strategy 2: Copier (Legacy/Alternative)
     if not metadata and copier_file.exists():
         metadata["template"] = "copier-template (inferred)"
-        
+
     # Strategy 3: Filesystem (Fallback)
     stat = project_path.stat()
     created_ts = stat.st_ctime
-    modified_ts = stat.st_mtime
-    
+
     # Construct Display
     template = metadata.get("template", "Unknown / Custom")
     governance = metadata.get("governance", "full")
@@ -463,7 +496,7 @@ def info_project(
     grid = Table.grid(expand=True)
     grid.add_column(style="bold cyan", width=15)
     grid.add_column()
-    
+
     grid.add_row("Project:", project_name)
     grid.add_row("Location:", str(project_path))
     grid.add_row("Governance:", gov_display)
@@ -474,7 +507,7 @@ def info_project(
     grid.add_row("DevBase Ver:", version)
     grid.add_row("Author:", author)
     grid.add_row("Description:", desc)
-    
+
     console.print(Panel(grid, title=f"ℹ️ Project Info: {project_name}", border_style="blue"))
 
 
@@ -484,18 +517,20 @@ def list_projects(
 ) -> None:
     """
     📂 List all projects.
-    
+
     scans 20-29_CODE/21_monorepo_apps and displays a table of projects.
     """
     from datetime import datetime
+
     from rich.table import Table
+
     from devbase.utils.telemetry import get_telemetry
 
     root: Path = ctx.obj["root"]
     telemetry = get_telemetry(root)
-    
+
     projects_dir = root / "20-29_CODE" / "21_monorepo_apps"
-    
+
     console.print()
     console.print("[bold]Project List[/bold]")
     console.print(f"[dim]Location: {projects_dir}[/dim]\n")
@@ -503,27 +538,27 @@ def list_projects(
     if not projects_dir.exists():
         console.print("[yellow]⚠ Projects folder not found.[/yellow]")
         return
-        
+
     projects = [p for p in projects_dir.iterdir() if p.is_dir()]
-    
+
     if not projects:
         console.print("[dim]No projects found.[/dim]")
         console.print("\nCreate one with:\n  [cyan]devbase dev new <name>[/cyan]")
         return
-        
+
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Name", style="cyan")
     table.add_column("Last Modified", justify="right")
     table.add_column("Governance", justify="center")
-    
+
     import json
-    
+
     for p in sorted(projects, key=lambda x: x.name):
         # Read governance from .devbase.json
         meta_file = p / ".devbase.json"
         governance = "full"
         template = None
-        
+
         if meta_file.exists():
             try:
                 meta = json.loads(meta_file.read_text(encoding="utf-8"))
@@ -531,7 +566,7 @@ def list_projects(
                 template = meta.get("template")
             except:
                 pass
-        
+
         # Determine badge style
         if template == "worktree":
             gov_badge = "[magenta]Worktree[/magenta]"
@@ -541,12 +576,12 @@ def list_projects(
             gov_badge = "[blue]Partial[/blue]"
         else:
             gov_badge = "[green]Full[/green]"
-        
+
         # Modified time
         mtime = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
-        
+
         table.add_row(p.name, mtime, gov_badge)
-    
+
     # Also list worktrees from 22_worktrees
     worktrees_dir = root / "20-29_CODE" / "22_worktrees"
     if worktrees_dir.exists():
@@ -555,10 +590,10 @@ def list_projects(
                 mtime = datetime.fromtimestamp(wt.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
                 table.add_row(wt.name, mtime, "[magenta]Worktree[/magenta]")
                 projects.append(wt)
-        
+
     console.print(table)
     console.print(f"\n[dim]Total: {len(projects)} projects[/dim]")
-    
+
     telemetry.track("Listed projects", category="discovery", action="list_projects")
 
 
@@ -570,19 +605,21 @@ def archive(
 ) -> None:
     """
     📦 Archive a project.
-    
+
     Moves the project from 21_monorepo_apps to 90-99_ARCHIVE_COLD/92_archived_projects/{year}.
     """
     import shutil
     from datetime import datetime
+
     from rich.prompt import Confirm
+
     from devbase.utils.telemetry import get_telemetry
 
     root: Path = ctx.obj["root"]
     telemetry = get_telemetry(root)
 
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / name
-    
+
     if not project_path.exists():
         console.print(f"[red]✗ Project '{name}' not found at {project_path}[/red]")
         raise typer.Exit(1)
@@ -611,9 +648,9 @@ def archive(
 
         with console.status("[bold yellow]Archiving project...[/bold yellow]"):
             shutil.move(str(project_path), str(archive_path))
-        
+
         console.print(f"\n[green]✓[/green] Project archived to: {archive_path}")
-        
+
         telemetry.track(
             f"Archived project {name}",
             category="lifecycle",
@@ -633,20 +670,18 @@ def update(
 ) -> None:
     """
     🔄 Update a project from its template.
-    
+
     Supports:
     - Copier (preferred): Runs 'copier update'
     - Legacy: Checks if hydration is possible (warns mainly)
     """
-    import shutil
-    import subprocess
     from devbase.utils.telemetry import get_telemetry
 
     root: Path = ctx.obj["root"]
     telemetry = get_telemetry(root)
-    
+
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / name
-    
+
     if not project_path.exists():
         console.print(f"[red]✗ Project '{name}' not found[/red]")
         raise typer.Exit(1)
@@ -661,28 +696,28 @@ def update(
     # check for copier
     copier_answers = project_path / ".copier-answers.yml"
     copier_answers_alt = project_path / ".copier-answers.yaml"
-    
+
     if copier_answers.exists() or copier_answers_alt.exists():
         console.print("[dim]Detected Copier project. Running update...[/dim]")
-        
+
         try:
              # Using subprocess to leverage copier CLI or we could import copier
              # importing copier is safer for python usage if installed
              import copier
-             
+
              # Copier update typically needs to run inside the project root or specify it
              # copier.run_update(project_path) is not exactly the API, usually it's run_update(src_path, dst_path...)
              # But for update, we just need the destination if answers file exists.
              # API: copier.run_update(dst_path=..., ...)
-             
+
              copier.run_update(
                  dst_path=str(project_path),
                  unsafe=True, # We trust our templates
                  overwrite=True,
                  quiet=False
              )
-             
-             console.print(f"[green]✓[/green] Project updated successfully!")
+
+             console.print("[green]✓[/green] Project updated successfully!")
              telemetry.track(f"Updated project {name}", category="lifecycle", action="update_project", status="success")
 
         except ImportError:
@@ -691,7 +726,7 @@ def update(
         except Exception as e:
              console.print(f"[red]✗ Update failed: {e}[/red]")
              telemetry.track(f"Update failed {name}: {e}", category="lifecycle", action="update_project", status="error")
-             
+
     else:
         # Legacy/Unknown
         console.print("[yellow]⚠ Not a Copier project.[/yellow]")
@@ -712,10 +747,11 @@ def blueprint(
     inspirada em Clean Architecture.
     """
     import json
-    from rich.tree import Tree
+
     from rich.prompt import Confirm
+    from rich.tree import Tree
+
     from devbase.adapters.ai.groq_adapter import GroqProvider
-    from devbase.services.security.sanitizer import sanitize_context
     from devbase.services.project_setup import get_project_setup
 
     root: Path = ctx.obj["root"]
@@ -870,7 +906,7 @@ def audit(
 ) -> None:
     """
     🔍 Audit workspace naming conventions (kebab-case).
-    
+
     Scans all directories and reports violations of the kebab-case
     naming convention required by DevBase.
     """
@@ -985,35 +1021,41 @@ def worktree_add(
 ) -> None:
     """
     🌳 Create a new worktree for a project.
-    
+
     Creates a worktree in 22_worktrees/<project>-<branch> (default).
-    
+
     Examples:
         devbase dev worktree-add MedSempreMVC_GIT feature/nova-rotina
         devbase dev worktree-add MyProject feature/xyz --create
         devbase dev worktree-add MyProject feature/xyz --name "my-feature-xyz"
     """
-    from devbase.utils.worktree import add_worktree, get_worktree_dir
     from devbase.utils.vscode import generate_vscode_workspace
+    from devbase.utils.worktree import add_worktree, get_worktree_dir
 
     root: Path = ctx.obj["root"]
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
-    
+
     if not project_path.exists():
         console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
         raise typer.Exit(1)
-    
+
     if not (project_path / ".git").exists():
         console.print(f"[red]✗ Project '{project_name}' is not a git repository.[/red]")
         raise typer.Exit(1)
-    
+
     worktrees_dir = get_worktree_dir(root)
+
+    # Sanitize custom name if provided
+    if name:
+        from devbase.utils.security import sanitize_filename
+        name = sanitize_filename(name)
+
     worktree_path = add_worktree(project_path, worktrees_dir, project_name, branch, create, custom_name=name)
-    
+
     if worktree_path:
         # Generate workspace file
         generate_vscode_workspace(worktree_path, worktree_path.name)
-        
+
         console.print(Panel(
             f"[bold green]✅ Worktree created![/bold green]\n\n"
             f"Location: [cyan]{worktree_path}[/cyan]\n"
@@ -1030,17 +1072,18 @@ def worktree_list(
 ) -> None:
     """
     🌳 List worktrees for a project or all projects.
-    
+
     Examples:
         devbase dev worktree-list
         devbase dev worktree-list MedSempreMVC_GIT
     """
     from rich.table import Table
+
     from devbase.utils.worktree import list_worktrees
 
     root: Path = ctx.obj["root"]
     apps_dir = root / "20-29_CODE" / "21_monorepo_apps"
-    
+
     if project_name:
         projects = [apps_dir / project_name]
         if not projects[0].exists():
@@ -1048,13 +1091,13 @@ def worktree_list(
             raise typer.Exit(1)
     else:
         projects = [p for p in apps_dir.iterdir() if p.is_dir() and (p / ".git").exists()]
-    
+
     table = Table(title="Git Worktrees", show_header=True, header_style="bold magenta")
     table.add_column("Project", style="cyan")
     table.add_column("Branch", style="yellow")
     table.add_column("Path")
     table.add_column("Commit", style="dim")
-    
+
     total = 0
     for project in sorted(projects, key=lambda x: x.name):
         worktrees = list_worktrees(project)
@@ -1069,7 +1112,7 @@ def worktree_list(
                 wt.get("commit", "")
             )
             total += 1
-    
+
     if total == 0:
         console.print("[dim]No worktrees found.[/dim]")
         console.print("\nCreate one with:\n  [cyan]devbase dev worktree-add <project> <branch>[/cyan]")
@@ -1089,25 +1132,25 @@ def worktree_remove(
 ) -> None:
     """
     🌳 Remove a worktree.
-    
+
     Examples:
         devbase dev worktree-remove MedSempreMVC_GIT--feature-xyz
         devbase dev worktree-remove MyProject--hotfix --force
     """
-    from devbase.utils.worktree import remove_worktree, get_worktree_dir
+    from devbase.utils.worktree import get_worktree_dir, remove_worktree
 
     root: Path = ctx.obj["root"]
     worktrees_dir = get_worktree_dir(root)
     worktree_path = worktrees_dir / worktree_name
-    
+
     if not worktree_path.exists():
         console.print(f"[red]✗ Worktree '{worktree_name}' not found.[/red]")
         raise typer.Exit(1)
-    
+
     # Try to determine parent project from metadata
     project_name = None
     meta_file = worktree_path / ".devbase.json"
-    
+
     if meta_file.exists():
         try:
             import json
@@ -1115,19 +1158,19 @@ def worktree_remove(
             project_name = meta.get("parent_project")
         except:
             pass
-            
+
     # Fallback to legacy naming convention
     if not project_name:
         project_name = worktree_name.split("--")[0]
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
-    
+
     if not project_path.exists():
         console.print(f"[yellow]⚠ Parent project '{project_name}' not found. Removing directory only.[/yellow]")
         import shutil
         shutil.rmtree(worktree_path)
         console.print(f"[green]✓[/green] Removed worktree directory: {worktree_name}")
         return
-    
+
     success = remove_worktree(project_path, worktree_path, force)
     if not success:
         raise typer.Exit(1)
