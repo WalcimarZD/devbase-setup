@@ -46,23 +46,46 @@ class KnowledgeGraph:
         files: List[Path] = []
         errors = 0
 
-        # 1. First Pass: Collect all nodes and build file map
+        # Regex for Markdown links: [text](link)
+        # We ignore external links (http/https)
+        md_link_pattern = re.compile(r"\[.*?\]\((.*?)\)")
+
+        # Regex for Wiki-links: [[link]] or [[link|text]]
+        wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
+
+        # Store potential links for resolution after building the map
+        # Structure: (source_rel, source_file_path, list_of_raw_links_md, list_of_raw_links_wiki)
+        pending_links: List[Tuple[str, Path, List[str], List[str]]] = []
+
+        # ⚡ Bolt Optimization: Single-Pass I/O
+        # Combined node discovery and content reading into one pass.
+        # Previously, files were read twice (once for frontmatter, once for content).
+        # We now cache extracted raw links in memory to avoid the second read.
+
         for path in search_paths:
             # Optimization: Use scan_directory for centralized pruning
-            # Replaces manual path.walk() to ensure consistency with performance guidelines
             for file_path in scan_directory(path, extensions={'.md'}):
                 # Store relative path from workspace root for portability
                 rel_path = file_path.relative_to(self.root).as_posix()
 
-                # Parse Frontmatter for title/tags
+                content = ""
+                title = file_path.stem
+                tags = []
+
+                # Parse Frontmatter for title/tags AND get content
                 try:
                     post = frontmatter.load(file_path)
                     title = post.get("title", file_path.stem)
                     tags = post.get("tags", [])
+                    content = post.content
                 except Exception:
                     errors += 1
-                    title = file_path.stem
-                    tags = []
+                    # Fallback: Try reading as plain text if frontmatter fails
+                    # We still want to parse links even if frontmatter is invalid
+                    try:
+                        content = file_path.read_text(encoding="utf-8")
+                    except Exception:
+                        continue  # Cannot read file at all
 
                 # Add node
                 self.graph.add_node(
@@ -73,35 +96,26 @@ class KnowledgeGraph:
                 )
 
                 # Map identifiers for Wiki-link resolution
-                # 1. Filename stem (e.g. "note_a" -> "path/to/note_a.md")
                 self.file_map[file_path.stem.lower()] = rel_path
-                # 2. Title (e.g. "Note A" -> "path/to/note_a.md")
                 if title:
                     self.file_map[title.lower()] = rel_path
 
                 files.append(file_path)
 
-        # 2. Second Pass: Parse links and add edges
+                # Extract potential links (to be resolved later)
+                if content:
+                    found_md_links = md_link_pattern.findall(content)
+                    found_wiki_links = wiki_link_pattern.findall(content)
+                    if found_md_links or found_wiki_links:
+                        pending_links.append((rel_path, file_path, found_md_links, found_wiki_links))
+
+        # 2. Second Pass: Resolve links (In-Memory)
         links_count = 0
 
-        # Regex for Markdown links: [text](link)
-        # We ignore external links (http/https)
-        md_link_pattern = re.compile(r"\[.*?\]\((.*?)\)")
-
-        # Regex for Wiki-links: [[link]] or [[link|text]]
-        wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
-
-        for file_path in files:
-            source_rel = file_path.relative_to(self.root).as_posix()
-
-            try:
-                content = file_path.read_text(encoding="utf-8")
-            except Exception:
-                continue
-
-            # Extract Markdown links
-            for match in md_link_pattern.findall(content):
-                target_link = match.split(" ")[0] # handle [text](link "title")
+        for source_rel, file_path, md_links, wiki_links in pending_links:
+            # Resolve Markdown links
+            for target_link_raw in md_links:
+                target_link = target_link_raw.split(" ")[0]  # handle [text](link "title")
 
                 if target_link.startswith(("http://", "https://", "mailto:")):
                     continue
@@ -120,15 +134,15 @@ class KnowledgeGraph:
                 except (ValueError, RuntimeError):
                     continue
 
-            # Extract Wiki-links
-            for match in wiki_link_pattern.findall(content):
+            # Resolve Wiki-links
+            for target_name_raw in wiki_links:
                 # Handle [[Link|Text]]
-                target_name = match.split("|")[0].strip().lower()
+                target_name = target_name_raw.split("|")[0].strip().lower()
 
                 # Try to find target in map
                 if target_name in self.file_map:
                     target_rel = self.file_map[target_name]
-                    if source_rel != target_rel: # Avoid self-loops
+                    if source_rel != target_rel:  # Avoid self-loops
                         self.graph.add_edge(source_rel, target_rel)
                         links_count += 1
 
