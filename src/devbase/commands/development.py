@@ -315,14 +315,40 @@ def open_project(
             console.print("Create one with: [cyan]devbase dev new[/cyan]")
             raise typer.Exit(1)
 
-        # Sort by name
-        candidates.sort(key=lambda x: x.name)
+        # Sort by modification time (newest first)
+        candidates.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+
+        # Helpers for relative time
+        from datetime import datetime
+        now = datetime.now()
+
+        def get_relative_time(timestamp: float) -> str:
+            dt = datetime.fromtimestamp(timestamp)
+            diff = now - dt
+            if diff.days == 0:
+                if diff.seconds < 60:
+                    return "just now"
+                if diff.seconds < 3600:
+                    return f"{diff.seconds // 60}m ago"
+                return f"{diff.seconds // 3600}h ago"
+            if diff.days == 1:
+                return "yesterday"
+            if diff.days < 7:
+                return f"{diff.days}d ago"
+            return dt.strftime("%Y-%m-%d")
 
         console.print("\n[bold]Select a project to open:[/bold]")
+        console.print(f"[dim](Sorted by recent activity)[/dim]")
+
         for i, path in enumerate(candidates, 1):
             kind = "Worktree" if path.parent.name == "22_worktrees" else "Project"
             color = "magenta" if kind == "Worktree" else "green"
-            console.print(f"  [bold cyan]{i}.[/bold cyan] {path.name} [{color}]({kind})[/{color}]")
+
+            # Get last modified time
+            mtime = path.stat().st_mtime
+            time_display = get_relative_time(mtime)
+
+            console.print(f"  [bold cyan]{i}.[/bold cyan] {path.name} [dim]({time_display})[/dim] [{color}][{kind}][/{color}]")
 
         console.print()
         choice = Prompt.ask("Enter number or name", default="1")
