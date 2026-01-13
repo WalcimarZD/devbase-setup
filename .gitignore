@@ -44,3 +44,5 @@ test_output/
 # DevBase State (should be local)
 .devbase_state.json
 .coverage
+temp_kb/
+temp_kb_perf/
