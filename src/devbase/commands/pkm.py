@@ -6,6 +6,7 @@ Commands for knowledge graph navigation and analysis.
 from pathlib import Path
 from typing import List, Optional
 
+import re
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -87,6 +88,22 @@ def find(
         # Preview
         if result['content_preview']:
             preview = result['content_preview'][:150].replace("\n", " ")
+
+            # Highlight query in preview if present
+            if query:
+                from rich.markup import escape
+                # Escape content first to prevent markup injection
+                preview = escape(preview)
+
+                # Use regex to find the query case-insensitively and wrap it in style
+                # We use a lambda to replace with the actual match case to preserve original casing
+                preview = re.sub(
+                    f"({re.escape(query)})",
+                    r"[black on yellow]\1[/black on yellow]",
+                    preview,
+                    flags=re.IGNORECASE
+                )
+
             console.print(f"  [dim]{preview}...[/dim]")
 
         console.print()
