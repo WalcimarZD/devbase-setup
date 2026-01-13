@@ -504,11 +504,13 @@ status: active
         )
     else:
         # Open in editor (VS Code)
+        import shutil
+
         console.print(f"Opening [cyan]{filename}[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
+        if shutil.which("code"):
+            subprocess.run(["code", str(file_path)], check=False)
         else:
-            subprocess.run(f"code {file_path}", shell=True)
+            console.print("[yellow]⚠ 'code' (VS Code) not found in PATH[/yellow]")
 
 
 @app.command()
@@ -563,8 +565,10 @@ def icebox(
         )
     else:
          # Open in editor
+        import shutil
+
         console.print(f"Opening [cyan]icebox.md[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
+        if shutil.which("code"):
+            subprocess.run(["code", str(file_path)], check=False)
         else:
-            subprocess.run(f"code {file_path}", shell=True)
+            console.print("[yellow]⚠ 'code' (VS Code) not found in PATH[/yellow]")
