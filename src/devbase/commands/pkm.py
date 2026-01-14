@@ -73,8 +73,26 @@ def find(
 
     console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
 
+    import re
+
+    def highlight_text(text: str, query: Optional[str]) -> str:
+        if not query or not text:
+            return text
+        # Escape special characters in query to avoid regex errors
+        escaped_query = re.escape(query)
+        # Replace case-insensitive match with highlighted version
+        # using [black on yellow] style from rich
+        return re.sub(
+            f"({escaped_query})",
+            r"[black on yellow]\1[/]",
+            text,
+            flags=re.IGNORECASE
+        )
+
     for result in results:
-        console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
+        # Highlight title if query matches
+        title = highlight_text(result['title'], query)
+        console.print(f"[cyan]■[/cyan] [bold]{title}[/bold]")
         console.print(f"  [dim]{result['path']}[/dim]")
 
         if result['type']:
@@ -87,7 +105,10 @@ def find(
         # Preview
         if result['content_preview']:
             preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+            # Highlight query in preview
+            # We apply highlighting BEFORE wrapping in [dim] so the style overrides dim
+            highlighted_preview = highlight_text(preview, query)
+            console.print(f"  [dim]{highlighted_preview}...[/dim]")
 
         console.print()
 
