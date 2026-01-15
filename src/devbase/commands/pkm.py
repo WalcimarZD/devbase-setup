@@ -3,11 +3,13 @@ PKM (Personal Knowledge Management) Commands
 =============================================
 Commands for knowledge graph navigation and analysis.
 """
+import re
 from pathlib import Path
 from typing import List, Optional
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 from typing_extensions import Annotated
 
@@ -73,6 +75,14 @@ def find(
 
     console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
 
+    # Compile regex once if query exists
+    highlight_pattern = None
+    if query:
+        try:
+            highlight_pattern = re.compile(re.escape(query), re.IGNORECASE)
+        except Exception:
+            pass
+
     for result in results:
         console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
         console.print(f"  [dim]{result['path']}[/dim]")
@@ -86,7 +96,17 @@ def find(
 
         # Preview
         if result['content_preview']:
-            preview = result['content_preview'][:150].replace("\n", " ")
+            # Sanitize content for Rich and replace newlines
+            preview = escape(result['content_preview']).replace("\n", " ")
+
+            # Highlight query terms
+            if highlight_pattern:
+                preview = highlight_pattern.sub(lambda m: f"[black on yellow]{m.group(0)}[/]", preview)
+
+            # Safety truncation (300 chars max)
+            if len(preview) > 300:
+                preview = preview[:300]
+
             console.print(f"  [dim]{preview}...[/dim]")
 
         console.print()
