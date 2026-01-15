@@ -10,6 +10,7 @@ import sys
 import toml
 import inspect
 import subprocess
+import re
 from pathlib import Path
 from typing import List, Set, Dict, Any
 from datetime import datetime, timedelta
@@ -33,6 +34,14 @@ def consistency_audit(
     Checks: Dependencies, CLI Commands, Database Integrity.
     """
     root = Path.cwd()
+    # Handle case where cwd is not root (e.g. inside src)
+    if not (root / "pyproject.toml").exists():
+        # Try to find root
+        if (root.parent / "pyproject.toml").exists():
+            root = root.parent
+        elif (root.parent.parent / "pyproject.toml").exists():
+            root = root.parent.parent
+
     report = {
         "updated": [],
         "warnings": [],
@@ -41,14 +50,14 @@ def consistency_audit(
 
     console.print(Panel("[bold blue]DevBase Consistency Audit[/bold blue]", subtitle="v5.1 Alpha"))
 
-    # 1. Diff Analysis (Simulated/Best Effort)
-    # ----------------------------------------
+    # 1. Diff Analysis
+    # ----------------
     console.print("[bold]1. Analyzing Changes...[/bold]")
     changes = _analyze_changes(root, days)
     if changes:
         console.print(f"   Found {len(changes)} modified/new files in src/devbase/ in last {days} days.")
     else:
-        console.print("   No recent code changes detected.")
+        console.print(f"   No functional changes detected in src/devbase/ in last {days} days.")
 
     # 2. Verify Dependencies
     # ----------------------
@@ -73,10 +82,10 @@ def consistency_audit(
 
     # Report Execution
     # ----------------
-    console.print("\n[bold underline]Audit Summary:[/bold underline]\n")
+    console.print("\n[bold underline]Relatório de Execução:[/bold underline]\n")
 
     if report["updated"]:
-        table = Table(title="✅ Updated Files", show_header=False, box=None)
+        table = Table(title="✅ Ficheiros de documentação atualizados", show_header=False, box=None)
         for item in report["updated"]:
             table.add_row(f"✅ {item}")
         console.print(table)
@@ -88,13 +97,13 @@ def consistency_audit(
         console.print(table)
 
     if report["suggestions"]:
-        table = Table(title="📝 Suggestions", show_header=False, box=None, style="blue")
+        table = Table(title="📝 Sugestões de melhoria", show_header=False, box=None, style="blue")
         for item in report["suggestions"]:
             table.add_row(f"📝 {item}")
         console.print(table)
 
     if not report["updated"] and not report["warnings"] and not report["suggestions"]:
-        console.print("[green]System is consistent! Good job.[/green]")
+        console.print("[green]✅ Sistema consistente! Nenhuma dívida de documentação encontrada.[/green]")
 
 def _analyze_changes(root: Path, days: int) -> List[str]:
     """
@@ -103,6 +112,9 @@ def _analyze_changes(root: Path, days: int) -> List[str]:
     """
     changed_files = []
     src_path = root / "src/devbase"
+
+    if not src_path.exists():
+        return []
 
     # Try git first
     try:
@@ -130,7 +142,7 @@ def _analyze_changes(root: Path, days: int) -> List[str]:
     return changed_files
 
 def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
-    """Check pyproject.toml vs ARCHITECTURE.md and README.md"""
+    """Check pyproject.toml vs ARCHITECTURE.md and README.md for specific critical libs."""
     pyproject_path = root / "pyproject.toml"
     arch_path = root / "ARCHITECTURE.md"
     readme_path = root / "README.md"
@@ -142,161 +154,148 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
     try:
         pyproject = toml.load(pyproject_path)
         deps = pyproject.get("project", {}).get("dependencies", [])
-        # Extract package names (basic parsing)
-        pkg_names = []
-        for dep in deps:
-            # Handle "package>=version" or "package"
-            name = dep.split(">")[0].split("<")[0].split("=")[0].strip()
-            pkg_names.append(name)
 
-        # Check docs
+        # Simplify deps list to just names
+        dep_names = set()
+        for dep in deps:
+            name = re.split(r'[<>=!]', dep)[0].strip()
+            dep_names.add(name)
+
+        # Critical libraries to watch for as per instructions
+        critical_libs = ["duckdb", "networkx", "pyvis"]
+
         arch_content = arch_path.read_text() if arch_path.exists() else ""
         readme_content = readme_path.read_text() if readme_path.exists() else ""
 
-        missing_in_arch = []
-        missing_in_readme = []
-
-        # Dependencies to ignore (standard or very common tools that might not need explicit arch docs)
-        ignore_libs = ["toml", "jinja2", "shellingham", "python-frontmatter", "copier"]
-
-        for pkg in pkg_names:
-            if pkg in ignore_libs:
-                continue
-
-            if pkg not in arch_content:
-                missing_in_arch.append(pkg)
-
-            # README usually doesn't list all deps, but prompt says "mentioned in ARCHITECTURE.md and README.md"
-            if pkg not in readme_content:
-                missing_in_readme.append(pkg)
-
-        if missing_in_arch:
-            report["warnings"].append(f"Dependencies missing in ARCHITECTURE.md: {', '.join(missing_in_arch)}")
-
-        if missing_in_readme:
-             report["suggestions"].append(f"Dependencies missing in README.md: {', '.join(missing_in_readme)}")
+        for lib in critical_libs:
+            if lib in dep_names:
+                if lib not in arch_content:
+                    report["warnings"].append(f"Library '{lib}' is in pyproject.toml but missing in ARCHITECTURE.md")
+                if lib not in readme_content:
+                    report["warnings"].append(f"Library '{lib}' is in pyproject.toml but missing in README.md")
 
     except Exception as e:
         report["warnings"].append(f"Failed to verify dependencies: {e}")
 
 def _verify_cli_consistency(root: Path, report: Dict[str, List[str]], fix: bool):
-    """Check CLI commands vs Documentation"""
-    # 1. Gather all commands from code
-    # This is tricky without importing everything. We can inspect the command files.
-    # Or import the app. But importing might have side effects or be slow.
-    # Let's simple parse files in src/devbase/commands for @app.command or similar.
-
+    """Check CLI commands vs Documentation (USAGE-GUIDE and docs/cli/)"""
     commands_dir = root / "src" / "devbase" / "commands"
-    found_commands = {} # module -> list of command names
+    docs_cli_dir = root / "docs" / "cli"
+    usage_guide = root / "USAGE-GUIDE.md"
 
-    for cmd_file in commands_dir.glob("*.py"):
-        if cmd_file.name == "__init__.py": continue
-
-        content = cmd_file.read_text()
-        import re
-        # Match @app.command("name") or @cli.command("name")
-        matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
-        if matches:
-            found_commands[cmd_file.stem] = matches
-
-    # 2. Check Docs
-    usage_guide = root / "USAGE-GUIDE.md" # or docs/cli/
-    usage_content = usage_guide.read_text() if usage_guide.exists() else ""
-
-    missing_docs = []
-
-    for module, cmds in found_commands.items():
-        for cmd in cmds:
-            # Check if command is mentioned in USAGE-GUIDE.md
-            # Heuristic: "devbase <module> <cmd>" or just the command name if unique
-            full_cmd = f"{module} {cmd}"
-            if full_cmd not in usage_content and cmd not in usage_content:
-                missing_docs.append(f"{module} {cmd}")
-
-    if missing_docs:
-        report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_docs)}")
-        if fix and usage_guide.exists():
-            # Append a todo section
-            with open(usage_guide, "a") as f:
-                f.write("\n\n## Undocumented Commands (Auto-detected)\n")
-                for cmd in missing_docs:
-                    f.write(f"- `devbase {cmd}`\n")
-            report["updated"].append("USAGE-GUIDE.md (added list of undocumented commands)")
-
-def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
-    """Check DB Code vs Technical Docs"""
-    tech_doc = root / "docs" / "TECHNICAL_DESIGN_DOC.md"
-    db_file = root / "src" / "devbase" / "services" / "knowledge_db.py"
-
-    if not tech_doc.exists():
-        report["warnings"].append("TECHNICAL_DESIGN_DOC.md not found.")
+    if not commands_dir.exists():
         return
 
-    if not db_file.exists():
-        report["warnings"].append("knowledge_db.py not found.")
+    # 1. Identify Command Modules
+    command_files = [f for f in commands_dir.glob("*.py") if f.name != "__init__.py"]
+
+    # 2. Check docs/cli/ mapping
+    if docs_cli_dir.exists():
+        for cmd_file in command_files:
+            expected_doc = docs_cli_dir / f"{cmd_file.stem}.md"
+            if not expected_doc.exists():
+                report["warnings"].append(f"Missing documentation file: docs/cli/{expected_doc.name}")
+                if fix:
+                    expected_doc.write_text(f"# {cmd_file.stem.capitalize()} Command\n\nRun `devbase {cmd_file.stem} --help` for details.\n")
+                    report["updated"].append(f"Created stub for docs/cli/{expected_doc.name}")
+
+    # 3. Check USAGE-GUIDE.md for new commands/flags
+    if usage_guide.exists():
+        usage_content = usage_guide.read_text()
+
+        undocumented_cmds = []
+        for cmd_file in command_files:
+            content = cmd_file.read_text()
+            # Look for command definitions
+            # Regex to find @app.command("name") or @cli.command("name")
+            matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
+
+            for cmd_name in matches:
+                # Check if specific command "module command" is in usage guide
+                # This is heuristic.
+                full_cmd_ref = f"{cmd_file.stem} {cmd_name}"
+                if full_cmd_ref not in usage_content and cmd_name not in usage_content:
+                    undocumented_cmds.append(full_cmd_ref)
+
+        if undocumented_cmds:
+            report["warnings"].append(f"New commands detected but not in USAGE-GUIDE.md: {', '.join(undocumented_cmds)}")
+            if fix:
+                with open(usage_guide, "a") as f:
+                    f.write("\n\n## New Commands (Auto-detected)\n")
+                    for cmd in undocumented_cmds:
+                        f.write(f"- `devbase {cmd}`\n")
+                report["updated"].append("USAGE-GUIDE.md (added new commands)")
+
+def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
+    """Check DB Schema in code vs TECHNICAL_DESIGN_DOC.md"""
+    tech_doc = root / "docs" / "TECHNICAL_DESIGN_DOC.md"
+    # Adapter is the source of truth for schema creation
+    db_adapter = root / "src" / "devbase" / "adapters" / "storage" / "duckdb_adapter.py"
+
+    if not tech_doc.exists():
+        report["warnings"].append("TECHNICAL_DESIGN_DOC.md missing.")
         return
 
     tech_content = tech_doc.read_text()
-    db_content = db_file.read_text()
 
-    # Extract table names from DB code using basic regex for SQL patterns
-    # Matches: INSERT INTO table_name, FROM table_name, CREATE TABLE table_name
-    import re
-    table_patterns = [
-        r'INSERT INTO\s+([a-zA-Z0-9_]+)',
-        r'FROM\s+([a-zA-Z0-9_]+)',
-        r'CREATE TABLE\s+([a-zA-Z0-9_]+)'
-    ]
+    # Specific check for hot_fts and cold_fts
+    tables_to_check = ["hot_fts", "cold_fts"]
 
-    found_tables = set()
-    for pattern in table_patterns:
-        matches = re.findall(pattern, db_content, re.IGNORECASE)
-        found_tables.update(matches)
+    # Check if they exist in code (either in adapter or knowledge_db service)
+    # We check adapter first as it usually has CREATE TABLE
+    code_content = ""
+    if db_adapter.exists():
+        code_content += db_adapter.read_text()
 
-    # Filter out likely SQL keywords or temp aliases if regex is too loose,
-    # but strictly looking for prompt's specific concern: hot_fts, cold_fts
-    # We filter for tables that seem "significant" (e.g., have 'fts' or 'embeddings' or are 'notes')
-    significant_tables = {t for t in found_tables if 'fts' in t or 'embeddings' in t or 'notes' in t}
+    # Also check knowledge_db.py as fallback or reference
+    kdb_service = root / "src" / "devbase" / "services" / "knowledge_db.py"
+    if kdb_service.exists():
+        code_content += kdb_service.read_text()
 
-    missing_in_doc = []
-    for table in significant_tables:
-        if table not in tech_content:
-            missing_in_doc.append(table)
-
-    if missing_in_doc:
-        report["warnings"].append(f"Tables found in code but missing in TECHNICAL_DESIGN_DOC.md: {', '.join(missing_in_doc)}")
+    for table in tables_to_check:
+        # Check if table is mentioned in code
+        if table in code_content:
+            # Check if mentioned in docs
+            if table not in tech_content:
+                report["warnings"].append(f"Table '{table}' found in code but missing explanation in TECHNICAL_DESIGN_DOC.md")
+        else:
+            # If not in code, weird, but maybe strictly speaking we only check what IS in code
+            pass
 
 def _check_changelog(root: Path, report: Dict[str, List[str]], changes: List[str], fix: bool):
-    """Check if CHANGELOG.md covers recent changes"""
+    """Ensure functional changes are logged."""
     changelog = root / "CHANGELOG.md"
     if not changelog.exists():
         return
 
     content = changelog.read_text()
 
-    # If there are changes but no "Unreleased" or "In Progress" section, warn
-    if "Unreleased" not in content and "In Progress" not in content:
-        report["suggestions"].append("CHANGELOG.md might need an 'Unreleased' section for new changes.")
+    has_unreleased = "Unreleased" in content or "In Progress" in content
+
+    if not has_unreleased:
+        report["suggestions"].append("Functional changes detected but no 'In Progress' section in CHANGELOG.md")
 
         if fix:
-            # Prepend a draft section
-            new_section = "## [Unreleased] - In Progress\n\n### Changed\n"
-            for change in changes[:5]: # limit to 5
-                new_section += f"- Modified {change}\n"
-            if len(changes) > 5:
-                new_section += f"- ... and {len(changes)-5} more files.\n"
-
-            # Simple prepend (risky if format is strict, better to append or insert after header)
-            # Assuming standard Keep A Changelog format
+            # Add Draft section
             lines = content.splitlines()
-            # Find first h2
             insert_idx = 0
             for i, line in enumerate(lines):
                 if line.startswith("## "):
                     insert_idx = i
                     break
 
-            if insert_idx > 0:
-                lines.insert(insert_idx, new_section)
-                changelog.write_text("\n".join(lines))
-                report["updated"].append("CHANGELOG.md (added Unreleased section)")
+            draft_section = [
+                "## [Unreleased] - In Progress",
+                "",
+                "### Draft",
+                ""
+            ]
+            for change in changes[:5]:
+                draft_section.append(f"- Modified {change}")
+            if len(changes) > 5:
+                draft_section.append(f"- ... and {len(changes)-5} more files.")
+            draft_section.append("")
+
+            lines[insert_idx:insert_idx] = draft_section
+            changelog.write_text("\n".join(lines))
+            report["updated"].append("CHANGELOG.md (Added 'In Progress' section)")
