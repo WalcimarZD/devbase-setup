@@ -3,12 +3,14 @@ PKM (Personal Knowledge Management) Commands
 =============================================
 Commands for knowledge graph navigation and analysis.
 """
+import re
 from pathlib import Path
 from typing import List, Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 from typing_extensions import Annotated
 
 app = typer.Typer(help="Personal Knowledge Management commands")
@@ -87,7 +89,14 @@ def find(
         # Preview
         if result['content_preview']:
             preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+            text = Text(f"  {preview}...", style="dim")
+
+            if query:
+                # Highlight search terms
+                pattern = re.compile(re.escape(query), re.IGNORECASE)
+                text.highlight_regex(pattern, "black on yellow")
+
+            console.print(text)
 
         console.print()
 
