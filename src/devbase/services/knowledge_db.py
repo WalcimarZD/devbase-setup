@@ -46,6 +46,9 @@ class KnowledgeDB:
         """
         stats = {"indexed": 0, "skipped": 0, "errors": 0}
 
+        # Track if we indexed anything to know if FTS needs refresh
+        files_indexed_count_start = stats["indexed"]
+
         # 1. Index Active Knowledge (Hot)
         hot_path = self.root / "10-19_KNOWLEDGE"
         if hot_path.exists():
@@ -58,7 +61,29 @@ class KnowledgeDB:
             existing_mtimes = self._get_existing_mtimes("cold_fts")
             self._scan_directory(cold_path, "cold_fts", stats, existing_mtimes)
 
+        # ⚡ Bolt Optimization:
+        # Refresh FTS index ONLY if new files were indexed.
+        # This ensures search is always up-to-date with minimal overhead.
+        if stats["indexed"] > files_indexed_count_start:
+            self._refresh_fts_index("hot_fts")
+            self._refresh_fts_index("cold_fts")
+
         return stats
+
+    def _refresh_fts_index(self, table: str) -> None:
+        """
+        Refresh the FTS index for the given table.
+
+        DuckDB FTS indexes are not auto-updating (as of v0.10/v1.0).
+        We must explicitly recreate them after bulk inserts.
+        """
+        try:
+            # overwrite=1 drops the existing index if it exists
+            self.conn.execute(f"PRAGMA create_fts_index('{table}', 'file_path', 'content', 'title', 'tags', overwrite=1);")
+        except Exception as e:
+            # Log but don't crash, FTS is optional-ish
+            # console.print(f"[yellow]Warning: Failed to refresh FTS index for {table}: {e}[/yellow]")
+            pass
 
     def _get_existing_mtimes(self, table: str) -> Dict[str, int]:
         """Fetch existing mtime_epoch for all files in the table."""
@@ -155,7 +180,8 @@ class KnowledgeDB:
         tags: Optional[List[str]] = None,
         note_type: Optional[str] = None,
         limit: int = 50,
-        global_search: bool = False
+        global_search: bool = False,
+        _fallback: bool = False
     ) -> List[Dict[str, Any]]:
         """
         Search the knowledge base.
@@ -173,11 +199,17 @@ class KnowledgeDB:
         params = []
         conditions = []
 
-        if query:
-            # Simple ILIKE search for now
-            conditions.append("(title ILIKE ? OR content ILIKE ?)")
-            wildcard_query = f"%{query}%"
-            params.extend([wildcard_query, wildcard_query])
+        # ⚡ Bolt Optimization: Use FTS (BM25) if query is present
+        use_fts = bool(query) and not _fallback
+
+        if use_fts:
+            # FTS logic: handled in SELECT clause
+            params.append(query)
+        elif query:
+             # Fallback logic for non-FTS
+             conditions.append("(title ILIKE ? OR content ILIKE ?)")
+             wildcard_query = f"%{query}%"
+             params.extend([wildcard_query, wildcard_query])
 
         if tags:
             tag_conditions = []
@@ -193,26 +225,48 @@ class KnowledgeDB:
 
         where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
 
+        # If using FTS, we need to ensure score IS NOT NULL which implies a match
+        if use_fts:
+            if where_clause:
+                where_clause += " AND score IS NOT NULL"
+            else:
+                where_clause = " WHERE score IS NOT NULL"
+
         # Build query parts
         query_parts = []
 
+        # Helper to construct SELECT
+        def build_select(table: str):
+            if use_fts:
+                # Use macro: fts_main_<table_name>.match_bm25(key, query)
+                return f"SELECT file_path, title, content, tags, note_type, fts_main_{table}.match_bm25(file_path, ?) as score FROM {table} {where_clause}"
+            else:
+                return f"SELECT file_path, title, content, tags, note_type, 0.0 as score FROM {table} {where_clause}"
+
         # Hot query
-        hot_query = f"SELECT file_path, title, content, tags, note_type FROM hot_fts {where_clause}"
-        query_parts.append(hot_query)
+        query_parts.append(build_select("hot_fts"))
 
         if global_search:
             # Cold query
-            # We need to duplicate params for the second query part in the UNION
-            cold_query = f"SELECT file_path, title, content, tags, note_type FROM cold_fts {where_clause}"
-            query_parts.append(cold_query)
-            params = params * 2  # Duplicate params for both parts of UNION
+            query_parts.append(build_select("cold_fts"))
+            # Duplicate params
+            params = params * 2
 
         full_query = " UNION ALL ".join(query_parts)
+
+        if use_fts:
+            full_query += " ORDER BY score DESC"
+
         full_query += f" LIMIT {limit}"
 
         try:
             rows = self.conn.execute(full_query, params).fetchall()
         except Exception as e:
+            # Fallback to ILIKE if FTS fails (e.g. index missing)
+            if use_fts:
+                # console.print(f"[yellow]FTS failed ({e}), falling back to ILIKE...[/yellow]")
+                return self.search(query, tags, note_type, limit, global_search, _fallback=True)
+
             console.print(f"[red]Search error: {e}[/red]")
             return []
 
@@ -223,6 +277,7 @@ class KnowledgeDB:
             content = row[2]
             tags_str = row[3]
             n_type = row[4]
+            # row[5] is score
 
             # Simple word count
             word_count = len(content.split()) if content else 0
