@@ -159,7 +159,7 @@ class ProjectSetupService:
     def _open_ide(self, path: Path):
         if shutil.which("code"):
             console.print("[dim]⚡ Opening VS Code...[/dim]")
-            subprocess.run(["code", str(path)], check=False)
+            subprocess.run(["code", "--", str(path)], check=False)
             console.print("  [green]✓[/green] Done")
 
 def get_project_setup(root: Path) -> ProjectSetupService:

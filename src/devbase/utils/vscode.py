@@ -88,7 +88,7 @@ def open_in_vscode(project_path: Path) -> bool:
     target = workspace_files[0] if workspace_files else project_path
     
     try:
-        subprocess.run(["code", str(target)], check=True)
+        subprocess.run(["code", "--", str(target)], check=True)
         console.print(f"[green]✓[/green] Opened in VS Code")
         return True
     except FileNotFoundError:

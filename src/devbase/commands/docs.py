@@ -99,5 +99,5 @@ def new(
         import shutil
         import subprocess
         if shutil.which("code"):
-            subprocess.run(["code", str(file_path)], check=False)
+            subprocess.run(["code", "--", str(file_path)], check=False)
             console.print("[dim]Opened in VS Code[/dim]")
