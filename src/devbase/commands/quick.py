@@ -78,7 +78,7 @@ tags: [{"til" if til else "note"}, quick]
         try:
             import shutil
             if shutil.which("code"):
-                subprocess.run(["code", str(filepath)], check=False)
+                subprocess.run(["code", "--", str(filepath)], check=False)
                 console.print("[dim]Opened in VS Code[/dim]")
         except Exception:
             pass
