@@ -418,3 +418,4 @@ To create a local custom template:
 ## Undocumented Commands (Auto-detected)
 - `devbase ai classify`
 - `devbase ai summarize`
+- `devbase audit run`
