@@ -16,12 +16,10 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Generator
+from typing import List
 
-import numpy as np
 from fastembed import TextEmbedding
 
 from devbase.adapters.storage.duckdb_adapter import get_connection
@@ -184,21 +182,30 @@ class SearchEngine:
         )
 
         # Embed and Insert (Chunk level)
-        for i, chunk in enumerate(chunks):
-            if not chunk.strip():
-                continue
+        # ⚡ Bolt Optimization: Batch embedding and insertion
+        valid_chunks = [c for c in chunks if c.strip()]
 
-            vector = self.generate_embedding(chunk)
+        if valid_chunks:
+            # Batch embedding generation (faster on both CPU/GPU)
+            embeddings = list(self.embedding_model.embed(valid_chunks))
 
-            conn.execute(
+            # Prepare data for bulk insert
+            # Convert numpy arrays to lists if necessary for DuckDB
+            data = []
+            for i, (chunk, vec) in enumerate(zip(valid_chunks, embeddings)):
+                vector_list = vec.tolist() if hasattr(vec, "tolist") else list(vec)
+                data.append((rel_path, i, chunk, vector_list, mtime))
+
+            # Bulk insert (reduces transaction overhead)
+            conn.executemany(
                 f"""
                 INSERT INTO {table} (file_path, chunk_id, content_chunk, embedding, mtime_epoch)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                [rel_path, i, chunk, vector, mtime]
+                data
             )
 
-        logger.debug(f"Indexed {rel_path} ({len(chunks)} chunks)")
+        logger.debug(f"Indexed {rel_path} ({len(valid_chunks)} chunks)")
 
     def search(self, query: str, limit: int = 5) -> List[SearchResult]:
         """

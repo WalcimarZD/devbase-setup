@@ -11,3 +11,7 @@
 ## 2024-05-22 - DuckDB MinMax Indexes
 **Learning:** DuckDB automatically maintains MinMax indexes on row groups. For time-series data inserted in roughly chronological order, these implicit indexes are often as effective as explicit B-Tree/ART indexes for range queries, rendering explicit indexing on timestamp columns largely redundant for scan performance on sorted data.
 **Action:** Before adding explicit indexes in DuckDB, benchmark against the implicit MinMax behavior, especially for append-only time-series data.
+
+## 2024-05-23 - Batch RAG Operations
+**Learning:** Processing chunks one-by-one for embedding and insertion is a massive bottleneck. Batching embeddings (passing list to model) and using `executemany` for DB inserts yielded a 3x speedup (pure overhead) and reduced DB roundtrips by 99%+.
+**Action:** Always batch vector generation and database insertions. Use `conn.executemany` instead of loops for inserts.
