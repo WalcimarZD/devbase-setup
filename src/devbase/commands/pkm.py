@@ -3,12 +3,14 @@ PKM (Personal Knowledge Management) Commands
 =============================================
 Commands for knowledge graph navigation and analysis.
 """
+import re
 from pathlib import Path
 from typing import List, Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 from typing_extensions import Annotated
 
 app = typer.Typer(help="Personal Knowledge Management commands")
@@ -74,20 +76,37 @@ def find(
     console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
 
     for result in results:
-        console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
+        # Title with highlighting
+        title_text = Text(result['title'], style="bold")
+        if query:
+            title_text.highlight_regex(
+                f"(?i){re.escape(query)}", style="black on yellow"
+            )
+        console.print(Text("■ ", style="cyan") + title_text)
+
         console.print(f"  [dim]{result['path']}[/dim]")
 
+        # Metadata
+        meta_parts = []
         if result['type']:
-            console.print(f"  Type: [yellow]{result['type']}[/yellow]", end="")
+            meta_parts.append(f"[dim]Type:[/dim] [yellow]{result['type']}[/yellow]")
         if result['word_count']:
-            console.print(f"  | Words: {result['word_count']}", end="")
+            meta_parts.append(f"[dim]Words:[/dim] {result['word_count']}")
+
+        if meta_parts:
+            console.print("  " + " | ".join(meta_parts))
 
         console.print()  # Newline
 
-        # Preview
+        # Preview with highlighting
         if result['content_preview']:
             preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+            preview_text = Text(preview, style="dim")
+            if query:
+                preview_text.highlight_regex(
+                    f"(?i){re.escape(query)}", style="black on yellow"
+                )
+            console.print(Text("  ") + preview_text + Text("...", style="dim"))
 
         console.print()
 
