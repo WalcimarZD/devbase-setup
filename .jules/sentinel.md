@@ -11,3 +11,8 @@
 **Vulnerability:** `ProjectSetupService` executed package manager commands (`npm install`, `uv sync`, etc.) automatically when detecting configuration files. If a user was tricked into generating a project from a malicious template (Supply Chain Attack), this could trigger arbitrary code execution via `postinstall` scripts without explicit user consent.
 **Learning:** Automation is convenient but dangerous when it involves executing untrusted code or scripts. "Golden Path" features should not sacrifice security for zero-friction.
 **Prevention:** Always require user confirmation (interactive prompt) before executing commands that can run arbitrary code, especially in context of setup/installation scripts. Added `interactive` flag and `Confirm.ask` guard.
+
+## 2025-01-22 - Command Injection via shell=True in Editor Launch
+**Vulnerability:** The `pkm` commands (`journal`, `icebox`) used `subprocess.run(f'code "{path}"', shell=True)` to open files. This pattern is vulnerable to command injection if the file path contains shell metacharacters (e.g. `; rm -rf /`).
+**Learning:** `shell=True` is almost always a security risk when combined with dynamic strings. It invokes the system shell, which interprets metacharacters.
+**Prevention:** Always use `subprocess.run(["executable", "arg1", ...])` (list format) which bypasses the shell. Verify executable existence with `shutil.which` beforehand.
