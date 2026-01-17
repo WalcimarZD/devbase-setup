@@ -10,6 +10,7 @@ import sys
 import toml
 import inspect
 import subprocess
+import re
 from pathlib import Path
 from typing import List, Set, Dict, Any
 from datetime import datetime, timedelta
@@ -25,6 +26,7 @@ app = typer.Typer()
 
 @app.command("run")
 def consistency_audit(
+    ctx: typer.Context,
     fix: bool = typer.Option(False, "--fix", help="Attempt to automatically fix issues where possible."),
     days: int = typer.Option(1, "--days", help="Number of days back to check for changes.")
 ):
@@ -32,7 +34,7 @@ def consistency_audit(
     Run a consistency audit between Code and Documentation.
     Checks: Dependencies, CLI Commands, Database Integrity.
     """
-    root = Path.cwd()
+    root = ctx.obj.get("root", Path.cwd())
     report = {
         "updated": [],
         "warnings": [],
@@ -133,6 +135,10 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
     """Check pyproject.toml vs ARCHITECTURE.md and README.md"""
     pyproject_path = root / "pyproject.toml"
     arch_path = root / "ARCHITECTURE.md"
+    # Try doc path if root path not found (handles both repo structures)
+    if not arch_path.exists():
+        arch_path = root / "docs" / "ARCHITECTURE.md"
+
     readme_path = root / "README.md"
 
     if not pyproject_path.exists():
@@ -141,12 +147,19 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
 
     try:
         pyproject = toml.load(pyproject_path)
-        deps = pyproject.get("project", {}).get("dependencies", [])
+        project_config = pyproject.get("project", {})
+        deps = project_config.get("dependencies", [])
+
+        # Add optional dependencies
+        optional_deps = project_config.get("optional-dependencies", {})
+        for group in optional_deps.values():
+            deps.extend(group)
+
         # Extract package names (basic parsing)
         pkg_names = []
         for dep in deps:
-            # Handle "package>=version" or "package"
-            name = dep.split(">")[0].split("<")[0].split("=")[0].strip()
+            # Handle "package>=version", "package<version", "package==version", "package"
+            name = re.split(r'[<>=]', dep)[0].strip()
             pkg_names.append(name)
 
         # Check docs
@@ -157,7 +170,8 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
         missing_in_readme = []
 
         # Dependencies to ignore (standard or very common tools that might not need explicit arch docs)
-        ignore_libs = ["toml", "jinja2", "shellingham", "python-frontmatter", "copier"]
+        # Updated list based on common dev deps
+        ignore_libs = ["toml", "jinja2", "shellingham", "python-frontmatter", "copier", "plyer", "hatchling"]
 
         for pkg in pkg_names:
             if pkg in ignore_libs:
@@ -180,88 +194,153 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
         report["warnings"].append(f"Failed to verify dependencies: {e}")
 
 def _verify_cli_consistency(root: Path, report: Dict[str, List[str]], fix: bool):
-    """Check CLI commands vs Documentation"""
-    # 1. Gather all commands from code
-    # This is tricky without importing everything. We can inspect the command files.
-    # Or import the app. But importing might have side effects or be slow.
-    # Let's simple parse files in src/devbase/commands for @app.command or similar.
-
+    """Check CLI commands and flags vs Documentation"""
     commands_dir = root / "src" / "devbase" / "commands"
-    found_commands = {} # module -> list of command names
+    found_commands = {} # module -> list of (command_name, flags_list)
+
+    # Map filenames to cli groups (simplified)
+    # This should match main.py registration
+    group_map = {
+        "core": "core",
+        "development": "dev",
+        "navigation": "nav",
+        "audit": "audit",
+        "operations": "ops",
+        "quick": "quick",
+        "docs": "docs",
+        "pkm": "pkm",
+        "study": "study",
+        "analytics": "analytics",
+        "ai": "ai"
+    }
+
+    if not commands_dir.exists():
+         report["warnings"].append(f"Commands directory not found: {commands_dir}")
+         return
 
     for cmd_file in commands_dir.glob("*.py"):
         if cmd_file.name == "__init__.py": continue
 
+        module_name = cmd_file.stem
+        group_name = group_map.get(module_name, module_name) # Default to filename if not in map
+
         content = cmd_file.read_text()
-        import re
-        # Match @app.command("name") or @cli.command("name")
-        matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
-        if matches:
-            found_commands[cmd_file.stem] = matches
+
+        # Regex to find commands
+        # Also capture the function definition to scan for flags inside arguments
+        # This is a simple parser, might miss complex cases
+
+        # Pattern: @app.command(...) ... def func(...)
+        # We'll just find all command names first
+        cmd_matches = re.finditer(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
+
+        for match in cmd_matches:
+            cmd_name = match.group(1)
+            # Naive flag extraction: look for typer.Option(..., "--flag") in the whole file
+            # Ideally we should limit to the function scope, but that's hard with regex.
+            # We will just collect ALL flags in the file and associate them with the module for now.
+            # Or better: check if known flags are in docs.
+
+            # Let's stick to checking if command exists in docs.
+            if group_name not in found_commands:
+                found_commands[group_name] = []
+            found_commands[group_name].append(cmd_name)
+
+    # Scan for flags globally in the file (approximation)
+    # Flags: typer.Option(..., "--flag" or "-f")
+    found_flags = {}
+    for cmd_file in commands_dir.glob("*.py"):
+         content = cmd_file.read_text()
+         flags = re.findall(r'--([\w-]+)', content)
+         # Filter out common flags usually not documented per command or documented globally
+         filtered_flags = {f for f in flags if f not in ['help', 'version', 'verbose', 'root']}
+         if filtered_flags:
+             found_flags[cmd_file.stem] = filtered_flags
 
     # 2. Check Docs
-    usage_guide = root / "USAGE-GUIDE.md" # or docs/cli/
+    usage_guide = root / "USAGE-GUIDE.md"
+    if not usage_guide.exists():
+        usage_guide = root / "docs" / "USAGE-GUIDE.md"
+
     usage_content = usage_guide.read_text() if usage_guide.exists() else ""
 
     missing_docs = []
 
-    for module, cmds in found_commands.items():
+    for group, cmds in found_commands.items():
         for cmd in cmds:
-            # Check if command is mentioned in USAGE-GUIDE.md
-            # Heuristic: "devbase <module> <cmd>" or just the command name if unique
-            full_cmd = f"{module} {cmd}"
-            if full_cmd not in usage_content and cmd not in usage_content:
-                missing_docs.append(f"{module} {cmd}")
+            full_cmd = f"devbase {group} {cmd}"
+            # Check for "devbase group cmd" OR "devbase group ... cmd"
+            if full_cmd not in usage_content and f"{group} {cmd}" not in usage_content:
+                missing_docs.append(full_cmd)
 
     if missing_docs:
         report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_docs)}")
         if fix and usage_guide.exists():
-            # Append a todo section
             with open(usage_guide, "a") as f:
                 f.write("\n\n## Undocumented Commands (Auto-detected)\n")
                 for cmd in missing_docs:
-                    f.write(f"- `devbase {cmd}`\n")
-            report["updated"].append("USAGE-GUIDE.md (added list of undocumented commands)")
+                    f.write(f"- `{cmd}`\n")
+            report["updated"].append(f"{usage_guide.name} (added list of undocumented commands)")
+
+    # Check flags (loose check)
+    missing_flags = []
+    for module, flags in found_flags.items():
+        for flag in flags:
+            if f"--{flag}" not in usage_content:
+                # heuristic: ignore if flag is very common like "name"
+                missing_flags.append(f"--{flag} (in {module})")
+
+    if missing_flags:
+        # Just suggest, don't warn too hard as flags might be documented generically
+        report["suggestions"].append(f"Potentially undocumented flags: {', '.join(missing_flags[:10])}...")
 
 def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
     """Check DB Code vs Technical Docs"""
     tech_doc = root / "docs" / "TECHNICAL_DESIGN_DOC.md"
-    db_file = root / "src" / "devbase" / "services" / "knowledge_db.py"
+    if not tech_doc.exists():
+         tech_doc = root / "TECHNICAL_DESIGN_DOC.md"
+
+    # Check both Schema Definition (Adapter) and Usage (Service)
+    db_adapter = root / "src" / "devbase" / "adapters" / "storage" / "duckdb_adapter.py"
+    db_service = root / "src" / "devbase" / "services" / "knowledge_db.py"
 
     if not tech_doc.exists():
         report["warnings"].append("TECHNICAL_DESIGN_DOC.md not found.")
         return
 
-    if not db_file.exists():
-        report["warnings"].append("knowledge_db.py not found.")
-        return
-
     tech_content = tech_doc.read_text()
-    db_content = db_file.read_text()
-
-    # Extract table names from DB code using basic regex for SQL patterns
-    # Matches: INSERT INTO table_name, FROM table_name, CREATE TABLE table_name
-    import re
-    table_patterns = [
-        r'INSERT INTO\s+([a-zA-Z0-9_]+)',
-        r'FROM\s+([a-zA-Z0-9_]+)',
-        r'CREATE TABLE\s+([a-zA-Z0-9_]+)'
-    ]
 
     found_tables = set()
-    for pattern in table_patterns:
-        matches = re.findall(pattern, db_content, re.IGNORECASE)
-        found_tables.update(matches)
 
-    # Filter out likely SQL keywords or temp aliases if regex is too loose,
-    # but strictly looking for prompt's specific concern: hot_fts, cold_fts
-    # We filter for tables that seem "significant" (e.g., have 'fts' or 'embeddings' or are 'notes')
-    significant_tables = {t for t in found_tables if 'fts' in t or 'embeddings' in t or 'notes' in t}
+    # 1. Check Adapter for CREATE TABLE
+    if db_adapter.exists():
+        adapter_content = db_adapter.read_text()
+        create_matches = re.findall(r'CREATE TABLE IF NOT EXISTS\s+([a-zA-Z0-9_]+)', adapter_content, re.IGNORECASE)
+        found_tables.update(create_matches)
+
+    # 2. Check Service for usage (if adapter didn't exist or just to be sure)
+    if db_service.exists():
+        service_content = db_service.read_text()
+        usage_matches = re.findall(r'(?:FROM|INSERT INTO|UPDATE)\s+([a-zA-Z0-9_]+)', service_content, re.IGNORECASE)
+        # Filter usage matches to only likely table names (avoiding SQL keywords captured by loose regex)
+        # But for 'hot_fts' and 'cold_fts' specifically, we want to be sure.
+        found_tables.update(usage_matches)
+
+    # Specific check for hot_fts and cold_fts as per requirement
+    required_tables = {'hot_fts', 'cold_fts'}
+
+    # Filter found tables to only those that seem like table definitions we care about
+    # or just check against the required list + others found
 
     missing_in_doc = []
-    for table in significant_tables:
-        if table not in tech_content:
-            missing_in_doc.append(table)
+    for table in found_tables:
+        # Ignore common SQL keywords if regex slipped
+        if table.upper() in ['SELECT', 'WHERE', 'FROM', 'INSERT', 'UPDATE', 'DELETE']: continue
+
+        # If it's a "significant" table, check if documented
+        if table in required_tables or 'fts' in table or 'index' in table or 'queue' in table:
+            if table not in tech_content:
+                missing_in_doc.append(table)
 
     if missing_in_doc:
         report["warnings"].append(f"Tables found in code but missing in TECHNICAL_DESIGN_DOC.md: {', '.join(missing_in_doc)}")
@@ -286,8 +365,6 @@ def _check_changelog(root: Path, report: Dict[str, List[str]], changes: List[str
             if len(changes) > 5:
                 new_section += f"- ... and {len(changes)-5} more files.\n"
 
-            # Simple prepend (risky if format is strict, better to append or insert after header)
-            # Assuming standard Keep A Changelog format
             lines = content.splitlines()
             # Find first h2
             insert_idx = 0
