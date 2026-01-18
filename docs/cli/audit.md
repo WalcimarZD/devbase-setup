@@ -100,4 +100,3 @@ Crie um arquivo `.devbaseignore` na raiz do workspace para excluir diretórios:
 ## Ver também
 
 - [doctor](doctor.md) - Verificação completa do workspace
-
