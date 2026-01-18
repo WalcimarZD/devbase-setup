@@ -6,6 +6,7 @@ Commands for generating standard documentation from templates.
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -36,8 +37,8 @@ TEMPLATE_MAP = {
 @app.command()
 def new(
     ctx: typer.Context,
-    doc_type: Annotated[str, typer.Argument(help="Type: decision, guide, or spec")],
-    title: Annotated[str, typer.Argument(help="Document title")],
+    doc_type: Annotated[Optional[str], typer.Argument(help="Type: decision, guide, or spec")] = None,
+    title: Annotated[Optional[str], typer.Argument(help="Document title")] = None,
     open: Annotated[bool, typer.Option("--open", "-o", help="Open in VS Code")] = True,
 ) -> None:
     """
@@ -52,6 +53,13 @@ def new(
     """
     root: Path = ctx.obj["root"]
     
+    # Interactive Prompts if arguments missing
+    if doc_type is None:
+        console.print("[cyan]Document Types:[/cyan]")
+        for key in TEMPLATE_MAP.keys():
+            console.print(f" • [green]{key}[/green]")
+        doc_type = Prompt.ask("Select document type", choices=list(TEMPLATE_MAP.keys()))
+
     # Validate type
     doc_type = doc_type.lower()
     if doc_type not in TEMPLATE_MAP:
@@ -59,6 +67,12 @@ def new(
         console.print(f"Available types: {', '.join(TEMPLATE_MAP.keys())}")
         raise typer.Exit(1)
         
+    if title is None:
+        title = Prompt.ask("Enter document title")
+        if not title:
+            console.print("[red]Title is required.[/red]")
+            raise typer.Exit(1)
+
     config = TEMPLATE_MAP[doc_type]
     
     # Prepare paths
