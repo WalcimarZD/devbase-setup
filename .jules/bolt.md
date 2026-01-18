@@ -11,3 +11,7 @@
 ## 2024-05-22 - DuckDB MinMax Indexes
 **Learning:** DuckDB automatically maintains MinMax indexes on row groups. For time-series data inserted in roughly chronological order, these implicit indexes are often as effective as explicit B-Tree/ART indexes for range queries, rendering explicit indexing on timestamp columns largely redundant for scan performance on sorted data.
 **Action:** Before adding explicit indexes in DuckDB, benchmark against the implicit MinMax behavior, especially for append-only time-series data.
+
+## 2024-05-22 - Single-Pass File Scanning
+**Learning:** When scanning files for multiple purposes (metadata + content analysis), combining them into a single read pass using `frontmatter.loads(content)` instead of `frontmatter.load(path)` + `path.read_text()` reduces I/O ops by 50%.
+**Action:** Always refactor multi-pass file scanners to read content once into memory if the file size allows.
