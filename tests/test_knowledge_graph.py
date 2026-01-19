@@ -136,3 +136,52 @@ def test_export_pyvis_missing_dep(temp_kb):
     with patch.dict("sys.modules", {"pyvis.network": None}):
         with pytest.raises(ImportError):
             kg.export_to_pyvis(temp_kb / "graph.html")
+
+def test_scan_malformed_frontmatter(temp_kb):
+    """Test that links are still extracted even if frontmatter is invalid."""
+    (temp_kb / "10-19_KNOWLEDGE" / "bad_fm.md").write_text(
+        "---\ntitle: Bad\ntags: [unclosed\n---\nLink to [[Note A]]", encoding="utf-8"
+    )
+
+    kg = KnowledgeGraph(temp_kb)
+    stats = kg.scan()
+
+    # Should have detected the file
+    assert kg.graph.has_node("10-19_KNOWLEDGE/bad_fm.md")
+
+    # Should have detected the error
+    assert stats["errors"] > 0
+
+    # Should have extracted the link despite frontmatter error
+    assert kg.graph.has_edge("10-19_KNOWLEDGE/bad_fm.md", "10-19_KNOWLEDGE/10_resources/note_a.md")
+
+def test_scan_io_error(temp_kb):
+    """Test handling of file read errors."""
+    unreadable_file = temp_kb / "10-19_KNOWLEDGE" / "unreadable.md"
+    unreadable_file.write_text("Secret", encoding="utf-8")
+
+    kg = KnowledgeGraph(temp_kb)
+
+    # Mock read_text to raise PermissionError for specific file
+    original_read = Path.read_text
+    def side_effect(self, *args, **kwargs):
+        if self == unreadable_file:
+            raise PermissionError("Access denied")
+        return original_read(self, *args, **kwargs)
+
+    with patch.object(Path, "read_text", side_effect=side_effect, autospec=True):
+        stats = kg.scan()
+
+    # File should be counted in stats
+    # existing files (3 + 1 bad_fm from previous tests? No, temp_kb is fixture per test)
+    # 3 standard files + 1 unreadable = 4 files.
+    assert stats["files"] == 4
+
+    # Error should be recorded
+    assert stats["errors"] == 1
+
+    # Node should exist (stub)
+    assert kg.graph.has_node("10-19_KNOWLEDGE/unreadable.md")
+
+    # Should have no connections
+    assert kg.graph.degree("10-19_KNOWLEDGE/unreadable.md") == 0
