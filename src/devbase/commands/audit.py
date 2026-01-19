@@ -5,13 +5,15 @@ Consistency Audit Command
 Performs automated consistency checks between code and documentation.
 Ensures no "Documentation Debt" accumulates.
 """
+import ast
 import os
 import sys
 import toml
 import inspect
 import subprocess
+import re
 from pathlib import Path
-from typing import List, Set, Dict, Any
+from typing import List, Set, Dict, Any, Optional
 from datetime import datetime, timedelta
 
 import typer
@@ -25,6 +27,7 @@ app = typer.Typer()
 
 @app.command("run")
 def consistency_audit(
+    ctx: typer.Context,
     fix: bool = typer.Option(False, "--fix", help="Attempt to automatically fix issues where possible."),
     days: int = typer.Option(1, "--days", help="Number of days back to check for changes.")
 ):
@@ -32,7 +35,9 @@ def consistency_audit(
     Run a consistency audit between Code and Documentation.
     Checks: Dependencies, CLI Commands, Database Integrity.
     """
-    root = Path.cwd()
+    # Use workspace root from context if available, else current directory
+    root = ctx.obj.get("root", Path.cwd()) if ctx.obj else Path.cwd()
+
     report = {
         "updated": [],
         "warnings": [],
@@ -141,10 +146,17 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
 
     try:
         pyproject = toml.load(pyproject_path)
-        deps = pyproject.get("project", {}).get("dependencies", [])
+        project_config = pyproject.get("project", {})
+        deps = project_config.get("dependencies", [])
+        optional_deps = project_config.get("optional-dependencies", {})
+
+        all_deps = list(deps)
+        for _, opt_list in optional_deps.items():
+            all_deps.extend(opt_list)
+
         # Extract package names (basic parsing)
         pkg_names = []
-        for dep in deps:
+        for dep in all_deps:
             # Handle "package>=version" or "package"
             name = dep.split(">")[0].split("<")[0].split("=")[0].strip()
             pkg_names.append(name)
@@ -180,82 +192,134 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
         report["warnings"].append(f"Failed to verify dependencies: {e}")
 
 def _verify_cli_consistency(root: Path, report: Dict[str, List[str]], fix: bool):
-    """Check CLI commands vs Documentation"""
-    # 1. Gather all commands from code
-    # This is tricky without importing everything. We can inspect the command files.
-    # Or import the app. But importing might have side effects or be slow.
-    # Let's simple parse files in src/devbase/commands for @app.command or similar.
-
+    """Check CLI commands and flags vs Documentation using AST."""
     commands_dir = root / "src" / "devbase" / "commands"
-    found_commands = {} # module -> list of command names
+    if not commands_dir.exists():
+         report["warnings"].append("src/devbase/commands not found.")
+         return
+
+    found_commands: Dict[str, List[Dict[str, Any]]] = {} # module -> list of {name: cmd, flags: [flags]}
 
     for cmd_file in commands_dir.glob("*.py"):
         if cmd_file.name == "__init__.py": continue
 
-        content = cmd_file.read_text()
-        import re
-        # Match @app.command("name") or @cli.command("name")
-        matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
-        if matches:
-            found_commands[cmd_file.stem] = matches
+        try:
+            tree = ast.parse(cmd_file.read_text())
+            module_commands = []
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    # Check for decorators
+                    is_command = False
+                    cmd_name = node.name # Default to function name
+
+                    for decorator in node.decorator_list:
+                        if isinstance(decorator, ast.Call):
+                            # Check for @app.command("name")
+                            if hasattr(decorator.func, 'attr') and decorator.func.attr == 'command':
+                                is_command = True
+                                if decorator.args and isinstance(decorator.args[0], ast.Constant): # Python 3.8+
+                                     cmd_name = decorator.args[0].value
+                                elif decorator.args and isinstance(decorator.args[0], ast.Str): # Python < 3.8
+                                     cmd_name = decorator.args[0].s
+
+                    if is_command:
+                        # Extract arguments as potential flags
+                        flags = []
+                        for arg in node.args.args:
+                            # Typer converts function args to kebab-case flags
+                            # e.g. "my_flag" -> "--my-flag"
+                            flag_name = "--" + arg.arg.replace("_", "-")
+                            # Ignore context
+                            if arg.arg != "ctx":
+                                flags.append(flag_name)
+
+                        module_commands.append({"name": cmd_name, "flags": flags})
+
+            if module_commands:
+                found_commands[cmd_file.stem] = module_commands
+
+        except Exception as e:
+            report["warnings"].append(f"Failed to parse {cmd_file.name}: {e}")
 
     # 2. Check Docs
-    usage_guide = root / "USAGE-GUIDE.md" # or docs/cli/
+    usage_guide = root / "USAGE-GUIDE.md"
     usage_content = usage_guide.read_text() if usage_guide.exists() else ""
+
+    # Also check docs/cli/ if exists
+    docs_cli_dir = root / "docs" / "cli"
+    if docs_cli_dir.exists():
+        for f in docs_cli_dir.glob("*.md"):
+             usage_content += "\n" + f.read_text()
 
     missing_docs = []
 
     for module, cmds in found_commands.items():
-        for cmd in cmds:
-            # Check if command is mentioned in USAGE-GUIDE.md
-            # Heuristic: "devbase <module> <cmd>" or just the command name if unique
+        for cmd_info in cmds:
+            cmd = cmd_info["name"]
+            flags = cmd_info["flags"]
+
+            # Check command
             full_cmd = f"{module} {cmd}"
             if full_cmd not in usage_content and cmd not in usage_content:
-                missing_docs.append(f"{module} {cmd}")
+                missing_docs.append(f"Command: {full_cmd}")
+
+            # Check flags
+            # This is heuristic, checking if the flag is mentioned anywhere in the docs
+            # Ideally should check in the section of that command, but global check is a good start
+            for flag in flags:
+                if flag not in usage_content:
+                    # Maybe it's mentioned as code `flag` or **flag**
+                    if f"`{flag}`" not in usage_content and f"**{flag}**" not in usage_content:
+                         # Don't flag standard flags if possible, but Typer adds --help etc.
+                         # User args are usually significant.
+                         missing_docs.append(f"Flag: {full_cmd} {flag}")
 
     if missing_docs:
-        report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_docs)}")
+        report["warnings"].append(f"Undocumented items in USAGE-GUIDE.md or docs/cli/: {', '.join(missing_docs)}")
         if fix and usage_guide.exists():
-            # Append a todo section
             with open(usage_guide, "a") as f:
-                f.write("\n\n## Undocumented Commands (Auto-detected)\n")
-                for cmd in missing_docs:
-                    f.write(f"- `devbase {cmd}`\n")
-            report["updated"].append("USAGE-GUIDE.md (added list of undocumented commands)")
+                f.write("\n\n## Undocumented Items (Auto-detected)\n")
+                for item in missing_docs:
+                    f.write(f"- {item}\n")
+            report["updated"].append("USAGE-GUIDE.md (added list of undocumented items)")
 
 def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
     """Check DB Code vs Technical Docs"""
     tech_doc = root / "docs" / "TECHNICAL_DESIGN_DOC.md"
+    # Check both adapter (definition) and service (usage)
+    adapter_file = root / "src" / "devbase" / "adapters" / "storage" / "duckdb_adapter.py"
     db_file = root / "src" / "devbase" / "services" / "knowledge_db.py"
 
     if not tech_doc.exists():
         report["warnings"].append("TECHNICAL_DESIGN_DOC.md not found.")
         return
 
-    if not db_file.exists():
-        report["warnings"].append("knowledge_db.py not found.")
-        return
-
     tech_content = tech_doc.read_text()
-    db_content = db_file.read_text()
-
-    # Extract table names from DB code using basic regex for SQL patterns
-    # Matches: INSERT INTO table_name, FROM table_name, CREATE TABLE table_name
-    import re
-    table_patterns = [
-        r'INSERT INTO\s+([a-zA-Z0-9_]+)',
-        r'FROM\s+([a-zA-Z0-9_]+)',
-        r'CREATE TABLE\s+([a-zA-Z0-9_]+)'
-    ]
 
     found_tables = set()
-    for pattern in table_patterns:
-        matches = re.findall(pattern, db_content, re.IGNORECASE)
+    table_pattern = r'CREATE TABLE\s+(?:IF NOT EXISTS\s+)?([a-zA-Z0-9_]+)'
+
+    # 1. Check Adapter (Primary Source of Truth)
+    if adapter_file.exists():
+        adapter_content = adapter_file.read_text()
+        matches = re.findall(table_pattern, adapter_content, re.IGNORECASE)
         found_tables.update(matches)
 
-    # Filter out likely SQL keywords or temp aliases if regex is too loose,
-    # but strictly looking for prompt's specific concern: hot_fts, cold_fts
-    # We filter for tables that seem "significant" (e.g., have 'fts' or 'embeddings' or are 'notes')
+    # 2. Check Service (Usage - Backup)
+    if db_file.exists():
+        db_content = db_file.read_text()
+        # Fallback to loose matching if needed, but sticking to explicit table names found in queries
+        # Simple extraction of words that follow FROM/INTO
+        usage_patterns = [
+             r'INSERT INTO\s+([a-zA-Z0-9_]+)',
+             r'FROM\s+([a-zA-Z0-9_]+)',
+        ]
+        for pattern in usage_patterns:
+            matches = re.findall(pattern, db_content, re.IGNORECASE)
+            found_tables.update(matches)
+
+    # Filter for significant tables
     significant_tables = {t for t in found_tables if 'fts' in t or 'embeddings' in t or 'notes' in t}
 
     missing_in_doc = []
