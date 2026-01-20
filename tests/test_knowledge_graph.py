@@ -136,3 +136,25 @@ def test_export_pyvis_missing_dep(temp_kb):
     with patch.dict("sys.modules", {"pyvis.network": None}):
         with pytest.raises(ImportError):
             kg.export_to_pyvis(temp_kb / "graph.html")
+
+def test_malformed_frontmatter(temp_kb):
+    """Test handling of files with malformed frontmatter."""
+    kg = KnowledgeGraph(temp_kb)
+
+    # Create malformed file
+    # This has invalid YAML (tab indentation is not allowed in YAML)
+    (temp_kb / "10-19_KNOWLEDGE" / "bad.md").write_text(
+        "---\ntitle: Bad\n\tbad_indent: yes\n---\nLink to [[Note A]]", encoding="utf-8"
+    )
+
+    stats = kg.scan()
+
+    # Should still find the node (fallback to stem title)
+    assert kg.graph.has_node("10-19_KNOWLEDGE/bad.md")
+
+    # Should count as error
+    assert stats["errors"] == 1
+
+    # Should still extract links (feature preserved by fix)
+    # The fix ensures we parse links even if frontmatter fails
+    assert kg.graph.has_edge("10-19_KNOWLEDGE/bad.md", "10-19_KNOWLEDGE/10_resources/note_a.md")
