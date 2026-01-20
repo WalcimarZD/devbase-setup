@@ -233,3 +233,14 @@ def test_dev_restore_not_dotnet(tmp_path):
     
     assert result.exit_code != 0
     assert ".NET" in result.stdout or "No .sln" in result.stdout or "does not appear" in result.stdout
+
+def test_audit_consistency_run(tmp_path):
+    """Test 'audit run' command."""
+    # Setup workspace
+    runner.invoke(app, ["--root", str(tmp_path), "core", "setup", "--no-interactive"])
+
+    # Run audit
+    result = runner.invoke(app, ["--root", str(tmp_path), "audit", "run"])
+
+    assert result.exit_code == 0
+    assert "DevBase Consistency Audit" in result.stdout
