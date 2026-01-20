@@ -163,11 +163,11 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
             if pkg in ignore_libs:
                 continue
 
-            if pkg not in arch_content:
+            if pkg.lower() not in arch_content.lower():
                 missing_in_arch.append(pkg)
 
             # README usually doesn't list all deps, but prompt says "mentioned in ARCHITECTURE.md and README.md"
-            if pkg not in readme_content:
+            if pkg.lower() not in readme_content.lower():
                 missing_in_readme.append(pkg)
 
         if missing_in_arch:

@@ -6,7 +6,7 @@
 [![Typer](https://img.shields.io/badge/CLI-Typer-white.svg)](https://typer.tiangolo.com)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-**DevBase** is a modular CLI that transforms your chaos into a structured, high-performance engineering workspace. Built on the [Johnny.Decimal](https://johnnydecimal.com) methodology, it organizes your code, knowledge, and operations into a standard, navigable directory tree.
+**DevBase** is a modular CLI that transforms your chaos into a structured, high-performance engineering workspace. Built on the [Johnny.Decimal](https://johnnydecimal.com) methodology, it organizes your code, knowledge, and operations into a standard, navigable directory tree. Powered by **DuckDB**, **NetworkX**, **Rich**, **Groq**, and **FastEmbed**.
 
 > [!NOTE]
 > **v5.1.0 (The "Intelligence" Release)**: This version introduces the AI module, empowering your workspace with LLM-driven organization and insights, while maintaining the high-speed Python core.
