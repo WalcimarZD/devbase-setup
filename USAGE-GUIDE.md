@@ -418,3 +418,32 @@ To create a local custom template:
 ## Undocumented Commands (Auto-detected)
 - `devbase ai classify`
 - `devbase ai summarize`
+
+
+## 🛠️ Comandos Novos/Não Documentados (Auto-Audit)
+- `devbase operations track`
+- `devbase operations stats`
+- `devbase operations weekly`
+- `devbase operations backup`
+- `devbase operations clean`
+- `devbase ai briefing`
+- `devbase ai triage`
+- `devbase navigation goto`
+- `devbase pkm journal`
+- `devbase pkm icebox`
+- `devbase audit run [--fix --days]`
+- `devbase development new`
+- `devbase development import_project`
+- `devbase development open_project`
+- `devbase development restore_packages`
+- `devbase development info_project`
+- `devbase development list_projects`
+- `devbase development archive`
+- `devbase development update`
+- `devbase development blueprint`
+- `devbase development adr_gen`
+- `devbase development audit`
+- `devbase development worktree_add`
+- `devbase development worktree_list`
+- `devbase development worktree_remove`
+- `devbase core hydrate_icons_cmd`
