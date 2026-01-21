@@ -5,10 +5,12 @@ Commands for knowledge graph navigation and analysis.
 """
 from pathlib import Path
 from typing import List, Optional
+import re
 
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 from typing_extensions import Annotated
 
 app = typer.Typer(help="Personal Knowledge Management commands")
@@ -87,7 +89,21 @@ def find(
         # Preview
         if result['content_preview']:
             preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+            text = Text(f"  {preview}...")
+            text.stylize("dim")
+
+            # Highlight query if present
+            if query:
+                try:
+                    # Simple case-insensitive highlight
+                    text.highlight_regex(
+                        re.compile(re.escape(query), re.IGNORECASE),
+                        "black on yellow"
+                    )
+                except Exception:
+                    pass
+
+            console.print(text)
 
         console.print()
 
