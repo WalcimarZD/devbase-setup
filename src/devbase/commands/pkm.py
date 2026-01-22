@@ -3,6 +3,7 @@ PKM (Personal Knowledge Management) Commands
 =============================================
 Commands for knowledge graph navigation and analysis.
 """
+import shutil
 from pathlib import Path
 from typing import List, Optional
 
@@ -505,10 +506,11 @@ status: active
     else:
         # Open in editor (VS Code)
         console.print(f"Opening [cyan]{filename}[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
+        code_cmd = shutil.which("code")
+        if code_cmd:
+            subprocess.run([code_cmd, str(file_path)], check=False)
         else:
-            subprocess.run(f"code {file_path}", shell=True)
+            console.print("[yellow]⚠ 'code' (VS Code) not found in PATH[/yellow]")
 
 
 @app.command()
@@ -564,7 +566,8 @@ def icebox(
     else:
          # Open in editor
         console.print(f"Opening [cyan]icebox.md[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
+        code_cmd = shutil.which("code")
+        if code_cmd:
+            subprocess.run([code_cmd, str(file_path)], check=False)
         else:
-            subprocess.run(f"code {file_path}", shell=True)
+            console.print("[yellow]⚠ 'code' (VS Code) not found in PATH[/yellow]")
