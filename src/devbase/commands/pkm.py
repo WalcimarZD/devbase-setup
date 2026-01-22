@@ -73,8 +73,25 @@ def find(
 
     console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
 
+    import re
+    from rich.text import Text
+
+    # Compile regex for highlighting if query exists
+    highlight_regex = None
+    if query:
+        # Use simple string matching regex, case insensitive
+        try:
+            highlight_regex = re.compile(re.escape(query), re.IGNORECASE)
+        except Exception:
+            pass
+
     for result in results:
-        console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
+        # Title with highlighting
+        title_text = Text(result['title'], style="bold")
+        if highlight_regex:
+            title_text.highlight_regex(highlight_regex, style="black on yellow")
+
+        console.print(Text("■ ", style="cyan").append(title_text))
         console.print(f"  [dim]{result['path']}[/dim]")
 
         if result['type']:
@@ -84,10 +101,13 @@ def find(
 
         console.print()  # Newline
 
-        # Preview
+        # Preview with highlighting
         if result['content_preview']:
             preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+            preview_text = Text(preview + "...", style="dim")
+            if highlight_regex:
+                preview_text.highlight_regex(highlight_regex, style="black on yellow")
+            console.print(Text("  ").append(preview_text))
 
         console.print()
 
