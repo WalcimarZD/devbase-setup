@@ -8,6 +8,12 @@
 
 **DevBase** is a modular CLI that transforms your chaos into a structured, high-performance engineering workspace. Built on the [Johnny.Decimal](https://johnnydecimal.com) methodology, it organizes your code, knowledge, and operations into a standard, navigable directory tree.
 
+### Core Stack
+- **CLI**: `typer`, `rich`, `shellingham`
+- **Data**: `duckdb`, `networkx`
+- **AI**: `groq`, `fastembed`
+- **Templating**: `jinja2`, `copier`, `toml`
+
 > [!NOTE]
 > **v5.1.0 (The "Intelligence" Release)**: This version introduces the AI module, empowering your workspace with LLM-driven organization and insights, while maintaining the high-speed Python core.
 
