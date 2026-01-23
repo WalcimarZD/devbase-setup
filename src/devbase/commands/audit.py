@@ -7,6 +7,7 @@ Ensures no "Documentation Debt" accumulates.
 """
 import os
 import sys
+import ast
 import toml
 import inspect
 import subprocess
@@ -22,6 +23,130 @@ from rich.text import Text
 
 console = Console()
 app = typer.Typer()
+
+
+class CommandVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.commands = {}  # name -> list of flags
+
+    def _extract_name_from_call(self, call_node):
+        """Helper to extract command name from app.command(...) call."""
+        name = None
+        if call_node.args:
+            if isinstance(call_node.args[0], ast.Constant):  # Python 3.8+
+                name = call_node.args[0].value
+            elif isinstance(call_node.args[0], ast.Str):  # Python <3.8
+                name = call_node.args[0].s
+        for keyword in call_node.keywords:
+            if keyword.arg == "name":
+                if isinstance(keyword.value, ast.Constant):
+                    name = keyword.value.value
+                elif isinstance(keyword.value, ast.Str):
+                    name = keyword.value.s
+        return name
+
+    def visit_FunctionDef(self, node):
+        is_command = False
+        command_name = node.name
+
+        # Check decorators
+        for decorator in node.decorator_list:
+            # @app.command(...)
+            if isinstance(decorator, ast.Call):
+                if isinstance(decorator.func, ast.Attribute) and decorator.func.attr == "command":
+                    is_command = True
+                    extracted = self._extract_name_from_call(decorator)
+                    if extracted:
+                        command_name = extracted
+            # @app.command (no call)
+            elif isinstance(decorator, ast.Attribute) and decorator.attr == "command":
+                is_command = True
+
+        # Note: We removed the 'Context' heuristic to avoid identifying helper functions as commands.
+        # Only explicitly decorated commands are matched.
+
+        if is_command:
+            flags = set()
+            # 1. Parse arguments for defaults that are typer.Option
+            defaults = node.args.defaults
+            for default in defaults:
+                self._extract_flags_from_node(default, flags)
+
+            # 2. Parse arguments for Annotated types
+            for arg in node.args.args:
+                if arg.annotation:
+                    self._extract_flags_from_annotation(arg.annotation, flags)
+
+            self.commands[command_name] = list(flags)
+
+        self.generic_visit(node)
+
+    def _extract_flags_from_annotation(self, annotation, flags):
+        # Check for Annotated[...]
+        if isinstance(annotation, ast.Subscript):
+            # Check if value is Annotated
+            is_annotated = False
+            if isinstance(annotation.value, ast.Name) and annotation.value.id == "Annotated":
+                is_annotated = True
+            elif isinstance(annotation.value, ast.Attribute) and annotation.value.attr == "Annotated":
+                is_annotated = True
+
+            if is_annotated:
+                # In Python 3.9+, slice is the node itself.
+                slice_node = annotation.slice
+                # If it's a Tuple (standard)
+                if isinstance(slice_node, ast.Tuple):
+                    for elt in slice_node.elts:
+                        self._extract_flags_from_node(elt, flags)
+                else:
+                    self._extract_flags_from_node(slice_node, flags)
+
+    def _extract_flags_from_node(self, node, flags):
+        if isinstance(node, ast.Call):
+            func = node.func
+            # Check if it is typer.Option or Option
+            is_option = False
+            if isinstance(func, ast.Attribute) and func.attr == "Option":
+                is_option = True
+            elif isinstance(func, ast.Name) and func.id == "Option":
+                is_option = True
+
+            if is_option:
+                # Extract flags from args (strings starting with -)
+                for arg in node.args:
+                    val = None
+                    if isinstance(arg, ast.Constant):
+                        val = arg.value
+                    elif isinstance(arg, ast.Str):
+                        val = arg.s
+
+                    if val and isinstance(val, str) and val.startswith("-"):
+                        flags.add(val)
+
+    def visit_Expr(self, node):
+        # Handle app.command(...)(func)
+        if isinstance(node.value, ast.Call):
+            outer_call = node.value
+            if isinstance(outer_call.func, ast.Call):
+                inner_call = outer_call.func
+                if isinstance(inner_call.func, ast.Attribute) and inner_call.func.attr == "command":
+                    command_name = self._extract_name_from_call(inner_call)
+                    if command_name:
+                        # We found a mounted command. We can't see flags here easily.
+                        self.commands[command_name] = []
+        self.generic_visit(node)
+
+
+def extract_commands_from_source(source_code: str) -> Dict[str, List[str]]:
+    """Extract commands and flags using AST."""
+    try:
+        tree = ast.parse(source_code)
+        visitor = CommandVisitor()
+        visitor.visit(tree)
+        return visitor.commands
+    except Exception:
+        return {}
+
 
 @app.command("run")
 def consistency_audit(
@@ -179,49 +304,108 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
     except Exception as e:
         report["warnings"].append(f"Failed to verify dependencies: {e}")
 
+def _parse_usage_guide(content: str) -> Dict[str, str]:
+    """Parse usage guide into command sections."""
+    sections = {}
+    current_cmd = None
+    buffer = []
+    import re
+    # Matches: #### `core setup` or ### `devbase core`
+    # Group 1: core setup
+    header_pattern = re.compile(r'^#+\s+`?(?:devbase\s+)?([\w\s-]+)`?')
+
+    for line in content.splitlines():
+        match = header_pattern.match(line)
+        if match:
+            # Save previous section
+            if current_cmd:
+                sections[current_cmd] = "\n".join(buffer)
+
+            current_cmd = match.group(1).strip()
+            buffer = []
+            buffer.append(line)
+        else:
+            if current_cmd:
+                buffer.append(line)
+
+    if current_cmd:
+        sections[current_cmd] = "\n".join(buffer)
+
+    return sections
+
+
 def _verify_cli_consistency(root: Path, report: Dict[str, List[str]], fix: bool):
     """Check CLI commands vs Documentation"""
-    # 1. Gather all commands from code
-    # This is tricky without importing everything. We can inspect the command files.
-    # Or import the app. But importing might have side effects or be slow.
-    # Let's simple parse files in src/devbase/commands for @app.command or similar.
-
+    # 1. Gather all commands from code using AST
     commands_dir = root / "src" / "devbase" / "commands"
-    found_commands = {} # module -> list of command names
+    found_commands = {}  # module -> {cmd_name: [flags]}
 
     for cmd_file in commands_dir.glob("*.py"):
         if cmd_file.name == "__init__.py": continue
 
         content = cmd_file.read_text()
-        import re
-        # Match @app.command("name") or @cli.command("name")
-        matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
-        if matches:
-            found_commands[cmd_file.stem] = matches
+        commands = extract_commands_from_source(content)
+        if commands:
+            found_commands[cmd_file.stem] = commands
 
     # 2. Check Docs
-    usage_guide = root / "USAGE-GUIDE.md" # or docs/cli/
+    usage_guide = root / "USAGE-GUIDE.md"  # or docs/cli/
     usage_content = usage_guide.read_text() if usage_guide.exists() else ""
 
-    missing_docs = []
+    # Parse usage guide into sections
+    sections = _parse_usage_guide(usage_content)
+
+    missing_cmds = []
+    missing_flags = []
+
+    # Map filenames to CLI command groups (based on main.py)
+    ALIAS_MAP = {
+        "development": "dev",
+        "navigation": "nav",
+        "operations": "ops"
+    }
 
     for module, cmds in found_commands.items():
-        for cmd in cmds:
-            # Check if command is mentioned in USAGE-GUIDE.md
-            # Heuristic: "devbase <module> <cmd>" or just the command name if unique
-            full_cmd = f"{module} {cmd}"
-            if full_cmd not in usage_content and cmd not in usage_content:
-                missing_docs.append(f"{module} {cmd}")
+        cli_group = ALIAS_MAP.get(module, module)
+        for cmd, flags in cmds.items():
+            full_cmd = f"{cli_group} {cmd}"
 
-    if missing_docs:
-        report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_docs)}")
-        if fix and usage_guide.exists():
-            # Append a todo section
-            with open(usage_guide, "a") as f:
+            # Locate section
+            # We try various keys: "module cmd", "cmd"
+            section_content = sections.get(full_cmd)
+            if not section_content:
+                section_content = sections.get(cmd)
+
+            if not section_content:
+                # If section not found, fallback to checking global content for command existence
+                # We strictly require full_cmd ("module cmd") to avoid false positives on common words like "run"
+                if full_cmd not in usage_content:
+                    missing_cmds.append(full_cmd)
+                continue
+
+            # Check flags within the section
+            for flag in flags:
+                if flag not in section_content:
+                    missing_flags.append(f"{full_cmd} {flag}")
+
+    if missing_cmds:
+        report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_cmds)}")
+
+    if missing_flags:
+        report["warnings"].append(f"Undocumented flags in USAGE-GUIDE.md: {', '.join(missing_flags)}")
+
+    if fix and usage_guide.exists() and (missing_cmds or missing_flags):
+        with open(usage_guide, "a") as f:
+            if missing_cmds:
                 f.write("\n\n## Undocumented Commands (Auto-detected)\n")
-                for cmd in missing_docs:
+                for cmd in missing_cmds:
                     f.write(f"- `devbase {cmd}`\n")
-            report["updated"].append("USAGE-GUIDE.md (added list of undocumented commands)")
+            if missing_flags:
+                f.write("\n\n## Undocumented Flags (Auto-detected)\n")
+                for flag in missing_flags:
+                    f.write(f"- `{flag}`\n")
+
+        report["updated"].append("USAGE-GUIDE.md (added list of undocumented items)")
 
 def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
     """Check DB Code vs Technical Docs"""
