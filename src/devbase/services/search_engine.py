@@ -114,15 +114,22 @@ class SearchEngine:
             self._embedding_model = TextEmbedding(model_name=self.model_name)
         return self._embedding_model
 
-    def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding vector for text."""
+    def generate_embedding(self, text: str | List[str]) -> List[float] | List[List[float]]:
+        """
+        Generate embedding vector(s) for text.
+
+        Supports both single string and batch processing.
+        """
+        is_batch = isinstance(text, list)
+        inputs = text if is_batch else [text]
+
         # FastEmbed returns a generator of iterables (numpy arrays)
-        embeddings = list(self.embedding_model.embed([text]))
-        # Ensure it's converted to list
-        result = embeddings[0]
-        if hasattr(result, "tolist"):
-            return result.tolist()
-        return list(result)
+        embeddings = list(self.embedding_model.embed(inputs))
+
+        # Convert numpy arrays to lists
+        results = [e.tolist() if hasattr(e, "tolist") else list(e) for e in embeddings]
+
+        return results if is_batch else results[0]
 
     def index_file(self, file_path: Path, force: bool = False) -> None:
         """
@@ -165,6 +172,7 @@ class SearchEngine:
 
         # Chunk
         chunks = self.splitter.split(sanitized.content)
+        valid_chunks = [c for c in chunks if c.strip()]
 
         # Clear existing chunks for this file
         conn.execute(f"DELETE FROM {table} WHERE file_path = ?", [rel_path])
@@ -183,22 +191,27 @@ class SearchEngine:
             [rel_path, file_path.name, sanitized.content, mtime]
         )
 
-        # Embed and Insert (Chunk level)
-        for i, chunk in enumerate(chunks):
-            if not chunk.strip():
-                continue
+        if not valid_chunks:
+            return
 
-            vector = self.generate_embedding(chunk)
+        # Optimization: Batch embedding generation and DB insertion
+        # Reduces overhead of model inference calls and DB transactions
+        vectors = self.generate_embedding(valid_chunks)
 
-            conn.execute(
-                f"""
-                INSERT INTO {table} (file_path, chunk_id, content_chunk, embedding, mtime_epoch)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                [rel_path, i, chunk, vector, mtime]
-            )
+        insert_data = []
+        for i, chunk in enumerate(valid_chunks):
+            # chunk, embedding, etc.
+            insert_data.append((rel_path, i, chunk, vectors[i], mtime))
 
-        logger.debug(f"Indexed {rel_path} ({len(chunks)} chunks)")
+        conn.executemany(
+            f"""
+            INSERT INTO {table} (file_path, chunk_id, content_chunk, embedding, mtime_epoch)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            insert_data
+        )
+
+        logger.debug(f"Indexed {rel_path} ({len(valid_chunks)} chunks)")
 
     def search(self, query: str, limit: int = 5) -> List[SearchResult]:
         """
