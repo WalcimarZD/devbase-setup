@@ -7,8 +7,10 @@ from pathlib import Path
 from typing import List, Optional
 
 import typer
+import re
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 from typing_extensions import Annotated
 
 app = typer.Typer(help="Personal Knowledge Management commands")
@@ -87,7 +89,14 @@ def find(
         # Preview
         if result['content_preview']:
             preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+            text = Text(preview + "...", style="dim")
+            if query:
+                # Highlight query (case insensitive)
+                text.highlight_regex(
+                    re.compile(re.escape(query), re.IGNORECASE),
+                    style="black on yellow"
+                )
+            console.print(Text("  ") + text)
 
         console.print()
 
