@@ -7,3 +7,7 @@
 ## 2025-12-30 - [Dev New Interactive Prompt]
 **Learning:** Typer's default behavior for missing arguments is to show an error and exit. By making the argument `Optional` and defaulting to `None`, we can check for its absence and provide an interactive prompt (via `rich.prompt.Prompt`). This improves the experience for new users who might not know the required arguments.
 **Action:** Apply this pattern to other creation commands like `devbase docs new` or `devbase dev blueprint` to make them more discoverable and user-friendly.
+
+## 2025-12-31 - [Structured Search Results]
+**Learning:** Sequential printing of search results with metadata creates visual noise and makes scanning difficult. Users struggle to distinguish between entries when headers and metadata are interspersed vertically.
+**Action:** Use `rich.Table` for structured data like search results. It enforces alignment, allowing users to scan columns (e.g., just the titles or just the types) efficiently, even in a CLI environment.
