@@ -3,12 +3,15 @@ PKM (Personal Knowledge Management) Commands
 =============================================
 Commands for knowledge graph navigation and analysis.
 """
+import re
 from pathlib import Path
 from typing import List, Optional
 
 import typer
+from rich import box
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 from typing_extensions import Annotated
 
 app = typer.Typer(help="Personal Knowledge Management commands")
@@ -73,24 +76,34 @@ def find(
 
     console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
 
+    table = Table(box=box.SIMPLE, show_header=True)
+    table.add_column("Title", style="cyan", no_wrap=True)
+    table.add_column("Type", style="yellow")
+    table.add_column("Words", justify="right")
+    table.add_column("Path", style="dim")
+    table.add_column("Preview")
+
     for result in results:
-        console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
-        console.print(f"  [dim]{result['path']}[/dim]")
+        preview_text = Text(result['content_preview'][:150].replace("\n", " ") + "..." if result['content_preview'] else "")
 
-        if result['type']:
-            console.print(f"  Type: [yellow]{result['type']}[/yellow]", end="")
-        if result['word_count']:
-            console.print(f"  | Words: {result['word_count']}", end="")
+        # Highlight query terms in preview
+        if query:
+            preview_text.highlight_regex(
+                re.compile(re.escape(query), re.IGNORECASE),
+                style="bold yellow reverse"
+            )
+        else:
+            preview_text.style = "dim"
 
-        console.print()  # Newline
+        table.add_row(
+            result['title'],
+            result['type'] or "",
+            str(result['word_count']) if result['word_count'] else "",
+            str(result['path']),
+            preview_text
+        )
 
-        # Preview
-        if result['content_preview']:
-            preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
-
-        console.print()
-
+    console.print(table)
     db.close()
 
 
