@@ -186,6 +186,27 @@ goto() { cd "$(devbase nav goto "$1")"; }
 
 ## 🟡 Daily Workflow Group
 
+### `devbase audit`
+*Consistency and health checks.*
+
+#### `audit run`
+Performs a consistency check between code and documentation.
+```bash
+devbase audit run
+# Auto-fix issues (e.g., update CHANGELOG, USAGE-GUIDE)
+devbase audit run --fix
+```
+**Checks:**
+- New dependencies vs Architecture docs.
+- CLI commands vs Usage Guide.
+- Database schema vs Technical Design.
+
+**Daily Routine:**
+A script is available to run this as a daily task:
+```bash
+./scripts/daily_audit.sh
+```
+
 ### `devbase ops`
 *Operational excellence and tracking.*
 
@@ -415,6 +436,3 @@ To create a local custom template:
 3. Use it via `--template my-custom-template`.
 
 
-## Undocumented Commands (Auto-detected)
-- `devbase ai classify`
-- `devbase ai summarize`
