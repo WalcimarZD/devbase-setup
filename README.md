@@ -22,6 +22,15 @@
 - **Documentation Engine**: Standardized ADRs, Guides, and Specs via `devbase docs`.
 - **Context-Aware Analytics**: Track your "Flow State" and generate weekly summaries automatically.
 
+## 🛠️ Built With
+
+- **[Typer](https://typer.tiangolo.com)**: CLI framework.
+- **[Rich](https://github.com/Textualize/rich)**: Terminal UI.
+- **[DuckDB](https://duckdb.org)**: Embedded OLAP database.
+- **[NetworkX](https://networkx.org)**: Graph algorithms.
+- **[FastEmbed](https://github.com/qdrant/fastembed)**: Local vector embeddings.
+- **[Groq](https://groq.com)**: Ultra-fast LLM inference.
+
 ## 🚀 Installation
 
 ### Option A: The One-Liner (Recommended)

@@ -25,6 +25,7 @@ app = typer.Typer()
 
 @app.command("run")
 def consistency_audit(
+    ctx: typer.Context,
     fix: bool = typer.Option(False, "--fix", help="Attempt to automatically fix issues where possible."),
     days: int = typer.Option(1, "--days", help="Number of days back to check for changes.")
 ):
@@ -32,7 +33,7 @@ def consistency_audit(
     Run a consistency audit between Code and Documentation.
     Checks: Dependencies, CLI Commands, Database Integrity.
     """
-    root = Path.cwd()
+    root = ctx.obj.get("root", Path.cwd())
     report = {
         "updated": [],
         "warnings": [],
@@ -205,16 +206,34 @@ def _verify_cli_consistency(root: Path, report: Dict[str, List[str]], fix: bool)
 
     missing_docs = []
 
+    docs_cli_dir = root / "docs" / "cli"
+
     for module, cmds in found_commands.items():
         for cmd in cmds:
             # Check if command is mentioned in USAGE-GUIDE.md
             # Heuristic: "devbase <module> <cmd>" or just the command name if unique
             full_cmd = f"{module} {cmd}"
-            if full_cmd not in usage_content and cmd not in usage_content:
+            in_usage = full_cmd in usage_content or cmd in usage_content
+
+            # Check if command has a file in docs/cli/
+            in_cli_docs = False
+            if docs_cli_dir.exists():
+                # Check for module.md or command.md
+                # e.g. devbase pkm find -> docs/cli/pkm.md or docs/cli/find.md
+                if (docs_cli_dir / f"{module}.md").exists():
+                    # Check if command is mentioned inside module doc
+                    if cmd in (docs_cli_dir / f"{module}.md").read_text():
+                        in_cli_docs = True
+
+                # Check for specific command file (e.g. docs/cli/find.md)
+                if (docs_cli_dir / f"{cmd}.md").exists():
+                    in_cli_docs = True
+
+            if not in_usage and not in_cli_docs:
                 missing_docs.append(f"{module} {cmd}")
 
     if missing_docs:
-        report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_docs)}")
+        report["warnings"].append(f"Undocumented commands (missing in USAGE-GUIDE.md or docs/cli/): {', '.join(missing_docs)}")
         if fix and usage_guide.exists():
             # Append a todo section
             with open(usage_guide, "a") as f:
