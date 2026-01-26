@@ -1,0 +1,40 @@
+name: Daily Consistency Audit
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run Audit
+        run: |
+          uv run python src/devbase/main.py --root . audit run --fix --days 1
+
+      - name: Check for changes
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "Inconsistencies found and fixed (or docs updated)."
+            git config --global user.name 'DevBase Bot'
+            git config --global user.email 'bot@devbase.local'
+            git add .
+            git commit -m "chore: auto-fix consistency audit [skip ci]"
+            git push
+          else
+            echo "System is consistent."
+          fi
