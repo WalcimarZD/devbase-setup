@@ -9,6 +9,7 @@ from typing import List, Optional
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 from typing_extensions import Annotated
 
 app = typer.Typer(help="Personal Knowledge Management commands")
@@ -73,6 +74,11 @@ def find(
 
     console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
 
+    import re
+    query_pattern = None
+    if query:
+        query_pattern = re.compile(re.escape(query), re.IGNORECASE)
+
     for result in results:
         console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
         console.print(f"  [dim]{result['path']}[/dim]")
@@ -87,7 +93,13 @@ def find(
         # Preview
         if result['content_preview']:
             preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+            text = Text(f"{preview}...", style="dim")
+
+            if query_pattern:
+                text.highlight_regex(query_pattern, style="bold black on yellow")
+
+            console.print("  ", end="")
+            console.print(text)
 
         console.print()
 
