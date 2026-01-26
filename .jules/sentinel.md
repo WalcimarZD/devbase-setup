@@ -11,3 +11,8 @@
 **Vulnerability:** `ProjectSetupService` executed package manager commands (`npm install`, `uv sync`, etc.) automatically when detecting configuration files. If a user was tricked into generating a project from a malicious template (Supply Chain Attack), this could trigger arbitrary code execution via `postinstall` scripts without explicit user consent.
 **Learning:** Automation is convenient but dangerous when it involves executing untrusted code or scripts. "Golden Path" features should not sacrifice security for zero-friction.
 **Prevention:** Always require user confirmation (interactive prompt) before executing commands that can run arbitrary code, especially in context of setup/installation scripts. Added `interactive` flag and `Confirm.ask` guard.
+
+## 2025-05-24 - Broken .gitignore Logic in Security Scanner
+**Vulnerability:** The security scanner's `find_unprotected_secrets` function contained a logic error where `any(git_pat in gitignore_patterns ...)` always evaluated to True if `.gitignore` existed. This caused the scanner to report *zero* findings, creating a false sense of security.
+**Learning:** Tautological conditions in list comprehensions/generators (checking if an item from a set is in that set) are subtle bugs that can completely disable security controls.
+**Prevention:** Always test negative cases (files that should *not* be ignored) in security tool unit tests. Use established libraries like `pathspec` or `fnmatch` correctly instead of custom, fragile logic.
