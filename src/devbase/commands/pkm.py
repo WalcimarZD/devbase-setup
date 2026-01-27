@@ -73,23 +73,27 @@ def find(
 
     console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
 
+    table = Table(show_header=True, expand=True)
+    table.add_column("Title", style="cyan bold", no_wrap=True)
+    table.add_column("Type", style="yellow", width=10)
+    table.add_column("Words", justify="right", width=8)
+    table.add_column("Path", style="dim")
+    table.add_column("Preview", style="dim", max_width=60)
+
     for result in results:
-        console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
-        console.print(f"  [dim]{result['path']}[/dim]")
-
-        if result['type']:
-            console.print(f"  Type: [yellow]{result['type']}[/yellow]", end="")
-        if result['word_count']:
-            console.print(f"  | Words: {result['word_count']}", end="")
-
-        console.print()  # Newline
-
-        # Preview
+        preview = ""
         if result['content_preview']:
-            preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+            preview = result['content_preview'][:150].replace("\n", " ") + "..."
 
-        console.print()
+        table.add_row(
+            result['title'],
+            result['type'] or "",
+            str(result['word_count']),
+            str(result['path']),
+            preview
+        )
+
+    console.print(table)
 
     db.close()
 
@@ -439,32 +443,32 @@ def journal(
 ) -> None:
     """
     📔 Add entry to weekly journal (auto-created).
-    
+
     If entry text is provided:
     - Appends to '10-19_KNOWLEDGE/12_private-vault/journal/weekly-YYYY-Www.md'
     - Tracks telemetry
-    
+
     If no text:
     - Opens the file in editor
-    
+
     Example:
         devbase pkm journal "Learned about DuckDB today"
     """
-    from datetime import datetime
     import subprocess
-    
+    from datetime import datetime
+
     root: Path = ctx.obj["root"]
-    
+
     # Calculate filename (ISO Week date)
     today = datetime.now()
     year, week, weekday = today.isocalendar()
     filename = f"weekly-{year}-W{week:02d}.md"
-    
+
     journal_dir = root / "10-19_KNOWLEDGE" / "12_private-vault" / "journal"
     journal_dir.mkdir(parents=True, exist_ok=True)
-    
+
     file_path = journal_dir / filename
-    
+
     # Create if missing
     if not file_path.exists():
         start_of_week = today # Approximation for created date
@@ -483,16 +487,16 @@ status: active
 """
         file_path.write_text(content, encoding="utf-8")
         console.print(f"[green]✓[/green] Created new journal: [cyan]{file_path.name}[/cyan]")
-    
+
     # Action
     if entry:
         # Append entry
         timestamp = today.strftime("%H:%M")
         with open(file_path, "a", encoding="utf-8") as f:
             f.write(f"- [{timestamp}] {entry}\n")
-        
+
         console.print(f"[green]✓[/green] Added entry to [cyan]{filename}[/cyan]")
-        
+
         # Telemetry
         from devbase.utils.telemetry import get_telemetry
         telemetry = get_telemetry(root)
@@ -519,23 +523,23 @@ def icebox(
 ) -> None:
     """
     🧊 Add item to Icebox (02_planning/icebox.md).
-    
+
     If idea text is provided:
     - Appends to Icebox file
     - Tracks telemetry
-    
+
     If no text:
     - Opens the file in editor
-    
+
     Example:
         devbase pkm icebox "Migrate to localized dates"
     """
     import subprocess
     from datetime import datetime
-    
+
     root: Path = ctx.obj["root"]
     file_path = root / "00-09_SYSTEM" / "02_planning" / "icebox.md"
-    
+
     if not file_path.exists():
         console.print(f"[red]✗[/red] Icebox file not found at {file_path}")
         return
@@ -544,14 +548,14 @@ def icebox(
         # Append idea
         timestamp = datetime.now().strftime("%Y-%m-%d")
         category = tag if tag else "Inbox"
-        
+
         with open(file_path, "a", encoding="utf-8") as f:
             f.write(f"\n### [{category.upper()}] {idea}\n")
             f.write(f"**Data:** {timestamp}\n")
-            f.write(f"**Status:** PROPOSED\n\n---\n")
-            
+            f.write("**Status:** PROPOSED\n\n---\n")
+
         console.print(f"[green]✓[/green] Added to Icebox: [cyan]{idea}[/cyan]")
-         
+
         # Telemetry
         from devbase.utils.telemetry import get_telemetry
         telemetry = get_telemetry(root)
@@ -563,7 +567,7 @@ def icebox(
         )
     else:
          # Open in editor
-        console.print(f"Opening [cyan]icebox.md[/cyan]...")
+        console.print("Opening [cyan]icebox.md[/cyan]...")
         if " " in str(file_path):
             subprocess.run(f'code "{file_path}"', shell=True)
         else:
