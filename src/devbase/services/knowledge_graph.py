@@ -5,7 +5,7 @@ Service for building and analyzing the knowledge graph from Markdown files.
 """
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import frontmatter
 import networkx as nx
@@ -43,26 +43,48 @@ class KnowledgeGraph:
         self.file_map.clear()
 
         search_paths = self._get_search_paths()
-        files: List[Path] = []
+        file_count = 0
         errors = 0
 
-        # 1. First Pass: Collect all nodes and build file map
+        # Regex for Markdown links: [text](link)
+        # We ignore external links (http/https)
+        md_link_pattern = re.compile(r"\[.*?\]\((.*?)\)")
+
+        # Regex for Wiki-links: [[link]] or [[link|text]]
+        wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
+
+        # Pending links to resolve after file map is built
+        # List of (source_rel, link_type, link_target, file_parent)
+        pending_links: List[Tuple[str, str, str, Optional[Path]]] = []
+
+        links_count = 0
+
+        # 1. Single Pass: Read content, build nodes, and extract raw links
         for path in search_paths:
             # Optimization: Use scan_directory for centralized pruning
             # Replaces manual path.walk() to ensure consistency with performance guidelines
             for file_path in scan_directory(path, extensions={'.md'}):
+                file_count += 1
                 # Store relative path from workspace root for portability
                 rel_path = file_path.relative_to(self.root).as_posix()
 
-                # Parse Frontmatter for title/tags
                 try:
-                    post = frontmatter.load(file_path)
-                    title = post.get("title", file_path.stem)
-                    tags = post.get("tags", [])
+                    content = file_path.read_text(encoding="utf-8")
+                    try:
+                        post = frontmatter.loads(content)
+                        title = post.get("title", file_path.stem)
+                        tags = post.get("tags", [])
+                    except Exception:
+                        # Parsing error
+                        errors += 1
+                        title = file_path.stem
+                        tags = []
                 except Exception:
+                    # I/O error
                     errors += 1
                     title = file_path.stem
                     tags = []
+                    content = ""
 
                 # Add node
                 self.graph.add_node(
@@ -79,62 +101,45 @@ class KnowledgeGraph:
                 if title:
                     self.file_map[title.lower()] = rel_path
 
-                files.append(file_path)
-
-        # 2. Second Pass: Parse links and add edges
-        links_count = 0
-
-        # Regex for Markdown links: [text](link)
-        # We ignore external links (http/https)
-        md_link_pattern = re.compile(r"\[.*?\]\((.*?)\)")
-
-        # Regex for Wiki-links: [[link]] or [[link|text]]
-        wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
-
-        for file_path in files:
-            source_rel = file_path.relative_to(self.root).as_posix()
-
-            try:
-                content = file_path.read_text(encoding="utf-8")
-            except Exception:
-                continue
-
-            # Extract Markdown links
-            for match in md_link_pattern.findall(content):
-                target_link = match.split(" ")[0] # handle [text](link "title")
-
-                if target_link.startswith(("http://", "https://", "mailto:")):
+                if not content:
                     continue
 
-                # Resolve relative link
+                # Extract Markdown links
+                for match in md_link_pattern.findall(content):
+                    target_link = match.split(" ")[0] # handle [text](link "title")
+                    if not target_link.startswith(("http://", "https://", "mailto:")):
+                        pending_links.append((rel_path, "md", target_link, file_path.parent))
+
+                # Extract Wiki-links
+                for match in wiki_link_pattern.findall(content):
+                    target_name = match.split("|")[0].strip().lower()
+                    pending_links.append((rel_path, "wiki", target_name, None))
+
+        # 2. Resolve Links
+        for source_rel, link_type, target, parent in pending_links:
+            target_rel = None
+
+            if link_type == "md" and parent:
                 try:
                     # Resolve from current file directory
-                    target_path = (file_path.parent / target_link).resolve()
+                    target_path = (parent / target).resolve()
                     if target_path.is_relative_to(self.root):
                         target_rel = target_path.relative_to(self.root).as_posix()
-
-                        # Check if node exists (valid internal link)
-                        if self.graph.has_node(target_rel):
-                            self.graph.add_edge(source_rel, target_rel)
-                            links_count += 1
                 except (ValueError, RuntimeError):
                     continue
 
-            # Extract Wiki-links
-            for match in wiki_link_pattern.findall(content):
-                # Handle [[Link|Text]]
-                target_name = match.split("|")[0].strip().lower()
+            elif link_type == "wiki":
+                if target in self.file_map:
+                    target_rel = self.file_map[target]
 
-                # Try to find target in map
-                if target_name in self.file_map:
-                    target_rel = self.file_map[target_name]
-                    if source_rel != target_rel: # Avoid self-loops
-                        self.graph.add_edge(source_rel, target_rel)
-                        links_count += 1
+            if target_rel and self.graph.has_node(target_rel):
+                if source_rel != target_rel: # Avoid self-loops
+                    self.graph.add_edge(source_rel, target_rel)
+                    links_count += 1
 
         self._scanned = True
         return {
-            "files": len(files),
+            "files": file_count,
             "nodes": self.graph.number_of_nodes(),
             "links": links_count,
             "errors": errors
