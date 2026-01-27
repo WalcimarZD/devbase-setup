@@ -418,3 +418,9 @@ To create a local custom template:
 ## Undocumented Commands (Auto-detected)
 - `devbase ai classify`
 - `devbase ai summarize`
+
+
+## Undocumented Commands/Flags (Auto-detected)
+- `pkm journal (command)`
+- `pkm icebox (command)`
+- `audit run --days`
