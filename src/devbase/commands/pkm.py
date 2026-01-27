@@ -11,6 +11,8 @@ from rich.console import Console
 from rich.table import Table
 from typing_extensions import Annotated
 
+from devbase.utils.vscode import open_in_vscode
+
 app = typer.Typer(help="Personal Knowledge Management commands")
 console = Console()
 
@@ -451,7 +453,6 @@ def journal(
         devbase pkm journal "Learned about DuckDB today"
     """
     from datetime import datetime
-    import subprocess
     
     root: Path = ctx.obj["root"]
     
@@ -505,10 +506,7 @@ status: active
     else:
         # Open in editor (VS Code)
         console.print(f"Opening [cyan]{filename}[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
-        else:
-            subprocess.run(f"code {file_path}", shell=True)
+        open_in_vscode(file_path)
 
 
 @app.command()
@@ -530,7 +528,6 @@ def icebox(
     Example:
         devbase pkm icebox "Migrate to localized dates"
     """
-    import subprocess
     from datetime import datetime
     
     root: Path = ctx.obj["root"]
@@ -564,7 +561,4 @@ def icebox(
     else:
          # Open in editor
         console.print(f"Opening [cyan]icebox.md[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
-        else:
-            subprocess.run(f"code {file_path}", shell=True)
+        open_in_vscode(file_path)
