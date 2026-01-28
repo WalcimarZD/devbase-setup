@@ -3,12 +3,14 @@ PKM (Personal Knowledge Management) Commands
 =============================================
 Commands for knowledge graph navigation and analysis.
 """
+import re
 from pathlib import Path
 from typing import List, Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 from typing_extensions import Annotated
 
 app = typer.Typer(help="Personal Knowledge Management commands")
@@ -73,23 +75,53 @@ def find(
 
     console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
 
+    table = Table(box=None, padding=(0, 2), show_header=True)
+    table.add_column("Title", ratio=2)
+    table.add_column("Type")
+    table.add_column("Preview", ratio=3)
+
     for result in results:
-        console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
-        console.print(f"  [dim]{result['path']}[/dim]")
+        # Title & Path
+        try:
+            rel_path = Path(result['path']).relative_to(root)
+        except ValueError:
+            rel_path = Path(result['path']).name
 
-        if result['type']:
-            console.print(f"  Type: [yellow]{result['type']}[/yellow]", end="")
+        title_text = Text.assemble(
+            (result['title'], "bold cyan"),
+            "\n",
+            (str(rel_path), "dim")
+        )
+
+        # Type & Metadata
+        type_text = Text(result['type'] or "note", style="yellow")
         if result['word_count']:
-            console.print(f"  | Words: {result['word_count']}", end="")
-
-        console.print()  # Newline
+            type_text.append(f"\n{result['word_count']} words", style="dim")
 
         # Preview
-        if result['content_preview']:
-            preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+        preview_content = result['content_preview'] or ""
+        # Clean up newlines for cleaner table display
+        preview_content = preview_content[:200].replace("\n", " ")
+        if len(result['content_preview'] or "") > 200:
+            preview_content += "..."
 
-        console.print()
+        preview_text = Text(preview_content, style="dim")
+
+        if query:
+            try:
+                # Highlight query terms
+                preview_text.highlight_regex(
+                    re.escape(query),
+                    style="bold black on yellow",
+                    case_sensitive=False
+                )
+            except Exception:
+                pass
+
+        table.add_row(title_text, type_text, preview_text)
+        table.add_row("", "", "") # Spacer row
+
+    console.print(table)
 
     db.close()
 
