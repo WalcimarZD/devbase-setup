@@ -1,0 +1,48 @@
+name: Daily Consistency Audit
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run Audit
+        run: |
+          chmod +x scripts/daily_audit.sh
+          ./scripts/daily_audit.sh
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "Jules (Audit Bot)"
+          git config --global user.email "jules@bot.devbase"
+          if [[ -n $(git status -s) ]]; then
+            git add .
+            git commit -m "chore: Auto-fix consistency audit [skip ci]"
+            git push
+          else
+            echo "No changes to commit"
+          fi

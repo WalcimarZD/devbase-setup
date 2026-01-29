@@ -10,6 +10,8 @@ import sys
 import toml
 import inspect
 import subprocess
+import re
+import ast
 from pathlib import Path
 from typing import List, Set, Dict, Any
 from datetime import datetime, timedelta
@@ -22,6 +24,52 @@ from rich.text import Text
 
 console = Console()
 app = typer.Typer()
+
+class CLICommandVisitor(ast.NodeVisitor):
+    """AST Visitor to extract Typer commands and options."""
+    def __init__(self):
+        self.commands = []
+
+    def visit_FunctionDef(self, node):
+        is_command = False
+        cmd_name = node.name.replace("_", "-") # Default typer behavior
+
+        # Check decorators
+        for decorator in node.decorator_list:
+            if isinstance(decorator, ast.Call):
+                func = decorator.func
+                if isinstance(func, ast.Attribute) and func.attr == "command":
+                    is_command = True
+                    # Check for explicitly provided name @app.command("name")
+                    if decorator.args and isinstance(decorator.args[0], ast.Constant):
+                         cmd_name = decorator.args[0].value
+            elif isinstance(decorator, ast.Attribute) and decorator.attr == "command":
+                 # Handle @app.command without parens (rare in typer but possible?)
+                 is_command = True
+
+        if is_command:
+            flags = []
+            # Check defaults for typer.Option
+            for default in node.args.defaults:
+                if isinstance(default, ast.Call):
+                    if self._is_typer_option(default):
+                        for arg in default.args:
+                            if isinstance(arg, ast.Constant) and isinstance(arg.value, str) and arg.value.startswith("--"):
+                                flags.append(arg.value[2:]) # remove --
+                        # Also check keyword args (e.g. param_decls=["--flag"]) - Typer usually uses positional args for names
+
+            self.commands.append({"name": cmd_name, "flags": flags})
+
+        # Continue visiting children (though nested commands are unlikely)
+        self.generic_visit(node)
+
+    def _is_typer_option(self, node):
+        if isinstance(node.func, ast.Attribute):
+            if node.func.attr == "Option":
+                # Check if it's from typer module (heuristic)
+                # Ideally we check imports but verifying 'typer.Option' or just 'Option' is usually enough
+                return True
+        return False
 
 @app.command("run")
 def consistency_audit(
@@ -141,7 +189,15 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
 
     try:
         pyproject = toml.load(pyproject_path)
+
+        # Collect all dependencies
         deps = pyproject.get("project", {}).get("dependencies", [])
+
+        # Add optional dependencies
+        opt_deps = pyproject.get("project", {}).get("optional-dependencies", {})
+        for group in opt_deps.values():
+            deps.extend(group)
+
         # Extract package names (basic parsing)
         pkg_names = []
         for dep in deps:
@@ -150,24 +206,24 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
             pkg_names.append(name)
 
         # Check docs
-        arch_content = arch_path.read_text() if arch_path.exists() else ""
-        readme_content = readme_path.read_text() if readme_path.exists() else ""
+        arch_content = arch_path.read_text().lower() if arch_path.exists() else ""
+        readme_content = readme_path.read_text().lower() if readme_path.exists() else ""
 
         missing_in_arch = []
         missing_in_readme = []
 
         # Dependencies to ignore (standard or very common tools that might not need explicit arch docs)
-        ignore_libs = ["toml", "jinja2", "shellingham", "python-frontmatter", "copier"]
+        ignore_libs = ["toml", "jinja2", "shellingham", "python-frontmatter", "copier", "typer", "rich"]
 
         for pkg in pkg_names:
             if pkg in ignore_libs:
                 continue
 
-            if pkg not in arch_content:
+            if pkg.lower() not in arch_content:
                 missing_in_arch.append(pkg)
 
             # README usually doesn't list all deps, but prompt says "mentioned in ARCHITECTURE.md and README.md"
-            if pkg not in readme_content:
+            if pkg.lower() not in readme_content:
                 missing_in_readme.append(pkg)
 
         if missing_in_arch:
@@ -180,38 +236,67 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
         report["warnings"].append(f"Failed to verify dependencies: {e}")
 
 def _verify_cli_consistency(root: Path, report: Dict[str, List[str]], fix: bool):
-    """Check CLI commands vs Documentation"""
-    # 1. Gather all commands from code
-    # This is tricky without importing everything. We can inspect the command files.
-    # Or import the app. But importing might have side effects or be slow.
-    # Let's simple parse files in src/devbase/commands for @app.command or similar.
-
+    """Check CLI commands vs Documentation using AST"""
     commands_dir = root / "src" / "devbase" / "commands"
-    found_commands = {} # module -> list of command names
+    docs_cli_dir = root / "docs" / "cli"
+
+    found_commands = {} # module -> {commands: [], flags: []}
 
     for cmd_file in commands_dir.glob("*.py"):
         if cmd_file.name == "__init__.py": continue
 
         content = cmd_file.read_text()
-        import re
-        # Match @app.command("name") or @cli.command("name")
-        matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
-        if matches:
-            found_commands[cmd_file.stem] = matches
+
+        try:
+            tree = ast.parse(content)
+            visitor = CLICommandVisitor()
+            visitor.visit(tree)
+
+            if visitor.commands:
+                cmd_names = [c["name"] for c in visitor.commands]
+                all_flags = []
+                for c in visitor.commands:
+                    all_flags.extend(c["flags"])
+
+                found_commands[cmd_file.stem] = {"commands": cmd_names, "flags": all_flags}
+        except Exception:
+            # Failed to parse python file?
+            pass
 
     # 2. Check Docs
-    usage_guide = root / "USAGE-GUIDE.md" # or docs/cli/
+    usage_guide = root / "USAGE-GUIDE.md"
     usage_content = usage_guide.read_text() if usage_guide.exists() else ""
 
     missing_docs = []
+    missing_cli_files = []
+    missing_flags_in_docs = []
 
-    for module, cmds in found_commands.items():
-        for cmd in cmds:
+    for module, info in found_commands.items():
+        # Check if module doc file exists
+        module_doc = docs_cli_dir / f"{module}.md"
+        if not module_doc.exists():
+            missing_cli_files.append(f"{module}.md")
+        else:
+            module_doc_content = module_doc.read_text()
+            # Check for flags in the specific module doc
+            for flag in info["flags"]:
+                if f"--{flag}" not in module_doc_content and f"--{flag}" not in usage_content:
+                     missing_flags_in_docs.append(f"{module} --{flag}")
+
+        for cmd in info["commands"]:
             # Check if command is mentioned in USAGE-GUIDE.md
-            # Heuristic: "devbase <module> <cmd>" or just the command name if unique
             full_cmd = f"{module} {cmd}"
             if full_cmd not in usage_content and cmd not in usage_content:
+                # Also check module doc if it exists
+                if module_doc.exists() and cmd in module_doc.read_text():
+                    continue
                 missing_docs.append(f"{module} {cmd}")
+
+    if missing_cli_files:
+        report["warnings"].append(f"Missing documentation files in docs/cli/: {', '.join(missing_cli_files)}")
+
+    if missing_flags_in_docs:
+        report["warnings"].append(f"Undocumented flags (in docs/cli or USAGE-GUIDE): {', '.join(missing_flags_in_docs)}")
 
     if missing_docs:
         report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_docs)}")
@@ -241,7 +326,7 @@ def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
 
     # Extract table names from DB code using basic regex for SQL patterns
     # Matches: INSERT INTO table_name, FROM table_name, CREATE TABLE table_name
-    import re
+
     table_patterns = [
         r'INSERT INTO\s+([a-zA-Z0-9_]+)',
         r'FROM\s+([a-zA-Z0-9_]+)',
