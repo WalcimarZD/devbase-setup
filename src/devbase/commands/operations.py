@@ -227,10 +227,13 @@ def backup(ctx: typer.Context) -> None:
 
     try:
         backup_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(root, backup_path, ignore=ignore_patterns)
 
-        # Calculate size
-        size = sum(f.stat().st_size for f in backup_path.rglob('*') if f.is_file())
+        with console.status("[bold green]Backing up workspace...[/bold green]", spinner="dots"):
+            shutil.copytree(root, backup_path, ignore=ignore_patterns)
+
+            # Calculate size
+            size = sum(f.stat().st_size for f in backup_path.rglob('*') if f.is_file())
+
         size_mb = size / (1024 * 1024)
 
         console.print("[green]✓[/green] Backup created successfully")
