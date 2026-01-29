@@ -452,6 +452,7 @@ def journal(
     """
     from datetime import datetime
     import subprocess
+    import shutil
     
     root: Path = ctx.obj["root"]
     
@@ -505,10 +506,11 @@ status: active
     else:
         # Open in editor (VS Code)
         console.print(f"Opening [cyan]{filename}[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
+        code_exe = shutil.which("code")
+        if code_exe:
+            subprocess.run([code_exe, str(file_path)], shell=False)
         else:
-            subprocess.run(f"code {file_path}", shell=True)
+            console.print("[yellow]⚠ 'code' (VS Code) not found in PATH[/yellow]")
 
 
 @app.command()
@@ -531,6 +533,7 @@ def icebox(
         devbase pkm icebox "Migrate to localized dates"
     """
     import subprocess
+    import shutil
     from datetime import datetime
     
     root: Path = ctx.obj["root"]
@@ -564,7 +567,8 @@ def icebox(
     else:
          # Open in editor
         console.print(f"Opening [cyan]icebox.md[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
+        code_exe = shutil.which("code")
+        if code_exe:
+            subprocess.run([code_exe, str(file_path)], shell=False)
         else:
-            subprocess.run(f"code {file_path}", shell=True)
+            console.print("[yellow]⚠ 'code' (VS Code) not found in PATH[/yellow]")

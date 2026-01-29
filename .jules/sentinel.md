@@ -11,3 +11,8 @@
 **Vulnerability:** `ProjectSetupService` executed package manager commands (`npm install`, `uv sync`, etc.) automatically when detecting configuration files. If a user was tricked into generating a project from a malicious template (Supply Chain Attack), this could trigger arbitrary code execution via `postinstall` scripts without explicit user consent.
 **Learning:** Automation is convenient but dangerous when it involves executing untrusted code or scripts. "Golden Path" features should not sacrifice security for zero-friction.
 **Prevention:** Always require user confirmation (interactive prompt) before executing commands that can run arbitrary code, especially in context of setup/installation scripts. Added `interactive` flag and `Confirm.ask` guard.
+
+## 2026-01-29 - Shell Injection via Unsanitized Path Interpolation
+**Vulnerability:** `pkm journal` and `pkm icebox` commands used `subprocess.run(f'code "{path}"', shell=True)` to open files. This allowed command injection if the workspace root path contained shell metacharacters (e.g., `/tmp/test"; echo "pwned`).
+**Learning:** Interpolating paths into shell commands is dangerous even if the path source seems trusted (like `ctx.obj["root"]`), as it may be user-influenced or exist in a hostile filesystem.
+**Prevention:** Always use `subprocess.run` with a list of arguments and `shell=False`. Use `shutil.which` to resolve executable paths instead of relying on shell PATH resolution with `shell=True`.
