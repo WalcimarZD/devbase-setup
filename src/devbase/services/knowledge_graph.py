@@ -43,10 +43,20 @@ class KnowledgeGraph:
         self.file_map.clear()
 
         search_paths = self._get_search_paths()
-        files: List[Path] = []
+        files_count = 0
         errors = 0
 
-        # 1. First Pass: Collect all nodes and build file map
+        # Store pending links for deferred resolution: (source_rel, file_parent, md_links, wiki_links)
+        pending_links: List[Tuple[str, Path, List[str], List[str]]] = []
+
+        # Regex for Markdown links: [text](link)
+        # We ignore external links (http/https)
+        md_link_pattern = re.compile(r"\[.*?\]\((.*?)\)")
+
+        # Regex for Wiki-links: [[link]] or [[link|text]]
+        wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
+
+        # 1. Single Pass: Read content, parse frontmatter, extract raw links
         for path in search_paths:
             # Optimization: Use scan_directory for centralized pruning
             # Replaces manual path.walk() to ensure consistency with performance guidelines
@@ -54,15 +64,31 @@ class KnowledgeGraph:
                 # Store relative path from workspace root for portability
                 rel_path = file_path.relative_to(self.root).as_posix()
 
-                # Parse Frontmatter for title/tags
+                content = ""
+                # Read content once
                 try:
-                    post = frontmatter.load(file_path)
+                    content = file_path.read_text(encoding="utf-8")
+                except Exception:
+                    errors += 1
+
+                # Parse Frontmatter from content
+                try:
+                    # frontmatter.loads parses from string
+                    post = frontmatter.loads(content)
                     title = post.get("title", file_path.stem)
                     tags = post.get("tags", [])
                 except Exception:
-                    errors += 1
+                    # If parsing fails (and not because of empty content from read failure), count error
+                    if content:
+                        errors += 1
                     title = file_path.stem
                     tags = []
+
+                # Extract links immediately
+                extracted_md_links = md_link_pattern.findall(content)
+                extracted_wiki_links = wiki_link_pattern.findall(content)
+
+                pending_links.append((rel_path, file_path.parent, extracted_md_links, extracted_wiki_links))
 
                 # Add node
                 self.graph.add_node(
@@ -79,29 +105,15 @@ class KnowledgeGraph:
                 if title:
                     self.file_map[title.lower()] = rel_path
 
-                files.append(file_path)
+                files_count += 1
 
-        # 2. Second Pass: Parse links and add edges
+        # 2. Resolve links against fully built file_map
         links_count = 0
 
-        # Regex for Markdown links: [text](link)
-        # We ignore external links (http/https)
-        md_link_pattern = re.compile(r"\[.*?\]\((.*?)\)")
-
-        # Regex for Wiki-links: [[link]] or [[link|text]]
-        wiki_link_pattern = re.compile(r"\[\[(.*?)\]\]")
-
-        for file_path in files:
-            source_rel = file_path.relative_to(self.root).as_posix()
-
-            try:
-                content = file_path.read_text(encoding="utf-8")
-            except Exception:
-                continue
-
-            # Extract Markdown links
-            for match in md_link_pattern.findall(content):
-                target_link = match.split(" ")[0] # handle [text](link "title")
+        for source_rel, file_parent, md_links, wiki_links in pending_links:
+            # Resolve Markdown links
+            for target_link in md_links:
+                target_link = target_link.split(" ")[0] # handle [text](link "title")
 
                 if target_link.startswith(("http://", "https://", "mailto:")):
                     continue
@@ -109,7 +121,7 @@ class KnowledgeGraph:
                 # Resolve relative link
                 try:
                     # Resolve from current file directory
-                    target_path = (file_path.parent / target_link).resolve()
+                    target_path = (file_parent / target_link).resolve()
                     if target_path.is_relative_to(self.root):
                         target_rel = target_path.relative_to(self.root).as_posix()
 
@@ -120,10 +132,10 @@ class KnowledgeGraph:
                 except (ValueError, RuntimeError):
                     continue
 
-            # Extract Wiki-links
-            for match in wiki_link_pattern.findall(content):
+            # Resolve Wiki-links
+            for raw_link in wiki_links:
                 # Handle [[Link|Text]]
-                target_name = match.split("|")[0].strip().lower()
+                target_name = raw_link.split("|")[0].strip().lower()
 
                 # Try to find target in map
                 if target_name in self.file_map:
@@ -134,7 +146,7 @@ class KnowledgeGraph:
 
         self._scanned = True
         return {
-            "files": len(files),
+            "files": files_count,
             "nodes": self.graph.number_of_nodes(),
             "links": links_count,
             "errors": errors
