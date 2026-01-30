@@ -9,6 +9,7 @@ import os
 import sys
 import toml
 import inspect
+import ast
 import subprocess
 from pathlib import Path
 from typing import List, Set, Dict, Any
@@ -23,8 +24,48 @@ from rich.text import Text
 console = Console()
 app = typer.Typer()
 
+class CLICommandVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.commands = {}  # command -> [flags]
+
+    def visit_FunctionDef(self, node):
+        """Visit function definitions to find @app.command()"""
+        cmd_name = None
+        for dec in node.decorator_list:
+            # Check for @app.command("name") or @cli.command("name")
+            if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute):
+                if dec.func.attr == 'command':
+                    if dec.args:
+                        # Handle python 3.8+ Constant vs older Str
+                        if isinstance(dec.args[0], ast.Constant):
+                            cmd_name = dec.args[0].value
+                        elif isinstance(dec.args[0], ast.Str):
+                            cmd_name = dec.args[0].s
+
+        if cmd_name:
+            flags = []
+            # Inspect defaults for typer.Option with flags
+            for default in node.args.defaults:
+                if isinstance(default, ast.Call) and isinstance(default.func, ast.Attribute):
+                    # Check for typer.Option or Option
+                    if default.func.attr == 'Option':
+                        for arg in default.args:
+                            val = None
+                            if isinstance(arg, ast.Constant):
+                                val = arg.value
+                            elif isinstance(arg, ast.Str):
+                                val = arg.s
+
+                            if val and isinstance(val, str) and val.startswith('-'):
+                                flags.append(val)
+
+            self.commands[cmd_name] = flags
+
+        self.generic_visit(node)
+
 @app.command("run")
 def consistency_audit(
+    ctx: typer.Context,
     fix: bool = typer.Option(False, "--fix", help="Attempt to automatically fix issues where possible."),
     days: int = typer.Option(1, "--days", help="Number of days back to check for changes.")
 ):
@@ -32,7 +73,7 @@ def consistency_audit(
     Run a consistency audit between Code and Documentation.
     Checks: Dependencies, CLI Commands, Database Integrity.
     """
-    root = Path.cwd()
+    root = ctx.obj.get("root", Path.cwd())
     report = {
         "updated": [],
         "warnings": [],
@@ -181,46 +222,67 @@ def _verify_dependencies(root: Path, report: Dict[str, List[str]]):
 
 def _verify_cli_consistency(root: Path, report: Dict[str, List[str]], fix: bool):
     """Check CLI commands vs Documentation"""
-    # 1. Gather all commands from code
-    # This is tricky without importing everything. We can inspect the command files.
-    # Or import the app. But importing might have side effects or be slow.
-    # Let's simple parse files in src/devbase/commands for @app.command or similar.
-
+    # 1. Gather all commands from code using AST
     commands_dir = root / "src" / "devbase" / "commands"
-    found_commands = {} # module -> list of command names
+    found_commands = {}  # module -> {command: [flags]}
 
     for cmd_file in commands_dir.glob("*.py"):
         if cmd_file.name == "__init__.py": continue
 
-        content = cmd_file.read_text()
-        import re
-        # Match @app.command("name") or @cli.command("name")
-        matches = re.findall(r'@(?:app|cli)\.command\(\s*["\']([\w-]+)["\']', content)
-        if matches:
-            found_commands[cmd_file.stem] = matches
+        try:
+            content = cmd_file.read_text()
+            tree = ast.parse(content)
+            visitor = CLICommandVisitor()
+            visitor.visit(tree)
+            if visitor.commands:
+                found_commands[cmd_file.stem] = visitor.commands
+        except Exception as e:
+            console.print(f"[yellow]Failed to parse {cmd_file}: {e}[/yellow]")
 
-    # 2. Check Docs
-    usage_guide = root / "USAGE-GUIDE.md" # or docs/cli/
+    # 2. Check Docs (USAGE-GUIDE and docs/cli/*.md)
+    usage_guide = root / "USAGE-GUIDE.md"
     usage_content = usage_guide.read_text() if usage_guide.exists() else ""
+
+    docs_cli_dir = root / "docs" / "cli"
 
     missing_docs = []
 
-    for module, cmds in found_commands.items():
-        for cmd in cmds:
-            # Check if command is mentioned in USAGE-GUIDE.md
-            # Heuristic: "devbase <module> <cmd>" or just the command name if unique
+    for module, commands in found_commands.items():
+        # Check module specific doc
+        module_doc_path = docs_cli_dir / f"{module}.md"
+        module_doc_content = module_doc_path.read_text() if module_doc_path.exists() else ""
+
+        for cmd, flags in commands.items():
             full_cmd = f"{module} {cmd}"
-            if full_cmd not in usage_content and cmd not in usage_content:
-                missing_docs.append(f"{module} {cmd}")
+            is_documented = False
+
+            # Check USAGE-GUIDE.md
+            if full_cmd in usage_content or cmd in usage_content:
+                is_documented = True
+
+            # Check module doc
+            if module_doc_content and (cmd in module_doc_content):
+                is_documented = True
+
+            if not is_documented:
+                missing_docs.append(f"{full_cmd}")
+
+            # Check flags (if command is documented)
+            if is_documented:
+                for flag in flags:
+                    if flag not in usage_content and flag not in module_doc_content:
+                        # Only warn if strictly missing in both
+                        missing_docs.append(f"{full_cmd} {flag}")
 
     if missing_docs:
-        report["warnings"].append(f"Undocumented commands in USAGE-GUIDE.md: {', '.join(missing_docs)}")
+        report["warnings"].append(f"Undocumented commands/flags: {', '.join(missing_docs)}")
+
         if fix and usage_guide.exists():
-            # Append a todo section
+            # Append a todo section to USAGE-GUIDE.md
             with open(usage_guide, "a") as f:
                 f.write("\n\n## Undocumented Commands (Auto-detected)\n")
-                for cmd in missing_docs:
-                    f.write(f"- `devbase {cmd}`\n")
+                for item in missing_docs:
+                    f.write(f"- `devbase {item}`\n")
             report["updated"].append("USAGE-GUIDE.md (added list of undocumented commands)")
 
 def _verify_db_integrity(root: Path, report: Dict[str, List[str]]):
