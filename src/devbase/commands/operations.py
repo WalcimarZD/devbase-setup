@@ -227,7 +227,9 @@ def backup(ctx: typer.Context) -> None:
 
     try:
         backup_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(root, backup_path, ignore=ignore_patterns)
+
+        with console.status("[bold green]Copying files...[/bold green]"):
+            shutil.copytree(root, backup_path, ignore=ignore_patterns)
 
         # Calculate size
         size = sum(f.stat().st_size for f in backup_path.rglob('*') if f.is_file())
