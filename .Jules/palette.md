@@ -7,3 +7,7 @@
 ## 2025-12-30 - [Dev New Interactive Prompt]
 **Learning:** Typer's default behavior for missing arguments is to show an error and exit. By making the argument `Optional` and defaulting to `None`, we can check for its absence and provide an interactive prompt (via `rich.prompt.Prompt`). This improves the experience for new users who might not know the required arguments.
 **Action:** Apply this pattern to other creation commands like `devbase docs new` or `devbase dev blueprint` to make them more discoverable and user-friendly.
+
+## 2026-01-31 - [Spinner for Blocking File Operations]
+**Learning:** Heavy file operations like `shutil.copytree` in Python are blocking and can freeze the UI for seconds or minutes.
+**Action:** Always wrap significant filesystem operations (backups, bulk moves) in `with console.status(...)` to provide immediate visual feedback.
