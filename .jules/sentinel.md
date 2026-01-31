@@ -11,3 +11,8 @@
 **Vulnerability:** `ProjectSetupService` executed package manager commands (`npm install`, `uv sync`, etc.) automatically when detecting configuration files. If a user was tricked into generating a project from a malicious template (Supply Chain Attack), this could trigger arbitrary code execution via `postinstall` scripts without explicit user consent.
 **Learning:** Automation is convenient but dangerous when it involves executing untrusted code or scripts. "Golden Path" features should not sacrifice security for zero-friction.
 **Prevention:** Always require user confirmation (interactive prompt) before executing commands that can run arbitrary code, especially in context of setup/installation scripts. Added `interactive` flag and `Confirm.ask` guard.
+
+## 2026-01-31 - Command Injection in Editor Launch
+**Vulnerability:** Use of `subprocess.run(..., shell=True)` to open files in VS Code allowed command injection via malicious file paths in `pkm journal` and `pkm icebox` commands.
+**Learning:** Convenience functions for opening editors often default to shell execution to handle path resolution, but this exposes the application to injection attacks if paths are not strictly controlled.
+**Prevention:** Always use `subprocess.run([executable, path], shell=False)` and resolve the executable path using `shutil.which()` instead of relying on the shell to find it.
