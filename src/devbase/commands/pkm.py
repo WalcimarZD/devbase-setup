@@ -73,8 +73,17 @@ def find(
 
     console.print(f"\n[bold]Found {len(results)} note(s):[/bold]\n")
 
+    import re
+
+    from rich.text import Text
+
     for result in results:
-        console.print(f"[cyan]■[/cyan] [bold]{result['title']}[/bold]")
+        # Title highlighting
+        title_text = Text(result['title'], style="bold")
+        if query:
+            title_text.highlight_regex(re.escape(query), style="bold black on yellow")
+
+        console.print(Text("■ ", style="cyan") + title_text)
         console.print(f"  [dim]{result['path']}[/dim]")
 
         if result['type']:
@@ -84,10 +93,14 @@ def find(
 
         console.print()  # Newline
 
-        # Preview
+        # Preview highlighting
         if result['content_preview']:
-            preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+            preview_str = result['content_preview'][:150].replace("\n", " ")
+            preview_text = Text(preview_str + "...", style="dim")
+            if query:
+                preview_text.highlight_regex(re.escape(query), style="bold black on yellow")
+
+            console.print(Text("  ") + preview_text)
 
         console.print()
 
@@ -439,32 +452,32 @@ def journal(
 ) -> None:
     """
     📔 Add entry to weekly journal (auto-created).
-    
+
     If entry text is provided:
     - Appends to '10-19_KNOWLEDGE/12_private-vault/journal/weekly-YYYY-Www.md'
     - Tracks telemetry
-    
+
     If no text:
     - Opens the file in editor
-    
+
     Example:
         devbase pkm journal "Learned about DuckDB today"
     """
-    from datetime import datetime
     import subprocess
-    
+    from datetime import datetime
+
     root: Path = ctx.obj["root"]
-    
+
     # Calculate filename (ISO Week date)
     today = datetime.now()
     year, week, weekday = today.isocalendar()
     filename = f"weekly-{year}-W{week:02d}.md"
-    
+
     journal_dir = root / "10-19_KNOWLEDGE" / "12_private-vault" / "journal"
     journal_dir.mkdir(parents=True, exist_ok=True)
-    
+
     file_path = journal_dir / filename
-    
+
     # Create if missing
     if not file_path.exists():
         start_of_week = today # Approximation for created date
@@ -483,16 +496,16 @@ status: active
 """
         file_path.write_text(content, encoding="utf-8")
         console.print(f"[green]✓[/green] Created new journal: [cyan]{file_path.name}[/cyan]")
-    
+
     # Action
     if entry:
         # Append entry
         timestamp = today.strftime("%H:%M")
         with open(file_path, "a", encoding="utf-8") as f:
             f.write(f"- [{timestamp}] {entry}\n")
-        
+
         console.print(f"[green]✓[/green] Added entry to [cyan]{filename}[/cyan]")
-        
+
         # Telemetry
         from devbase.utils.telemetry import get_telemetry
         telemetry = get_telemetry(root)
@@ -519,23 +532,23 @@ def icebox(
 ) -> None:
     """
     🧊 Add item to Icebox (02_planning/icebox.md).
-    
+
     If idea text is provided:
     - Appends to Icebox file
     - Tracks telemetry
-    
+
     If no text:
     - Opens the file in editor
-    
+
     Example:
         devbase pkm icebox "Migrate to localized dates"
     """
     import subprocess
     from datetime import datetime
-    
+
     root: Path = ctx.obj["root"]
     file_path = root / "00-09_SYSTEM" / "02_planning" / "icebox.md"
-    
+
     if not file_path.exists():
         console.print(f"[red]✗[/red] Icebox file not found at {file_path}")
         return
@@ -544,14 +557,14 @@ def icebox(
         # Append idea
         timestamp = datetime.now().strftime("%Y-%m-%d")
         category = tag if tag else "Inbox"
-        
+
         with open(file_path, "a", encoding="utf-8") as f:
             f.write(f"\n### [{category.upper()}] {idea}\n")
             f.write(f"**Data:** {timestamp}\n")
-            f.write(f"**Status:** PROPOSED\n\n---\n")
-            
+            f.write("**Status:** PROPOSED\n\n---\n")
+
         console.print(f"[green]✓[/green] Added to Icebox: [cyan]{idea}[/cyan]")
-         
+
         # Telemetry
         from devbase.utils.telemetry import get_telemetry
         telemetry = get_telemetry(root)
@@ -563,7 +576,7 @@ def icebox(
         )
     else:
          # Open in editor
-        console.print(f"Opening [cyan]icebox.md[/cyan]...")
+        console.print("Opening [cyan]icebox.md[/cyan]...")
         if " " in str(file_path):
             subprocess.run(f'code "{file_path}"', shell=True)
         else:

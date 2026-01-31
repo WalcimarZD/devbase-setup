@@ -7,3 +7,6 @@
 ## 2025-12-30 - [Dev New Interactive Prompt]
 **Learning:** Typer's default behavior for missing arguments is to show an error and exit. By making the argument `Optional` and defaulting to `None`, we can check for its absence and provide an interactive prompt (via `rich.prompt.Prompt`). This improves the experience for new users who might not know the required arguments.
 **Action:** Apply this pattern to other creation commands like `devbase docs new` or `devbase dev blueprint` to make them more discoverable and user-friendly.
+## 2025-05-24 - [Search Highlighting in CLI]
+**Learning:** In text-heavy CLI search results, users struggle to scan for relevance without visual cues. Highlighting the query terms (using `rich`'s `highlight_regex`) dramatically improves the ability to parse results quickly, simulating the experience of `grep --color`.
+**Action:** Look for other "list" or "find" commands where highlighting matched criteria (like tags or status) could aid visual scanning.
