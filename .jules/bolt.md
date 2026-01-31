@@ -11,3 +11,7 @@
 ## 2024-05-22 - DuckDB MinMax Indexes
 **Learning:** DuckDB automatically maintains MinMax indexes on row groups. For time-series data inserted in roughly chronological order, these implicit indexes are often as effective as explicit B-Tree/ART indexes for range queries, rendering explicit indexing on timestamp columns largely redundant for scan performance on sorted data.
 **Action:** Before adding explicit indexes in DuckDB, benchmark against the implicit MinMax behavior, especially for append-only time-series data.
+
+## 2024-05-24 - Double I/O Anti-Pattern
+**Learning:** In two-pass algorithms (e.g. metadata extraction then content analysis), avoiding a second disk read by caching content in memory yielded a ~10% performance improvement (warm cache) and theoretically 50% I/O reduction.
+**Action:** When scanning files for multiple purposes (headers, then body), read once and cache if memory allows, or use a single-pass parser.
