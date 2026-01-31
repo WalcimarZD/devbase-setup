@@ -44,6 +44,7 @@ class KnowledgeGraph:
 
         search_paths = self._get_search_paths()
         files: List[Path] = []
+        file_contents: Dict[Path, str] = {}  # Cache content to avoid double read
         errors = 0
 
         # 1. First Pass: Collect all nodes and build file map
@@ -54,9 +55,18 @@ class KnowledgeGraph:
                 # Store relative path from workspace root for portability
                 rel_path = file_path.relative_to(self.root).as_posix()
 
+                # Bolt Optimization: Read once, use twice.
+                # Avoids opening/reading the file again in the second pass.
+                try:
+                    content = file_path.read_text(encoding="utf-8")
+                    file_contents[file_path] = content
+                except Exception:
+                    errors += 1
+                    continue
+
                 # Parse Frontmatter for title/tags
                 try:
-                    post = frontmatter.load(file_path)
+                    post = frontmatter.loads(content)
                     title = post.get("title", file_path.stem)
                     tags = post.get("tags", [])
                 except Exception:
@@ -94,9 +104,8 @@ class KnowledgeGraph:
         for file_path in files:
             source_rel = file_path.relative_to(self.root).as_posix()
 
-            try:
-                content = file_path.read_text(encoding="utf-8")
-            except Exception:
+            content = file_contents.get(file_path)
+            if content is None:
                 continue
 
             # Extract Markdown links
