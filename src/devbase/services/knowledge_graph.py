@@ -47,6 +47,9 @@ class KnowledgeGraph:
         errors = 0
 
         # 1. First Pass: Collect all nodes and build file map
+        # Optimization: Cache file contents to avoid double I/O (read+parse, then read again for links)
+        file_contents: Dict[Path, str] = {}
+
         for path in search_paths:
             # Optimization: Use scan_directory for centralized pruning
             # Replaces manual path.walk() to ensure consistency with performance guidelines
@@ -56,13 +59,18 @@ class KnowledgeGraph:
 
                 # Parse Frontmatter for title/tags
                 try:
-                    post = frontmatter.load(file_path)
+                    content = file_path.read_text(encoding="utf-8")
+                    file_contents[file_path] = content
+
+                    post = frontmatter.loads(content)
                     title = post.get("title", file_path.stem)
                     tags = post.get("tags", [])
                 except Exception:
+                    # If read or parse fails, we log error but might still add node as placeholder
                     errors += 1
                     title = file_path.stem
                     tags = []
+                    # If read failed, content won't be in file_contents, so it will be skipped in pass 2
 
                 # Add node
                 self.graph.add_node(
@@ -94,9 +102,9 @@ class KnowledgeGraph:
         for file_path in files:
             source_rel = file_path.relative_to(self.root).as_posix()
 
-            try:
-                content = file_path.read_text(encoding="utf-8")
-            except Exception:
+            # Retrieve cached content
+            content = file_contents.get(file_path)
+            if content is None:
                 continue
 
             # Extract Markdown links
