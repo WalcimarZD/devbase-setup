@@ -1,0 +1,40 @@
+name: Daily Consistency Audit
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Daily at 00:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for git log analysis
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Dependencies
+        run: uv sync
+
+      - name: Make script executable
+        run: chmod +x scripts/daily_audit.sh
+
+      - name: Run Consistency Audit
+        run: ./scripts/daily_audit.sh
+
+      - name: Commit and Push Changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: daily consistency audit fixes"
+          branch: main
+          file_pattern: 'docs/ USAGE-GUIDE.md CHANGELOG.md'
+          push_options: '--force'
