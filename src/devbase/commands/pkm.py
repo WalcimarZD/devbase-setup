@@ -451,6 +451,7 @@ def journal(
         devbase pkm journal "Learned about DuckDB today"
     """
     from datetime import datetime
+    import shutil
     import subprocess
     
     root: Path = ctx.obj["root"]
@@ -505,10 +506,8 @@ status: active
     else:
         # Open in editor (VS Code)
         console.print(f"Opening [cyan]{filename}[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
-        else:
-            subprocess.run(f"code {file_path}", shell=True)
+        code_cmd = shutil.which("code") or "code"
+        subprocess.run([code_cmd, str(file_path)], check=False)
 
 
 @app.command()
@@ -530,6 +529,7 @@ def icebox(
     Example:
         devbase pkm icebox "Migrate to localized dates"
     """
+    import shutil
     import subprocess
     from datetime import datetime
     
@@ -564,7 +564,5 @@ def icebox(
     else:
          # Open in editor
         console.print(f"Opening [cyan]icebox.md[/cyan]...")
-        if " " in str(file_path):
-            subprocess.run(f'code "{file_path}"', shell=True)
-        else:
-            subprocess.run(f"code {file_path}", shell=True)
+        code_cmd = shutil.which("code") or "code"
+        subprocess.run([code_cmd, str(file_path)], check=False)
