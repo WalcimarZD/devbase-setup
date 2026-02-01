@@ -87,7 +87,21 @@ def find(
         # Preview
         if result['content_preview']:
             preview = result['content_preview'][:150].replace("\n", " ")
-            console.print(f"  [dim]{preview}...[/dim]")
+
+            if query:
+                import re
+                from rich.text import Text
+
+                text = Text("  ", style="dim")
+                text.append(preview, style="dim")
+                text.highlight_regex(
+                    f"(?i){re.escape(query)}",
+                    "bold black on yellow"
+                )
+                text.append("...", style="dim")
+                console.print(text)
+            else:
+                console.print(f"  [dim]{preview}...[/dim]")
 
         console.print()
 
