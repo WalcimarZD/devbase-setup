@@ -14,7 +14,10 @@ Version: 5.1.0
 from __future__ import annotations
 
 import atexit
+<<<<<<< HEAD
+=======
 import logging
+>>>>>>> origin/main
 import signal
 import sys
 from pathlib import Path
@@ -219,14 +222,25 @@ def init_schema(conn: duckdb.DuckDBPyConnection) -> None:
         try:
             conn.execute("PRAGMA create_fts_index('hot_fts', 'file_path', 'content', 'title', 'tags');")
         except Exception:
+<<<<<<< HEAD
+            # Index creation is best-effort: ignore errors (e.g., index already exists or FTS behavior differs by version).
+=======
+>>>>>>> origin/main
             pass
 
         try:
             conn.execute("PRAGMA create_fts_index('cold_fts', 'file_path', 'content', 'title', 'tags');")
         except Exception:
+<<<<<<< HEAD
+            # Same rationale as above: failures here are non-fatal and depend on DuckDB/FTS capabilities.
+            pass
+    except Exception:
+        # FTS might not be available in some environments; continue without FTS support.
+=======
             pass
     except Exception:
         # FTS might not be available in some environments
+>>>>>>> origin/main
         pass
 
     # Embeddings Tables (Hot/Cold Separation)
