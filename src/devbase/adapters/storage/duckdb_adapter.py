@@ -34,6 +34,7 @@ SCHEMA_VERSION = '5.1'
 logger = logging.getLogger(__name__)
 
 
+
 def get_db_path(root: Optional[Path] = None) -> Path:
     """Get the database path (workspace-local or global)."""
     return _get_db_path_from_paths(root)
