@@ -137,12 +137,14 @@ def main(
     if no_color:
         console.no_color = True
 
-    # Skip workspace detection during shell-completion generation or when the
-    # user is only asking for help.  In both cases the command body never
-    # executes, so an unresolved workspace root is harmless.
+    # Skip workspace detection when:
+    # - generating shell completions (resilient_parsing)
+    # - the user is only asking for help (command body never executes)
+    # - running `core setup`, which IS the command that creates the workspace
     _help_requested = "--help" in sys.argv or "-h" in sys.argv
-    if ctx.resilient_parsing or _help_requested:
-        ctx.obj = {"root": Path.cwd(), "console": console, "verbose": verbose}
+    _is_setup = ctx.invoked_subcommand == "core" and "setup" in sys.argv
+    if ctx.resilient_parsing or _help_requested or _is_setup:
+        ctx.obj = {"root": root.resolve() if root else Path.cwd(), "console": console, "verbose": verbose}
         return
 
     # Detect or validate workspace root

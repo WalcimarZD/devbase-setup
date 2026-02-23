@@ -16,7 +16,6 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
 
 console = Console()
 
@@ -75,34 +74,11 @@ def prompt_workspace_setup() -> Path:
     ))
     console.print()
 
-    # Ask if user wants to create workspace now
-    create_now = Confirm.ask(
-        "Would you like to create a workspace now?",
-        default=True
+    console.print(
+        "[bold cyan]Run[/bold cyan] [cyan]devbase core setup[/cyan] "
+        "[dim]to create and configure a workspace.[/dim]\n"
     )
-
-    if not create_now:
-        console.print("[yellow]Run 'devbase setup' when ready to create a workspace.[/yellow]")
-        raise SystemExit(0)
-
-    # Get workspace location
-    default_path = Path.home() / "Dev_Workspace"
-    workspace_input = Prompt.ask(
-        "[bold]Workspace location[/bold]",
-        default=str(default_path)
-    )
-
-    workspace_path = Path(workspace_input).expanduser().resolve()
-
-    # Validate path
-    if workspace_path.exists() and not workspace_path.is_dir():
-        console.print("[red]Error: Path exists but is not a directory![/red]")
-        raise SystemExit(1)
-
-    console.print(f"\n[green]✓[/green] Workspace will be created at: [cyan]{workspace_path}[/cyan]")
-    console.print("[dim]Run 'devbase setup' to initialize the workspace structure.[/dim]\n")
-
-    return workspace_path
+    raise SystemExit(0)
 
 
 def is_valid_workspace(path: Path) -> bool:

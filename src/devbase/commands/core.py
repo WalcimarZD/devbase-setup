@@ -243,7 +243,7 @@ def setup(
         from devbase.utils.wizard import execute_setup_with_config, run_interactive_wizard
 
         try:
-            config = run_interactive_wizard()
+            config = run_interactive_wizard(suggested_path=root)
             execute_setup_with_config(config)
             return  # Wizard handles everything
         except KeyboardInterrupt:

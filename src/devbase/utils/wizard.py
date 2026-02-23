@@ -144,9 +144,12 @@ def validate_workspace_path(path: Path) -> tuple[bool, str]:
     return True, ""
 
 
-def run_interactive_wizard() -> dict:
+def run_interactive_wizard(suggested_path: Path | None = None) -> dict:
     """
     Run the complete interactive setup wizard.
+
+    Args:
+        suggested_path: Pre-fill the workspace location prompt (skips repeated asking).
 
     Returns:
         dict: Configuration choices made by user
@@ -176,7 +179,7 @@ def run_interactive_wizard() -> dict:
     console.print()
     console.print("[bold]Step 2/6:[/bold] Choose workspace location\n")
 
-    default_path = Path.home() / "Dev_Workspace"
+    default_path = suggested_path if suggested_path else Path.home() / "Dev_Workspace"
     console.print(f"[dim]Recommended: {default_path}[/dim]\n")
 
     while True:
