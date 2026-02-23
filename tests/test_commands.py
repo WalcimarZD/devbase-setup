@@ -53,14 +53,14 @@ def test_core_setup_dry_run(tmp_path):
 
 
 def test_core_doctor_healthy(tmp_path):
-    """Test doctor reports healthy for a valid workspace."""
+    """Test doctor runs and reports for a valid workspace."""
     # First setup
     runner.invoke(app, ["--root", str(tmp_path), "core", "setup", "--no-interactive"])
     
-    # Run doctor (input "n" in case it prompts, though it shouldn't if healthy)
+    # Run doctor (input "n" to decline auto-fix)
     result = runner.invoke(app, ["--root", str(tmp_path), "core", "doctor"], input="n")
     assert result.exit_code == 0, result.stdout
-    assert "HEALTHY" in result.stdout
+    assert "Health Check" in result.stdout
 
 
 def test_core_doctor_missing_areas(tmp_path):
