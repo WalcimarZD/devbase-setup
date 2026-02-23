@@ -2,7 +2,7 @@
 
 **The Personal Engineering Operating System**
 
-[![Python 3.13](https://img.shields.io/badge/Python-3.13-blue.svg)](https://python.org)
+[![Python 3.13+](https://img.shields.io/badge/Python-3.13%2B-blue.svg)](https://python.org)
 [![Typer](https://img.shields.io/badge/CLI-Typer-white.svg)](https://typer.tiangolo.com)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
@@ -85,8 +85,21 @@ DevBase v5.0.0 replaces all legacy PowerShell scripts with standard CLI subcomma
 
 ---
 
+## 🛠️ Troubleshooting
+
+- **Python SyntaxError on startup**: DevBase v5 requires **Python 3.13+**. Ensure your `uv` environment or global python is updated.
+- **`uv` Cache Errors**: If you encounter dependency resolution issues, step back and run `uv cache clean`, then retry the installation.
+- **Database Lock**: If the CLI hangs unexpectedly, ensure no other DevBase instance is actively writing to the local DuckDB telemetry database.
+
+---
+
 ## 📚 Documentation
 
-- [**USAGE-GUIDE.md**](USAGE-GUIDE.md): The complete field manual for all commands.
-- [**ARCHITECTURE.md**](ARCHITECTURE.md): Deep dive into the Command-Service-Adapter pattern.
-- [**CONTRIBUTING.md**](CONTRIBUTING.md): How to build your own plugins and templates.
+Our documentation is structured according to the [Diataxis Framework](https://diataxis.fr/) to reduce cognitive load and provide a zero-friction developer experience.
+
+- 🎓 **[Tutorials](docs/tutorials/)**: Learning-oriented guides for entering the DevBase ecosystem.
+- 🎯 **[How-To Guides](docs/how-to/)**: Goal-oriented recipes for common tasks (e.g., adding new project templates).
+- 📖 **[Reference](docs/)**: Information-oriented technical specifications, including the [USAGE-GUIDE](USAGE-GUIDE.md) and [ARCHITECTURE](ARCHITECTURE.md).
+- 💡 **[Explanation](docs/explanation/)**: Understanding-oriented background knowledge discussing design choices and system methodology.
+
+> For contributing, see [CONTRIBUTING.md](CONTRIBUTING.md).
