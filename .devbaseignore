@@ -1,0 +1,16 @@
+# Files and folders ignored by DevBase tools
+
+.jules/
+.Jules/
+.cline_memory/
+.aider/
+.cursor/
+temp_workspace/
+test_output/
+__pycache__/
+.pytest_cache/
+.vscode/
+.git/
+.github/
+__target__/
+.DS_Store

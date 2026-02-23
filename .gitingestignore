@@ -1,0 +1,21 @@
+# Ignore rules for GitIngest
+
+# Exclude AI configurations and logs
+.jules/
+.cline_memory/
+.aider/
+.cursor/
+
+# Exclude large/temp directories
+temp_workspace/
+test_output/
+__pycache__/
+.pytest_cache/
+.vscode/
+.git/
+.github/
+
+# Ignore lockfiles and large files for ingestion
+uv.lock
+*.json
+*.mdc

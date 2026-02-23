@@ -9,6 +9,17 @@
 .augment/rules/byterover-rules.md
 devbase-setup.code-workspace
 
+# AI Agents & IDE Pollution
+.jules/
+.Jules/
+.cline_memory/
+.aider/
+.cursor/
+!.cursorrules
+.DS_Store
+temp_workspace/
+pollution.txt
+
 # Python
 __pycache__/
 *.py[cod]
@@ -40,6 +51,8 @@ test_output/
 
 # VS Code
 .vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
 
 # DevBase State (should be local)
 .devbase_state.json
