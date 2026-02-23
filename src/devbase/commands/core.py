@@ -119,6 +119,7 @@ def run_setup_core(fs, policy_version=None):
     required_subfolders = [
         '00-09_SYSTEM/00_inbox',
         '00-09_SYSTEM/01_dotfiles',
+        '00-09_SYSTEM/05_templates',
         '00-09_SYSTEM/07_documentation',
         '10-19_KNOWLEDGE/10_guides_and_references',
         '10-19_KNOWLEDGE/11_public_garden',
@@ -152,25 +153,42 @@ import shutil
 
 
 def copy_built_in_templates(fs, category: str, destination: str):
-    """Copy built-in templates from package to workspace."""
+    """Copy built-in templates from package to workspace.
+
+    This operation is non-fatal: failures are logged and skipped
+    so that the overall setup can still complete.
+    """
+    import logging
+
     import devbase
+
+    logger = logging.getLogger(__name__)
     pkg_root = Path(devbase.__file__).parent
     tmpl_src = pkg_root / "templates" / category
 
     if not tmpl_src.exists():
+        logger.debug(f"Template source not found: {tmpl_src}")
         return
 
     dest_path = Path(fs.root) / destination
+    fs.ensure_dir(destination)
+
+    # Skip actual file copy in dry-run mode
+    if getattr(fs, 'dry_run', False):
+        return
 
     for item in tmpl_src.iterdir():
         if item.name.startswith("__template-") or item.name.endswith(".template"):
             src = item
             dst = dest_path / item.name
 
-            if src.is_dir():
-                shutil.copytree(src, dst, dirs_exist_ok=True)
-            else:
-                shutil.copy2(src, dst)
+            try:
+                if src.is_dir():
+                    shutil.copytree(src, dst, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(src, dst)
+            except OSError as e:
+                logger.warning(f"Failed to copy template {item.name}: {e}")
 
 def run_setup_code(fs, policy_version=None):
     run_setup_module(fs, "Code Templates", policy_version)
@@ -572,7 +590,7 @@ def doctor(
                         console.print(f"  [yellow]⚠[/yellow] {wt.name}: Uncommitted changes")
                     else:
                         console.print(f"  [green]✓[/green] {wt.name}")
-                except:
+                except (subprocess.SubprocessError, OSError):
                     console.print(f"  [dim]?[/dim] {wt.name}: Could not check status")
         else:
             console.print("  [dim]No worktrees found.[/dim]")

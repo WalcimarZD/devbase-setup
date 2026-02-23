@@ -75,13 +75,13 @@ def review(
                 try:
                     last_dt = datetime.fromisoformat(str(last_reviewed))
                     days_ago = (datetime.now() - last_dt).days
-                except:
+                except (ValueError, TypeError):
                     days_ago = 999  # Never reviewed properly
             elif created:
                 try:
                     created_dt = datetime.fromisoformat(str(created))
                     days_ago = (datetime.now() - created_dt).days
-                except:
+                except (ValueError, TypeError):
                     days_ago = 0
             else:
                 days_ago = 0

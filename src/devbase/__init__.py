@@ -8,4 +8,4 @@ except ImportError:
 try:
     __version__ = version("devbase")
 except PackageNotFoundError:
-    __version__ = "5.1.0-alpha.1"  # Fallback for local dev without install
+    __version__ = "5.1.0-alpha.3"  # Fallback for local dev without install
