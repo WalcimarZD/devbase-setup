@@ -7,7 +7,35 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff check
+        run: uv run ruff check src/ tests/
+
+      - name: Ruff format check
+        run: uv run ruff format --check src/ tests/
+
+      - name: Type check (mypy)
+        run: uv run mypy src/devbase/ --ignore-missing-imports
+
+  test:
+    needs: lint
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -17,85 +45,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install Python deps (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Install dependencies
+        run: uv sync --frozen
 
-      - name: Run pre-commit & tests (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          python -m pip install pre-commit coverage codecov
-          # run pre-commit but don't fail the job if hooks auto-fix files (allow CI to continue)
-          pre-commit run --all-files || true
-          # debug: show workspace to ensure tests/ is present
-          ls -la
-          ls -R || true
-          # run tests under coverage explicitly against tests/ and don't fail the step if no tests found
-          coverage run -m pytest tests -q || true
-          # generate coverage.xml only if coverage data exists (be tolerant)
-          if [ -f .coverage ] && [ -s .coverage ]; then
-            coverage xml -i || true
-          else
-            echo "No coverage data generated"
-          fi
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short
 
-      - name: Install Python deps (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
+      - name: Run tests with coverage (Linux 3.13 only)
+        if: runner.os == 'Linux' && matrix.python-version == '3.13'
         run: |
-          python -m pip install --upgrade pip
-          # install only pytest on Windows to keep runner lightweight
-          pip install pytest
-
-      - name: Run tests (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          pytest -q || true
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-
-      - name: Install Node deps & run tests (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          if [ -f package.json ]; then npm ci || npm install --legacy-peer-deps; if jq -e '.scripts.test' package.json >/dev/null 2>&1; then npm test; fi; if jq -e '.scripts.lint' package.json >/dev/null 2>&1; then npm run lint; fi; fi
-
-      - name: Install Node deps & run tests (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          if [ -f package.json ]; then
-            npm ci || npm install --legacy-peer-deps
-            if grep -q '"test"' package.json; then npm test; fi
-            if grep -q '"lint"' package.json; then npm run lint; fi
-          fi
-
-      - name: Check coverage artifact
-        if: runner.os == 'Linux'
-        id: cov-check
-        shell: bash
-        run: |
-          if [ -f coverage.xml ] && [ -s coverage.xml ]; then
-            echo "coverage_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "coverage_exists=false" >> $GITHUB_OUTPUT
-          fi
+          uv run pytest tests/ --cov=devbase --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage to Codecov
-        if: runner.os == 'Linux' && steps.cov-check.outputs.coverage_exists == 'true'
+        if: runner.os == 'Linux' && matrix.python-version == '3.13'
         uses: codecov/codecov-action@v4
         with:
           files: coverage.xml

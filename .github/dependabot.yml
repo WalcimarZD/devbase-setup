@@ -4,7 +4,24 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-  - package-ecosystem: "npm"
+    groups:
+      dev-deps:
+        patterns:
+          - "ruff"
+          - "mypy"
+          - "pytest*"
+          - "python-semantic-release"
+      ai-deps:
+        patterns:
+          - "groq"
+          - "fastembed"
+      cli-framework:
+        patterns:
+          - "typer"
+          - "rich"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
