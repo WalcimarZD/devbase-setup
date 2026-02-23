@@ -70,19 +70,29 @@ class FileSystem:
         # Ensure parent exists
         target.parent.mkdir(parents=True, exist_ok=True)
         
-        # Atomic write pattern
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding=encoding,
-            dir=target.parent,
-            delete=False,
-            suffix=".tmp"
-        ) as tf:
-            tf.write(content)
-            temp_path = Path(tf.name)
-        
-        # Atomic rename (works on Windows too in Python 3.3+)
-        temp_path.replace(target)
+        temp_path = None
+        try:
+            # Atomic write pattern
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding=encoding,
+                dir=target.parent,
+                delete=False,
+                suffix=".tmp"
+            ) as tf:
+                tf.write(content)
+                temp_path = Path(tf.name)
+            
+            # Atomic rename (works on Windows too in Python 3.3+)
+            temp_path.replace(target)
+            temp_path = None # Signal success
+        finally:
+            # Cleanup temp file if rename failed
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
     
     def assert_safe_path(self, target_path: Path) -> bool:
         """

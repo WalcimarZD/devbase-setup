@@ -338,6 +338,9 @@ def doctor(
     Use --fix to auto-fix all issues without prompting.
     """
     from rich.prompt import Confirm
+    from devbase.commands.doctor.checks import (
+        StructureCheck, GovernanceCheck, SecurityCheck
+    )
 
     root: Path = ctx.obj["root"]
 
@@ -345,257 +348,82 @@ def doctor(
     console.print("[bold]DevBase Health Check[/bold]")
     console.print(f"[dim]Workspace: {root}[/dim]\n")
 
-    # Collect issues with fix actions
-    issues = []
+    # Strategy-based checks
+    checks = [StructureCheck(root), GovernanceCheck(root), SecurityCheck(root)]
+    all_issues = []
 
-    def add_issue(description: str, fix_action=None, fix_description: str = None):
-        issues.append({
-            "description": description,
-            "fix_action": fix_action,
-            "fix_description": fix_description or "Auto-fix available"
-        })
-
-    # Check areas
-    console.print("[bold]Checking folder structure...[/bold]")
-    required_areas = [
-        '00-09_SYSTEM',
-        '10-19_KNOWLEDGE',
-        '20-29_CODE',
-        '30-39_OPERATIONS',
-        '40-49_MEDIA_ASSETS',
-        '90-99_ARCHIVE_COLD'
-    ]
-
-    for area in required_areas:
-        area_path = root / area
-        if area_path.exists():
-            console.print(f"  [green]✓[/green] {area}")
+    for check in checks:
+        console.print(f"[bold]Running {check.__class__.__name__}...[/bold]")
+        issues = check.run()
+        if not issues:
+            console.print(f"  [green]✓[/green] Passed")
         else:
-            console.print(f"  [red]✗[/red] {area} [dim]- NOT FOUND[/dim]")
-            add_issue(
-                f"Missing folder: {area}",
-                fix_action=lambda p=area_path: p.mkdir(parents=True, exist_ok=True),
-                fix_description=f"Create {area}"
-            )
+            for issue in issues:
+                console.print(f"  [red]✗[/red] {issue.description}")
+            all_issues.extend(issues)
 
-    # Check required subfolders (Johnny.Decimal categories)
-    console.print("\n[bold]Checking required subfolders...[/bold]")
-    required_subfolders = [
-        '00-09_SYSTEM/00_inbox',
-        '00-09_SYSTEM/01_dotfiles',
-        '00-09_SYSTEM/07_documentation',
-        '10-19_KNOWLEDGE/10_references',
-        '10-19_KNOWLEDGE/11_public_garden',
-        '10-19_KNOWLEDGE/12_private_vault',
-        '20-29_CODE/21_monorepo_apps',
-        '20-29_CODE/22_worktrees',
-        '20-29_CODE/23_playground',
-        '30-39_OPERATIONS/31_backups',
-        '30-39_OPERATIONS/32_automation',
-    ]
+    # === FIX-IT FLOW ===
+    console.print()
+    console.print("=" * 50)
 
-    for subfolder in required_subfolders:
-        folder_path = root / subfolder
-        if folder_path.exists():
-            console.print(f"  [green]✓[/green] {subfolder}")
-        else:
-            console.print(f"  [red]✗[/red] {subfolder} [dim]- NOT FOUND[/dim]")
-            add_issue(
-                f"Missing subfolder: {subfolder}",
-                fix_action=lambda p=folder_path: p.mkdir(parents=True, exist_ok=True),
-                fix_description=f"Create {subfolder}"
-            )
+    if not all_issues:
+        console.print("[bold green]✓ DevBase is HEALTHY[/bold green]")
+        return
 
-    # STRICT AUDIT: Check for convention violations (hyphens, duplicates)
-    console.print("\n[bold]Running strict structure audit...[/bold]")
-    import re
-    jd_pattern = re.compile(r"^\d{2}_[a-z0-9_]+$")
-    
-    for area in required_areas:
-        area_path = root / area
-        if not area_path.exists(): continue
-        
-        seen_ids = {} # map id -> name
-        
-        for item in area_path.iterdir():
-            if not item.is_dir(): continue
-            if item.name.startswith("."): continue # skip hidden
-            
-            # Check naming convention
-            if not jd_pattern.match(item.name):
-                console.print(f"  [yellow]⚠[/yellow] {area}/{item.name} [dim](Invalid Naming)[/dim]")
-                if "-" in item.name:
-                    fixed_name = item.name.replace("-", "_")
-                    add_issue(
-                        f"Naming violation: {item.name} (hyphens detected)",
-                        fix_action=lambda src=item, dst=area_path/fixed_name: src.rename(dst),
-                        fix_description=f"Rename to {fixed_name}"
-                    )
-                else:
-                    add_issue(f"Naming violation: {item.name}", fix_description="Rename manually to XX_snake_case")
-                continue
+    # Report issues
+    console.print(f"[bold yellow]Found {len(all_issues)} issue(s)[/bold yellow]\n")
 
-            # Check Duplicates
-            cat_id = item.name[:2]
-            if cat_id in seen_ids:
-                prev = seen_ids[cat_id]
-                console.print(f"  [red]✗[/red] Duplicate ID {cat_id}: {prev} vs {item.name}")
-                add_issue(
-                    f"Duplicate ID {cat_id} in {area}",
-                    fix_description=f"Resolve duplicate: {prev} vs {item.name}"
-                )
-            else:
-                seen_ids[cat_id] = item.name
+    fixable = [i for i in all_issues if i.fix_action]
 
-    # Check governance files
-    console.print("\n[bold]Checking governance files...[/bold]")
-    required_files = [
-        '.editorconfig',
-        '.gitignore',
-        '00-09_SYSTEM/00.00_index.md',
-        '.devbase_state.json'
-    ]
+    if not fixable:
+        console.print("[dim]No auto-fixes available. Please fix manually.[/dim]")
+        return
 
-    for file in required_files:
-        file_path = root / file
-        if file_path.exists():
-            console.print(f"  [green]✓[/green] {file}")
-        else:
-            console.print(f"  [yellow]⚠[/yellow] {file} [dim]- NOT FOUND[/dim]")
-            # Some files can be auto-created
-            if file == '.editorconfig':
-                add_issue(
-                    f"Missing: {file}",
-                    fix_action=lambda p=file_path: p.write_text("root = true\n\n[*]\nindent_style = space\nindent_size = 4\n"),
-                    fix_description="Create default .editorconfig"
-                )
-
-    # Check Air-Gap
-    console.print("\n[bold]Checking Air-Gap protection...[/bold]")
-    private_vault = root / "10-19_KNOWLEDGE" / "12_private_vault"
-    gitignore = root / ".gitignore"
-
-    if private_vault.exists():
-        if gitignore.exists():
-            content = gitignore.read_text()
-            if "12_private_vault" in content:
-                console.print("  [green]✓[/green] Private Vault is protected")
-            else:
-                console.print("  [red]✗[/red] Private Vault NOT in .gitignore!")
-                add_issue(
-                    "Private Vault exposed to Git",
-                    fix_action=lambda: gitignore.write_text(content + "\n# Private vault (security)\n12_private_vault/\n"),
-                    fix_description="Add 12_private_vault to .gitignore"
-                )
-        else:
-            console.print("  [yellow]⚠[/yellow] No .gitignore found")
-
-    # Check state file
-    console.print("\n[bold]Checking state file...[/bold]")
-    state_path = root / ".devbase_state.json"
-    if state_path.exists():
-        try:
-            state_mgr = get_state_manager(root)
-            state = state_mgr.get_state()
-            console.print(f"  [green]✓[/green] Version: {state['version']}")
-            console.print(f"  [dim]  Installed: {state.get('installedAt', 'Unknown')}[/dim]")
-        except Exception:
-            console.print("  [red]✗[/red] State file corrupted")
-            add_issue(
-                "Corrupted state file",
-                fix_action=lambda: state_path.unlink() if state_path.exists() else None,
-                fix_description="Reset state file (will be recreated on next setup)"
-            )
+    # Interactive fix flow
+    if fix:
+        # Auto-fix mode
+        console.print("[bold]Auto-fixing issues...[/bold]\n")
+        for issue in fixable:
+            try:
+                issue["fix_action"]()
+                console.print(f"  [green]✓[/green] {issue['fix_description']}")
+            except Exception as e:
+                console.print(f"  [red]✗[/red] Failed: {issue['fix_description']} ({e})")
+        console.print("\n[green]Done! Run [cyan]devbase doctor[/cyan] again to verify.[/green]")
     else:
-        console.print("  [yellow]⚠[/yellow] State file not found")
+        # Interactive mode
+        console.print(f"[bold]{len(fixable)} issue(s) can be auto-fixed:[/bold]\n")
 
-    # Check Templates
-    console.print("\n[bold]Checking templates...[/bold]")
-    templates_dir = root / "00-09_SYSTEM" / "05_templates"
-    
-    required_templates = ["__template-clean-arch", "__template-bi", "__template-db"]
-    missing_templates = []
+        table = Table(show_header=True, header_style="bold magenta", box=None)
+        table.add_column("#", style="dim", width=4)
+        table.add_column("Issue Detected", style="bold red")
+        table.add_column("Proposed Fix", style="green")
 
-    for tmpl in required_templates:
-        if (templates_dir / tmpl).exists():
-            console.print(f"  [green]✓[/green] {tmpl}")
+        for i, issue in enumerate(fixable, 1):
+            table.add_row(str(i), issue.description, issue.fix_description)
+
+        console.print(table)
+        console.print()
+
+        if Confirm.ask("[bold]Do you want to apply these fixes now?[/bold]"):
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                task = progress.add_task("Applying fixes...", total=len(fixable))
+
+                for issue in fixable:
+                    try:
+                        issue["fix_action"]()
+                        progress.console.print(f"  [green]✓[/green] {issue.fix_description}")
+                    except Exception as e:
+                        progress.console.print(f"  [red]✗[/red] Failed: {e}")
+                    progress.advance(task)
+
+            console.print("\n[green]Done![/green]")
         else:
-            missing_templates.append(tmpl)
-            console.print(f"  [red]✗[/red] {tmpl} [dim]- NOT FOUND[/dim]")
-
-    if missing_templates:
-        # Only __template-clean-arch is currently built-in and fixable via hydration
-        if "__template-clean-arch" in missing_templates:
-            add_issue(
-                "Missing default code templates",
-                fix_action=lambda: run_setup_code(get_filesystem(str(root), dry_run=False)),
-                fix_description="Hydrate code templates"
-            )
-        else:
-             add_issue(
-                f"Missing custom templates: {', '.join(t for t in missing_templates if t != '__template-clean-arch')}",
-                fix_description="Restore templates manually or from backup"
-            )
-
-    # Run security checks
-    from devbase.commands.security_check import run_security_checks
-    security_ok = run_security_checks(root)
-    if not security_ok:
-        add_issue("Security issues detected", fix_description="Review security audit above")
-
-    # Check Projects (New Governance Check)
-    console.print("\n[bold]Checking Projects health (Governance)...[/bold]")
-    apps_dir = root / "20-29_CODE" / "21_monorepo_apps"
-    if apps_dir.exists():
-        projects = [p for p in apps_dir.iterdir() if p.is_dir()]
-        console.print(f"  Found {len(projects)} projects.")
-
-        for proj in projects:
-            issues_found = False
-            # Check Git
-            if not (proj / ".git").exists():
-                console.print(f"  [red]✗[/red] {proj.name}: Missing .git")
-                issues_found = True
-                add_issue(f"Project {proj.name} not initialized", fix_description="Run 'git init' manually")
-
-            # Check Pre-commit (soft check)
-            if not (proj / ".pre-commit-config.yaml").exists():
-                # Not necessarily an error, but a warning for governance
-                # console.print(f"  [yellow]⚠[/yellow] {proj.name}: No pre-commit config")
-                pass
-
-            if not issues_found:
-                 console.print(f"  [green]✓[/green] {proj.name}")
-
-    # Check Worktrees for stale branches
-    console.print("\n[bold]Checking Worktrees health...[/bold]")
-    worktrees_dir = root / "20-29_CODE" / "22_worktrees"
-    if worktrees_dir.exists():
-        worktrees = [w for w in worktrees_dir.iterdir() if w.is_dir()]
-        if worktrees:
-            console.print(f"  Found {len(worktrees)} worktrees.")
-
-            for wt in worktrees:
-                # Check if worktree has uncommitted changes
-                import subprocess
-                try:
-                    result = subprocess.run(
-                        ["git", "status", "--porcelain"],
-                        cwd=str(wt),
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    if result.stdout.strip():
-                        console.print(f"  [yellow]⚠[/yellow] {wt.name}: Uncommitted changes")
-                    else:
-                        console.print(f"  [green]✓[/green] {wt.name}")
-                except (subprocess.SubprocessError, OSError):
-                    console.print(f"  [dim]?[/dim] {wt.name}: Could not check status")
-        else:
-            console.print("  [dim]No worktrees found.[/dim]")
-    else:
-        console.print("  [dim]No worktrees directory.[/dim]")
+            console.print("\n[dim]Run [cyan]devbase doctor --fix[/cyan] to auto-fix later.[/dim]")
 
     # === FIX-IT FLOW ===
     console.print()

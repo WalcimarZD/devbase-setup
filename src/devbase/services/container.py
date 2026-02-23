@@ -1,66 +1,56 @@
-"""
-Service Container
-==================
-Lazy-initialized, workspace-scoped service registry.
-
-Caches service instances per workspace root to avoid repeated
-factory calls across commands.
-"""
 from __future__ import annotations
-
-import logging
+from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-logger = logging.getLogger(__name__)
-
+if TYPE_CHECKING:
+    from devbase.utils.filesystem import FileSystem
+    from devbase.utils.state import StateManager
+    from devbase.utils.telemetry import TelemetryService
+    from devbase.ai.service import AIService
 
 class ServiceContainer:
-    """Workspace-scoped service container with lazy initialization.
-
-    Each property creates its service on first access and caches it.
-    Services that depend on optional extras fail gracefully with hints.
-
-    Usage::
-
-        container = ServiceContainer(workspace_root)
-        container.telemetry  # lazy-created on first access
+    """
+    Workspace-scoped Dependency Injection (DI) Container.
+    
+    Provides lazy-initialized, cached instances of core services. 
+    Uses @cached_property to ensure thread-safe, singleton-per-workspace behavior.
     """
 
     def __init__(self, root: Path) -> None:
+        """
+        Initialize the container for a specific workspace.
+        @param root: Canonical Path to the Johnny.Decimal workspace root.
+        """
         self.root = root
-        self._cache: dict[str, Any] = {}
 
-    def _get_or_create(self, key: str, factory: Any) -> Any:
-        """Get a cached service or create it via factory."""
-        if key not in self._cache:
-            try:
-                self._cache[key] = factory()
-            except ImportError as e:
-                logger.warning(f"Service '{key}' unavailable: {e}")
-                raise
-        return self._cache[key]
+    @cached_property
+    def filesystem(self) -> FileSystem:
+        """Port for atomic filesystem operations."""
+        from devbase.utils.filesystem import get_filesystem
+        return get_filesystem(str(self.root))
 
-    @property
-    def filesystem(self) -> Any:
-        """Filesystem adapter for the workspace."""
-        def _factory() -> Any:
-            from devbase.utils.filesystem import get_filesystem
-            return get_filesystem(str(self.root))
-        return self._get_or_create("filesystem", _factory)
-
-    @property
-    def state_manager(self) -> Any:
+    @cached_property
+    def state_manager(self) -> StateManager:
         """State manager for workspace metadata."""
-        def _factory() -> Any:
-            from devbase.utils.state import get_state_manager
-            return get_state_manager(self.root)
-        return self._get_or_create("state_manager", _factory)
+        from devbase.utils.state import get_state_manager
+        return get_state_manager(self.root)
 
-    @property
-    def telemetry(self) -> Any:
-        """Telemetry tracker (requires db extra)."""
-        def _factory() -> Any:
-            from devbase.utils.telemetry import get_telemetry
-            return get_telemetry(self.root)
-        return self._get_or_create("telemetry", _factory)
+    @cached_property
+    def telemetry(self) -> TelemetryService:
+        """
+        OLAP Telemetry provider using DuckDB.
+        @requires: devbase[db] extra.
+        """
+        from devbase.utils.telemetry import get_telemetry
+        return get_telemetry(self.root)
+
+    @cached_property
+    def ai(self) -> AIService:
+        """
+        Orchestrator for LLM-powered workspace features.
+        @requires: devbase[ai] extra.
+        """
+        from devbase.ai.service import AIService
+        from devbase.ai.providers.groq import GroqProvider
+        return AIService(GroqProvider())
