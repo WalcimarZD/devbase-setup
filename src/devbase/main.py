@@ -1,12 +1,18 @@
 """
 DevBase CLI Main Entry Point (Typer-based)
 ============================================
-Modern CLI using Typer framework for type-safe, declarative commands.
-Replaces the legacy argparse-based devbase.py.
+Modern CLI using Typer framework with plugin-based command discovery.
+
+Commands are registered via entry_points (pyproject.toml) and loaded
+lazily — only the invoked command's module is imported at runtime.
 
 Author: DevBase Team
 Version: Dynamic (see __init__.py)
 """
+from __future__ import annotations
+
+import logging
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Optional
 
@@ -14,8 +20,26 @@ import typer
 from rich.console import Console
 from typing_extensions import Annotated
 
-from devbase.commands import core, development, navigation, operations, quick, docs, pkm, study, analytics, ai, audit
 from devbase.utils.workspace import detect_workspace_root
+
+logger = logging.getLogger(__name__)
+
+# Progressive Disclosure panel assignments
+# Commands not listed here default to "🔵 Advanced"
+PANEL_MAP: dict[str, tuple[str, str]] = {
+    # name: (help text, panel)
+    "core":      ("🏠 Workspace health & setup",     "🟢 Essentials (Start Here)"),
+    "dev":       ("📦 Create and manage projects",    "🟢 Essentials (Start Here)"),
+    "nav":       ("🧭 Navigate folders quickly",      "🟢 Essentials (Start Here)"),
+    "audit":     ("🛡️ Consistency & Health",          "🟡 Daily Workflow"),
+    "ops":       ("📊 Track activities & backup",     "🟡 Daily Workflow"),
+    "quick":     ("⚡ One-command shortcuts",          "🟡 Daily Workflow"),
+    "docs":      ("📚 Generate documentation",        "🟡 Daily Workflow"),
+    "pkm":       ("🧠 Knowledge graph & linking",     "🔵 Advanced"),
+    "study":     ("📚 Learning & spaced repetition",  "🔵 Advanced"),
+    "analytics": ("📈 Productivity insights",         "🔵 Advanced"),
+    "ai":        ("🧠 AI-powered features",           "🔵 Advanced"),
+}
 
 # Initialize Typer app with rich help
 app = typer.Typer(
@@ -29,80 +53,39 @@ app = typer.Typer(
 # Initialize Rich console
 console = Console()
 
-# Register command groups with Progressive Disclosure panels
-# Panel names create visual grouping in --help output
 
-# 🟢 ESSENTIALS - Start here (Week 1)
-app.add_typer(
-    core.app,
-    name="core",
-    help="🏠 Workspace health & setup",
-    rich_help_panel="🟢 Essentials (Start Here)",
-)
-app.add_typer(
-    development.app,
-    name="dev",
-    help="📦 Create and manage projects",
-    rich_help_panel="🟢 Essentials (Start Here)",
-)
-app.add_typer(
-    navigation.app,
-    name="nav",
-    help="🧭 Navigate folders quickly",
-    rich_help_panel="🟢 Essentials (Start Here)",
-)
+def _discover_commands() -> None:
+    """Auto-discover and register command plugins via entry_points.
 
-# 🟡 DAILY WORKFLOW - After mastering essentials (Week 2-3)
-app.add_typer(
-    audit.app,
-    name="audit",
-    help="🛡️ Consistency & Health",
-    rich_help_panel="🟡 Daily Workflow",
-)
-app.add_typer(
-    operations.app,
-    name="ops",
-    help="📊 Track activities & backup",
-    rich_help_panel="🟡 Daily Workflow",
-)
-app.add_typer(
-    quick.app,
-    name="quick",
-    help="⚡ One-command shortcuts",
-    rich_help_panel="🟡 Daily Workflow",
-)
-app.add_typer(
-    docs.app,
-    name="docs",
-    help="📚 Generate documentation",
-    rich_help_panel="🟡 Daily Workflow",
-)
+    Each entry point in the 'devbase.commands' group is loaded lazily
+    and registered as a Typer sub-app with its panel assignment.
+    """
+    eps = entry_points()
 
-# 🔵 ADVANCED - For power users (Week 4+)
-app.add_typer(
-    pkm.app,
-    name="pkm",
-    help="🧠 Knowledge graph & linking",
-    rich_help_panel="🔵 Advanced",
-)
-app.add_typer(
-    study.app,
-    name="study",
-    help="📚 Learning & spaced repetition",
-    rich_help_panel="🔵 Advanced",
-)
-app.add_typer(
-    analytics.app,
-    name="analytics",
-    help="📈 Productivity insights",
-    rich_help_panel="🔵 Advanced",
-)
-app.add_typer(
-    ai.app,
-    name="ai",
-    help="🧠 AI-powered features",
-    rich_help_panel="🔵 Advanced",
-)
+    # Python 3.12+ returns a SelectableGroups; 3.10–3.11 returns dict
+    if hasattr(eps, "select"):
+        command_eps = eps.select(group="devbase.commands")
+    else:
+        command_eps = eps.get("devbase.commands", [])
+
+    for ep in command_eps:
+        try:
+            cmd_app = ep.load()
+            help_text, panel = PANEL_MAP.get(
+                ep.name, (f"{ep.name} commands", "🔵 Advanced")
+            )
+            app.add_typer(
+                cmd_app,
+                name=ep.name,
+                help=help_text,
+                rich_help_panel=panel,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load command plugin '{ep.name}': {e}")
+
+
+# Discover and register commands at import-time
+_discover_commands()
 
 
 def version_callback(value: bool) -> None:
@@ -140,7 +123,7 @@ def main(
 ) -> None:
     """
     DevBase CLI - Global callback for all commands.
-    
+
     Detects workspace root and stores in context for all subcommands.
     """
     # Disable colors if requested
@@ -160,8 +143,34 @@ def main(
         "verbose": verbose,
     }
 
+    # Lazy service container — available to all subcommands
+    try:
+        from devbase.services.container import ServiceContainer
+        ctx.obj["services"] = ServiceContainer(workspace_root)
+    except Exception:
+        pass  # non-fatal; commands that need it will handle absence
+
     if verbose:
         console.print(f"[dim]Workspace: {workspace_root}[/dim]")
+
+
+# ── Self-update command ─────────────────────────────────────────────
+
+@app.command(name="self-update")
+def self_update() -> None:
+    """🔄 Update DevBase to the latest version."""
+    import subprocess as sp
+
+    console.print("[bold]Checking for updates...[/bold]")
+    result = sp.run(
+        ["uv", "pip", "install", "--upgrade", "devbase"],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        console.print("[green]✓[/green] DevBase updated successfully.")
+    else:
+        console.print(f"[red]✗[/red] Update failed: {result.stderr.strip()}")
+        console.print("[dim]Try manually: uv pip install --upgrade devbase[/dim]")
 
 
 # Entry point for console script
