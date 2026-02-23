@@ -12,6 +12,7 @@ Version: Dynamic (see __init__.py)
 from __future__ import annotations
 
 import logging
+import sys
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Optional
@@ -81,7 +82,13 @@ def _discover_commands() -> None:
                 rich_help_panel=panel,
             )
         except Exception as e:
-            logger.warning(f"Failed to load command plugin '{ep.name}': {e}")
+            # Always visible — a silent drop here is worse than a noisy warning.
+            print(
+                f"[devbase] WARNING: failed to load plugin '{ep.name}': "
+                f"{type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            logger.debug("Plugin load traceback:", exc_info=True)
 
 
 # Discover and register commands at import-time
@@ -129,6 +136,14 @@ def main(
     # Disable colors if requested
     if no_color:
         console.no_color = True
+
+    # Skip workspace detection during shell-completion generation or when the
+    # user is only asking for help.  In both cases the command body never
+    # executes, so an unresolved workspace root is harmless.
+    _help_requested = "--help" in sys.argv or "-h" in sys.argv
+    if ctx.resilient_parsing or _help_requested:
+        ctx.obj = {"root": Path.cwd(), "console": console, "verbose": verbose}
+        return
 
     # Detect or validate workspace root
     if root:

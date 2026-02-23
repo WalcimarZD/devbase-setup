@@ -19,10 +19,14 @@ from rich.table import Table
 from rich.text import Text
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from typing_extensions import Annotated
-from typer.testing import CliRunner
 
 console = Console()
-runner = CliRunner()
+
+
+def _runner():
+    """Lazy CliRunner factory — keeps typer.testing out of the cold-start path."""
+    from typer.testing import CliRunner
+    return CliRunner()
 
 
 class DebugReport:
@@ -179,7 +183,7 @@ def run_sanity_checks(report: DebugReport):
         try:
             # We use CliRunner to invoke "devbase <group> --help"
             # We explicitly pass the root to avoid "no workspace detected" errors
-            result = runner.invoke(main_app, ["--root", str(report.root), group, "--help"])
+            result = _runner().invoke(main_app, ["--root", str(report.root), group, "--help"])
 
             if result.exit_code == 0:
                 report.add_sanity_result(f"devbase {group}", "PASSED")
@@ -204,7 +208,7 @@ def run_smoke_tests(report: DebugReport):
         try:
             report.log("Running 'core setup' in sandbox...")
             # Note: We need to pass --root to override the context detection
-            result = runner.invoke(main_app, ["--root", str(sandbox_root), "core", "setup", "--no-interactive", "--force"])
+            result = _runner().invoke(main_app, ["--root", str(sandbox_root), "core", "setup", "--no-interactive", "--force"])
 
             checks = []
             failed_checks = []
@@ -253,7 +257,7 @@ def run_smoke_tests(report: DebugReport):
             # User said: "Verificar se a pasta do projeto surgiu ... e se contém arquivos de template."
             # So --no-setup is appropriate to test file generation speed.
 
-            result = runner.invoke(main_app, [
+            result = _runner().invoke(main_app, [
                 "--root", str(sandbox_root),
                 "dev", "new", project_name,
                 "--template", template_name,
@@ -298,7 +302,7 @@ def run_smoke_tests(report: DebugReport):
             # Create a dummy file to backup
             (sandbox_root / "dummy_data.txt").write_text("important data")
 
-            result = runner.invoke(main_app, [
+            result = _runner().invoke(main_app, [
                 "--root", str(sandbox_root),
                 "ops", "backup"
             ])
