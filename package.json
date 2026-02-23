@@ -1,6 +1,6 @@
 {
   "name": "devbase-setup",
-  "version": "5.1.0-alpha.1",
+  "version": "5.1.0-alpha.3",
   "private": true,
   "scripts": {
     "test": "echo \"No tests defined\" && exit 0",
