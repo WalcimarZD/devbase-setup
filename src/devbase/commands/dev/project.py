@@ -1,19 +1,30 @@
 """
-Development Commands: new, audit
-=================================
-Commands for creating and managing code projects.
+Project Management Commands
+=============================
+Commands for creating, importing, listing, and managing projects.
 """
+import json
+import logging
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 from typing_extensions import Annotated
 
-app = typer.Typer(help="Development commands")
+app = typer.Typer()
 console = Console()
+logger = logging.getLogger(__name__)
+
+
+def _get_ghostwriter(root: Path):
+    """Lazy import for ADR ghostwriter."""
+    from devbase.services.adr_generator import get_ghostwriter
+    return get_ghostwriter(root)
 
 
 @app.command()
@@ -35,35 +46,31 @@ def new(
 ) -> None:
     """
     📦 Create a new project from template.
-    
+
     Creates a customized project in 21_monorepo_apps/ using the specified template.
-    
+
     Golden Path (Default):
     - Generates files
     - Initializes Git repo
     - Installs dependencies (uv/pip)
     - Sets up pre-commit hooks
     - Opens in VS Code
-    
+
     Use --no-setup to only generate files.
     """
     root: Path = ctx.obj["root"]
 
-    # Interactive Prompt for Name (Micro-UX Improvement)
     if name is None:
         from rich.prompt import Prompt
         name = Prompt.ask("Project name (kebab-case)")
 
-    # Validate project name (kebab-case)
     if not re.match(r'^[a-z0-9]+([-.][a-z0-9]+)*$', name):
         from rich.prompt import Confirm
 
         console.print(f"[red]✗ Project name '{name}' is not kebab-case.[/red]")
 
-        # Suggest valid name
         suggestion = re.sub(r'([a-z])([A-Z])', r'\1-\2', name).lower()
         suggestion = re.sub(r'[_ ]', '-', suggestion)
-        # Remove any remaining invalid chars (keep only a-z, 0-9, -)
         suggestion = re.sub(r'[^a-z0-9-]', '', suggestion)
 
         if suggestion and suggestion != name:
@@ -76,16 +83,13 @@ def new(
             console.print("  [dim]Name must contain only lowercase letters, numbers, and hyphens.[/dim]")
             raise typer.Exit(1)
 
-    # Use template engine
     from devbase.utils.templates import generate_project_from_template, list_available_templates
     from devbase.services.project_setup import get_project_setup
     from devbase.utils.telemetry import get_telemetry
-    from devbase.services.adr_generator import get_ghostwriter
 
     telemetry = get_telemetry(root)
     setup_service = get_project_setup(root)
 
-    # Start tracking
     telemetry.track(
         f"Creating project {name}",
         category="scaffolding",
@@ -97,7 +101,6 @@ def new(
         console.print()
         console.print(f"[bold]Creating project '{name}'...[/bold]\n")
 
-        # 1. Generate Files
         dest_path = generate_project_from_template(
             template_name=template,
             project_name=name,
@@ -106,7 +109,6 @@ def new(
         )
         console.print(f"[green]✓[/green] Files generated at {dest_path}")
 
-        # 2. Golden Path Setup
         if setup:
             setup_service.run_golden_path(dest_path, name, interactive=interactive)
         else:
@@ -118,8 +120,7 @@ def new(
             f"Location: [cyan]{dest_path}[/cyan]",
             border_style="green"
         ))
-        
-        # Success telemetry
+
         telemetry.track(
             f"Created project {name}",
             category="scaffolding",
@@ -159,41 +160,37 @@ def import_project(
 ) -> None:
     """
     📥 Import an existing project (brownfield).
-    
+
     Clones a Git repository or copies a local project into the DevBase workspace.
     Imported projects are marked as 'external' and exempt from governance rules.
-    
+
     Examples:
         devbase dev import https://github.com/user/repo.git
         devbase dev import https://github.com/user/dotnet-app.git --restore
         devbase dev import D:\\Projects\\legacy-app --name legacy
     """
     import subprocess
-    import json
     import shutil
-    from datetime import datetime
     import devbase
 
     root: Path = ctx.obj["root"]
     apps_dir = root / "20-29_CODE" / "21_monorepo_apps"
     apps_dir.mkdir(parents=True, exist_ok=True)
 
-    # Determine if source is URL or path
     is_url = source.startswith("http://") or source.startswith("https://") or source.startswith("git@")
-    
+
     if is_url:
-        # Extract repo name from URL
         repo_name = name or source.rstrip("/").split("/")[-1].replace(".git", "")
         dest_path = apps_dir / repo_name
-        
+
         if dest_path.exists():
             console.print(f"[red]✗ Project '{repo_name}' already exists.[/red]")
             raise typer.Exit(1)
-        
+
         console.print(f"\n[bold]Importing project from Git...[/bold]")
         console.print(f"[dim]Source: {source}[/dim]")
         console.print(f"[dim]Destination: {dest_path}[/dim]\n")
-        
+
         try:
             result = subprocess.run(
                 ["git", "clone", "--", source, str(dest_path)],
@@ -212,31 +209,29 @@ def import_project(
             console.print("[red]✗ Clone timed out (120s).[/red]")
             raise typer.Exit(1)
     else:
-        # Local path
         source_path = Path(source).resolve()
         if not source_path.exists():
             console.print(f"[red]✗ Source path not found: {source}[/red]")
             raise typer.Exit(1)
-        
+
         project_name = name or source_path.name
         dest_path = apps_dir / project_name
-        
+
         if dest_path.exists():
             console.print(f"[red]✗ Project '{project_name}' already exists.[/red]")
             raise typer.Exit(1)
-        
+
         console.print(f"\n[bold]Importing local project...[/bold]")
         console.print(f"[dim]Source: {source_path}[/dim]")
         console.print(f"[dim]Destination: {dest_path}[/dim]\n")
-        
+
         try:
             shutil.copytree(source_path, dest_path)
             console.print(f"[green]✓[/green] Project copied successfully")
-        except Exception as e:
+        except OSError as e:
             console.print(f"[red]✗ Copy failed: {e}[/red]")
             raise typer.Exit(1)
-    
-    # Create .devbase.json with external governance
+
     metadata = {
         "template": "imported",
         "governance": "external",
@@ -244,11 +239,11 @@ def import_project(
         "imported_at": datetime.now().isoformat(),
         "devbase_version": devbase.__version__
     }
-    
+
     meta_file = dest_path / ".devbase.json"
     meta_file.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     console.print(f"[green]✓[/green] Created .devbase.json (governance: external)")
-    
+
     console.print(Panel(
         f"[bold green]✅ Import Complete![/bold green]\n\n"
         f"Project: [cyan]{dest_path.name}[/cyan]\n"
@@ -256,8 +251,7 @@ def import_project(
         f"[dim]This project is marked as 'external' and exempt from governance rules.[/dim]",
         border_style="green"
     ))
-    
-    # Optional: NuGet restore
+
     if restore:
         from devbase.utils.nuget import nuget_restore, is_dotnet_project
         if is_dotnet_project(dest_path):
@@ -266,11 +260,10 @@ def import_project(
         else:
             console.print("[dim]--restore specified but no .NET project detected. Skipping.[/dim]")
 
-    # Generate VS Code workspace
     try:
         from devbase.utils.vscode import generate_vscode_workspace
         generate_vscode_workspace(dest_path, dest_path.name)
-    except Exception as e:
+    except OSError as e:
         console.print(f"[yellow]⚠ Failed to generate workspace: {e}[/yellow]")
 
 
@@ -281,7 +274,7 @@ def open_project(
 ) -> None:
     """
     💻 Open a project in VS Code.
-    
+
     Opens the project's .code-workspace file or folder in VS Code.
     If no name is provided, an interactive list is shown.
 
@@ -294,19 +287,16 @@ def open_project(
 
     root: Path = ctx.obj["root"]
     project_path = None
-    
-    # If no name provided, show interactive list
+
     if not project_name:
         apps_dir = root / "20-29_CODE" / "21_monorepo_apps"
         worktrees_dir = root / "20-29_CODE" / "22_worktrees"
 
         candidates = []
 
-        # Collect projects
         if apps_dir.exists():
             candidates.extend([p for p in apps_dir.iterdir() if p.is_dir()])
 
-        # Collect worktrees
         if worktrees_dir.exists():
             candidates.extend([w for w in worktrees_dir.iterdir() if w.is_dir()])
 
@@ -315,7 +305,6 @@ def open_project(
             console.print("Create one with: [cyan]devbase dev new[/cyan]")
             raise typer.Exit(1)
 
-        # Sort by name
         candidates.sort(key=lambda x: x.name)
 
         console.print("\n[bold]Select a project to open:[/bold]")
@@ -327,7 +316,6 @@ def open_project(
         console.print()
         choice = Prompt.ask("Enter number or name", default="1")
 
-        # Handle number selection
         if choice.isdigit():
             idx = int(choice) - 1
             if 0 <= idx < len(candidates):
@@ -336,21 +324,18 @@ def open_project(
                 console.print(f"[red]Invalid selection: {choice}[/red]")
                 raise typer.Exit(1)
         else:
-            # Handle name input
             project_name = choice
 
-    # If project_path not set by interactive selection, resolve by name
     if not project_path:
         project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
 
-        # Also check worktrees
         if not project_path.exists():
             project_path = root / "20-29_CODE" / "22_worktrees" / project_name
-    
+
     if not project_path.exists():
         console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
         raise typer.Exit(1)
-    
+
     open_in_vscode(project_path)
 
 
@@ -365,9 +350,9 @@ def restore_packages(
 ) -> None:
     """
     📦 Restore NuGet packages for a .NET project.
-    
+
     Downloads nuget.exe automatically if needed and runs restore.
-    
+
     Examples:
         devbase dev restore MedSempreMVC_GIT
         devbase dev restore MyProject --solution MyProject.Web.sln
@@ -376,20 +361,19 @@ def restore_packages(
 
     root: Path = ctx.obj["root"]
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
-    
-    # Also check worktrees
+
     if not project_path.exists():
         project_path = root / "20-29_CODE" / "22_worktrees" / project_name
-    
+
     if not project_path.exists():
         console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
         raise typer.Exit(1)
-    
+
     if not is_dotnet_project(project_path):
         console.print(f"[yellow]⚠ '{project_name}' does not appear to be a .NET project.[/yellow]")
         console.print("[dim]No .sln or packages.config found.[/dim]")
         raise typer.Exit(1)
-    
+
     success = nuget_restore(project_path, solution, root=root)
     if not success:
         raise typer.Exit(1)
@@ -402,18 +386,13 @@ def info_project(
 ) -> None:
     """
     ℹ️ Show project details.
-    
+
     Displays template used, creation date, and metadata.
     """
-    import json
-    from datetime import datetime
-    from rich.panel import Panel
-    from rich.table import Table
 
     root: Path = ctx.obj["root"]
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
 
-    # Also check worktrees
     if not project_path.exists():
         project_path = root / "20-29_CODE" / "22_worktrees" / project_name
 
@@ -421,29 +400,23 @@ def info_project(
         console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
         raise typer.Exit(1)
 
-    # Gather Info
     meta_file = project_path / ".devbase.json"
-    copier_file = project_path / ".copier-answers.yml"
-    
     metadata = {}
-    
-    # Strategy 1: .devbase.json (New standard)
+
     if meta_file.exists():
         try:
             metadata = json.loads(meta_file.read_text(encoding="utf-8"))
-        except:
-            pass
-            
-    # Strategy 2: Copier (Legacy/Alternative)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Failed to parse .devbase.json for {project_name}: {e}")
+
+    copier_file = project_path / ".copier-answers.yml"
     if not metadata and copier_file.exists():
         metadata["template"] = "copier-template (inferred)"
-        
-    # Strategy 3: Filesystem (Fallback)
+
     stat = project_path.stat()
     created_ts = stat.st_ctime
     modified_ts = stat.st_mtime
-    
-    # Construct Display
+
     template = metadata.get("template", "Unknown / Custom")
     governance = metadata.get("governance", "full")
     created = metadata.get("created_at", metadata.get("imported_at", datetime.fromtimestamp(created_ts).strftime("%Y-%m-%d %H:%M")))
@@ -452,7 +425,6 @@ def info_project(
     desc = metadata.get("description", "No description")
     source = metadata.get("source", None)
 
-    # Governance badge
     if governance == "external":
         gov_display = "[yellow]External[/yellow] (Governance skipped)"
     elif governance == "partial":
@@ -463,7 +435,7 @@ def info_project(
     grid = Table.grid(expand=True)
     grid.add_column(style="bold cyan", width=15)
     grid.add_column()
-    
+
     grid.add_row("Project:", project_name)
     grid.add_row("Location:", str(project_path))
     grid.add_row("Governance:", gov_display)
@@ -474,7 +446,7 @@ def info_project(
     grid.add_row("DevBase Ver:", version)
     grid.add_row("Author:", author)
     grid.add_row("Description:", desc)
-    
+
     console.print(Panel(grid, title=f"ℹ️ Project Info: {project_name}", border_style="blue"))
 
 
@@ -484,18 +456,16 @@ def list_projects(
 ) -> None:
     """
     📂 List all projects.
-    
-    scans 20-29_CODE/21_monorepo_apps and displays a table of projects.
+
+    Scans 20-29_CODE/21_monorepo_apps and displays a table of projects.
     """
-    from datetime import datetime
-    from rich.table import Table
     from devbase.utils.telemetry import get_telemetry
 
     root: Path = ctx.obj["root"]
     telemetry = get_telemetry(root)
-    
+
     projects_dir = root / "20-29_CODE" / "21_monorepo_apps"
-    
+
     console.print()
     console.print("[bold]Project List[/bold]")
     console.print(f"[dim]Location: {projects_dir}[/dim]\n")
@@ -503,36 +473,32 @@ def list_projects(
     if not projects_dir.exists():
         console.print("[yellow]⚠ Projects folder not found.[/yellow]")
         return
-        
+
     projects = [p for p in projects_dir.iterdir() if p.is_dir()]
-    
+
     if not projects:
         console.print("[dim]No projects found.[/dim]")
         console.print("\nCreate one with:\n  [cyan]devbase dev new <name>[/cyan]")
         return
-        
+
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Name", style="cyan")
     table.add_column("Last Modified", justify="right")
     table.add_column("Governance", justify="center")
-    
-    import json
-    
+
     for p in sorted(projects, key=lambda x: x.name):
-        # Read governance from .devbase.json
         meta_file = p / ".devbase.json"
         governance = "full"
         template = None
-        
+
         if meta_file.exists():
             try:
                 meta = json.loads(meta_file.read_text(encoding="utf-8"))
                 governance = meta.get("governance", "full")
                 template = meta.get("template")
-            except:
-                pass
-        
-        # Determine badge style
+            except (json.JSONDecodeError, OSError) as e:
+                logger.debug(f"Could not read metadata for {p.name}: {e}")
+
         if template == "worktree":
             gov_badge = "[magenta]Worktree[/magenta]"
         elif governance == "external":
@@ -541,13 +507,11 @@ def list_projects(
             gov_badge = "[blue]Partial[/blue]"
         else:
             gov_badge = "[green]Full[/green]"
-        
-        # Modified time
+
         mtime = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
-        
+
         table.add_row(p.name, mtime, gov_badge)
-    
-    # Also list worktrees from 22_worktrees
+
     worktrees_dir = root / "20-29_CODE" / "22_worktrees"
     if worktrees_dir.exists():
         for wt in sorted(worktrees_dir.iterdir(), key=lambda x: x.name):
@@ -555,10 +519,10 @@ def list_projects(
                 mtime = datetime.fromtimestamp(wt.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
                 table.add_row(wt.name, mtime, "[magenta]Worktree[/magenta]")
                 projects.append(wt)
-        
+
     console.print(table)
     console.print(f"\n[dim]Total: {len(projects)} projects[/dim]")
-    
+
     telemetry.track("Listed projects", category="discovery", action="list_projects")
 
 
@@ -570,11 +534,10 @@ def archive(
 ) -> None:
     """
     📦 Archive a project.
-    
+
     Moves the project from 21_monorepo_apps to 90-99_ARCHIVE_COLD/92_archived_projects/{year}.
     """
     import shutil
-    from datetime import datetime
     from rich.prompt import Confirm
     from devbase.utils.telemetry import get_telemetry
 
@@ -582,12 +545,11 @@ def archive(
     telemetry = get_telemetry(root)
 
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / name
-    
+
     if not project_path.exists():
         console.print(f"[red]✗ Project '{name}' not found at {project_path}[/red]")
         raise typer.Exit(1)
 
-    # Determine archive destination
     year = str(datetime.now().year)
     archive_root = root / "90-99_ARCHIVE_COLD" / "92_archived_projects" / year
     archive_path = archive_root / name
@@ -611,9 +573,9 @@ def archive(
 
         with console.status("[bold yellow]Archiving project...[/bold yellow]"):
             shutil.move(str(project_path), str(archive_path))
-        
+
         console.print(f"\n[green]✓[/green] Project archived to: {archive_path}")
-        
+
         telemetry.track(
             f"Archived project {name}",
             category="lifecycle",
@@ -621,7 +583,7 @@ def archive(
             metadata={"src": str(project_path), "dst": str(archive_path)}
         )
 
-    except Exception as e:
+    except OSError as e:
         console.print(f"[red]✗ Failed to archive: {e}[/red]")
         raise typer.Exit(1)
 
@@ -633,20 +595,18 @@ def update(
 ) -> None:
     """
     🔄 Update a project from its template.
-    
+
     Supports:
     - Copier (preferred): Runs 'copier update'
     - Legacy: Checks if hydration is possible (warns mainly)
     """
-    import shutil
-    import subprocess
     from devbase.utils.telemetry import get_telemetry
 
     root: Path = ctx.obj["root"]
     telemetry = get_telemetry(root)
-    
+
     project_path = root / "20-29_CODE" / "21_monorepo_apps" / name
-    
+
     if not project_path.exists():
         console.print(f"[red]✗ Project '{name}' not found[/red]")
         raise typer.Exit(1)
@@ -658,476 +618,34 @@ def update(
         border_style="blue"
     ))
 
-    # check for copier
     copier_answers = project_path / ".copier-answers.yml"
     copier_answers_alt = project_path / ".copier-answers.yaml"
-    
+
     if copier_answers.exists() or copier_answers_alt.exists():
         console.print("[dim]Detected Copier project. Running update...[/dim]")
-        
+
         try:
-             # Using subprocess to leverage copier CLI or we could import copier
-             # importing copier is safer for python usage if installed
-             import copier
-             
-             # Copier update typically needs to run inside the project root or specify it
-             # copier.run_update(project_path) is not exactly the API, usually it's run_update(src_path, dst_path...)
-             # But for update, we just need the destination if answers file exists.
-             # API: copier.run_update(dst_path=..., ...)
-             
-             copier.run_update(
-                 dst_path=str(project_path),
-                 unsafe=True, # We trust our templates
-                 overwrite=True,
-                 quiet=False
-             )
-             
-             console.print(f"[green]✓[/green] Project updated successfully!")
-             telemetry.track(f"Updated project {name}", category="lifecycle", action="update_project", status="success")
+            import copier
+
+            copier.run_update(
+                dst_path=str(project_path),
+                unsafe=True,
+                overwrite=True,
+                quiet=False
+            )
+
+            console.print(f"[green]✓[/green] Project updated successfully!")
+            telemetry.track(f"Updated project {name}", category="lifecycle", action="update_project", status="success")
 
         except ImportError:
-             console.print("[red]✗ Copier not installed.[/red]")
-             telemetry.track(f"Update failed {name}: copier missing", category="lifecycle", action="update_project", status="error")
-        except Exception as e:
-             console.print(f"[red]✗ Update failed: {e}[/red]")
-             telemetry.track(f"Update failed {name}: {e}", category="lifecycle", action="update_project", status="error")
-             
+            console.print("[red]✗ Copier not installed.[/red]")
+            telemetry.track(f"Update failed {name}: copier missing", category="lifecycle", action="update_project", status="error")
+        except OSError as e:
+            console.print(f"[red]✗ Update failed: {e}[/red]")
+            telemetry.track(f"Update failed {name}: {e}", category="lifecycle", action="update_project", status="error")
+
     else:
-        # Legacy/Unknown
         console.print("[yellow]⚠ Not a Copier project.[/yellow]")
         console.print("Legacy template hydration is strongly discouraged for manual updates.")
         console.print("Recommendation: Migrate to Copier for update capabilities.")
         telemetry.track(f"Update skipped {name}", category="lifecycle", action="update_project", status="skipped")
-
-
-@app.command(name="blueprint")
-def blueprint(
-    ctx: typer.Context,
-    description: Annotated[str, typer.Argument(help="Descrição do projeto (ex: 'API FastAPI com Redis')")],
-) -> None:
-    """
-    🏗️ Generate Dynamic Project Blueprint (IA).
-
-    Usa IA para gerar uma estrutura de projeto baseada na descrição,
-    inspirada em Clean Architecture.
-    """
-    import json
-    from rich.tree import Tree
-    from rich.prompt import Confirm
-    from devbase.adapters.ai.groq_adapter import GroqProvider
-    from devbase.services.security.sanitizer import sanitize_context
-    from devbase.services.project_setup import get_project_setup
-
-    root: Path = ctx.obj["root"]
-
-    console.print()
-    console.print(Panel.fit(
-        f"[bold blue]DevBase Blueprint Generator[/bold blue]\n\n"
-        f"Request: [cyan]{description}[/cyan]",
-        border_style="blue"
-    ))
-
-    provider = GroqProvider()
-
-    # Prompt for the AI
-    # We want a JSON structure: {"files": [{"path": "src/main.py", "content": "..."}]}
-    # We enforce Clean Arch inspiration.
-    prompt = f"""
-Generate a project file structure for: "{description}".
-Follow Clean Architecture principles (Domain, Use Cases, Interfaces, Infrastructure).
-Return ONLY a valid JSON object with this exact schema:
-{{
-  "project_name": "suggested-kebab-name",
-  "files": [
-    {{
-      "path": "relative/path/to/file.ext",
-      "content": "Minimal content/stub code..."
-    }}
-  ]
-}}
-Do not include markdown blocks or extra text.
-"""
-
-    with console.status("[bold green]🤖 Generating Blueprint...[/bold green]"):
-        try:
-            response = provider.generate(prompt, temperature=0.2, model="llama-3.3-70b-versatile")
-            # Cleanup potential markdown fencing
-            raw_json = response.content.strip()
-            if raw_json.startswith("```"):
-                raw_json = raw_json.strip("`").replace("json", "").strip()
-
-            plan = json.loads(raw_json)
-        except Exception as e:
-            console.print(f"[red]Failed to generate blueprint: {e}[/red]")
-            raise typer.Exit(1)
-
-    project_name = plan.get("project_name", "unnamed-project")
-    files = plan.get("files", [])
-
-    # Preview using Rich Tree
-    tree = Tree(f"📂 [bold cyan]{project_name}[/bold cyan]")
-
-    # Group by directories for display
-    # (Simple flat list to tree conversion for visualization)
-    target_dir = root / "20-29_CODE" / "21_monorepo_apps" / project_name
-
-    if target_dir.exists():
-         console.print(f"[red]Error: Project '{project_name}' already exists at {target_dir}[/red]")
-         raise typer.Exit(1)
-
-    for f in files:
-        tree.add(f"[green]📄 {f['path']}[/green]")
-
-    console.print(tree)
-    console.print()
-
-    if Confirm.ask("[bold]Confirmar criação desta estrutura?[/bold]", default=True):
-        console.print(f"\n[dim]Writing to {target_dir}...[/dim]")
-        target_dir.mkdir(parents=True, exist_ok=True)
-
-        for f in files:
-            path = target_dir / f['path']
-            content = f['content']
-
-            # Security check
-            # We don't want to overwrite anything outside target_dir
-            # sanitizer is for content, but we need path safety here.
-            try:
-                # Resolve ensures it's absolute
-                # relative_to ensures it's inside target_dir
-                full_path = (target_dir / path).resolve()
-                full_path.relative_to(target_dir.resolve())
-
-                full_path.parent.mkdir(parents=True, exist_ok=True)
-                full_path.write_text(content, encoding="utf-8")
-                console.print(f"  [green]✓[/green] {path}")
-            except Exception as e:
-                console.print(f"  [red]✗[/red] Skipped unsafe path {path}: {e}")
-
-        console.print(f"\n[bold green]✅ Project '{project_name}' created successfully![/bold green]")
-
-        # Optional: Run Golden Path Setup?
-        if Confirm.ask("Run Golden Path setup? (Git init, venv)", default=True):
-            setup_service = get_project_setup(root)
-            setup_service.run_golden_path(target_dir, project_name)
-    else:
-        console.print("[yellow]Aborted.[/yellow]")
-
-
-@app.command(name="adr-gen")
-def adr_gen(
-    ctx: typer.Context,
-    context: Annotated[str, typer.Option("--context", "-c", help="Context or reasoning for the decision")] = "",
-) -> None:
-    """
-    👻 Ghostwrite an ADR from recent activity.
-
-    Analyses recent 'track' events or uses provided context to generate
-    an Architecture Decision Record (MADR format).
-    """
-    root: Path = ctx.obj["root"]
-    ghostwriter = get_ghostwriter(root)
-
-    console.print()
-    console.print("[bold]ADR Ghostwriter[/bold]")
-
-    final_context = context
-
-    # If no manual context, scan recent events
-    if not final_context:
-        console.print("[dim]Scanning recent architecture events...[/dim]")
-        events = ghostwriter.find_recent_decisions()
-        if events:
-            console.print(f"[green]Found {len(events)} relevant events.[/green]")
-            lines = [f"- {e['message']} ({e['timestamp']})" for e in events]
-            final_context = "\n".join(lines)
-        else:
-            if not context:
-                console.print("[yellow]No recent architecture events found.[/yellow]")
-                from rich.prompt import Prompt
-                final_context = Prompt.ask("Please provide context for the ADR")
-
-    if final_context:
-        path = ghostwriter.generate_draft(final_context)
-        if path:
-            console.print(Panel.fit(
-                f"[bold green]✅ ADR Drafted![/bold green]\n\n"
-                f"Location: [cyan]{path}[/cyan]\n"
-                f"Review and edit before committing.",
-                border_style="green"
-            ))
-        else:
-            console.print("[red]Failed to generate ADR.[/red]")
-
-
-@app.command()
-def audit(
-    ctx: typer.Context,
-    fix: Annotated[
-        bool,
-        typer.Option("--fix", help="Automatically fix violations"),
-    ] = False,
-) -> None:
-    """
-    🔍 Audit workspace naming conventions (kebab-case).
-    
-    Scans all directories and reports violations of the kebab-case
-    naming convention required by DevBase.
-    """
-    root: Path = ctx.obj["root"]
-
-    console.print()
-    console.print("[bold]Auditing naming conventions...[/bold]")
-    console.print(f"Workspace: [cyan]{root}[/cyan]\n")
-
-
-    # Allowed patterns - IMPORTANT: Use raw strings (r"") for regex
-    allowed_patterns = [
-        r'^\d{2}-\d{2}_',                 # Johnny.Decimal areas (00-09_SYSTEM)
-        r'^\d{2}_',                       # Johnny.Decimal categories (00_inbox, 21_monorepo_apps)
-        r'^[a-z0-9]+(-[a-z0-9]+)*$',      # kebab-case (my-project)
-        r'^\d+(\.\d+)*$',                 # Versions (4.0.3)
-        r'^\.',                           # Dotfiles (.git, .vscode)
-        r'^__',                           # Dunder (__pycache__, __template-*)
-        r'^src$',                         # Common code folders
-        r'^tests?$',                      # test or tests
-        r'^docs?$',                       # doc or docs
-        r'^lib$',                         # lib folder
-    ]
-
-    # Ignore patterns - folders to skip entirely
-    default_ignore = [
-        'node_modules', '.git', '__pycache__', 'bin', 'obj', '.vs',
-        '.vscode', 'packages', 'vendor', 'dist', 'build', 'target',
-        '.telemetry', '.devbase', 'credentials', 'local', 'cloud',
-        # Standard code structure folders
-        'src', 'tests', 'test', 'docs', 'lib', 'scripts',
-        'application', 'domain', 'infrastructure', 'presentation',
-        'entities', 'value-objects', 'repositories', 'services', 'events',
-        'use-cases', 'dtos', 'mappers', 'interfaces',
-        'persistence', 'migrations', 'external', 'messaging',
-        'api', 'cli', 'web', 'unit', 'integration', 'e2e',
-        # Template internals
-        'ISSUE_TEMPLATE',
-    ]
-
-    violations = []
-
-    with console.status("[bold cyan]Auditing workspace...[/bold cyan]"):
-        for item in root.rglob('*'):
-            if not item.is_dir():
-                continue
-
-            name = item.name
-
-            # Check if should ignore
-            if name in default_ignore:
-                continue
-
-            # Skip anything inside known good structures
-            rel_parts = item.relative_to(root).parts
-            if any(part in default_ignore for part in rel_parts):
-                continue
-
-            # Check if name matches allowed patterns
-            is_allowed = any(re.match(pattern, name) for pattern in allowed_patterns)
-
-            if not is_allowed:
-                suggestion = re.sub(r'([a-z])([A-Z])', r'\1-\2', name).lower()
-                suggestion = re.sub(r'[_ ]', '-', suggestion)
-                violations.append({
-                    'path': item,
-                    'name': name,
-                    'suggestion': suggestion
-                })
-
-    if not violations:
-        console.print("[bold green]✅ No violations found[/bold green]")
-    else:
-        console.print(f"[yellow]Found {len(violations)} violation(s):[/yellow]\n")
-
-        for v in violations[:20]:
-            console.print(f"  [red]✗[/red] {v['name']}")
-            console.print(f"    [dim]→ Suggested: {v['suggestion']}[/dim]")
-            console.print(f"    [dim]  Path: {v['path']}[/dim]\n")
-
-        if len(violations) > 20:
-            console.print(f"[dim]... and {len(violations) - 20} more violations[/dim]\n")
-
-        if fix:
-            console.print("[bold]Applying fixes...[/bold]")
-            for v in violations:
-                try:
-                    new_path = v['path'].parent / v['suggestion']
-                    v['path'].rename(new_path)
-                    console.print(f"  [green]✓[/green] Renamed: {v['name']} → {v['suggestion']}")
-                except Exception as e:
-                    console.print(f"  [red]✗[/red] Failed: {v['name']} - {e}")
-
-
-# ============================================================================
-# WORKTREE COMMANDS
-# ============================================================================
-
-@app.command(name="worktree-add")
-def worktree_add(
-    ctx: typer.Context,
-    project_name: Annotated[str, typer.Argument(help="Parent project name")],
-    branch: Annotated[str, typer.Argument(help="Branch name to checkout")],
-    create: Annotated[
-        bool,
-        typer.Option("--create", "-c", help="Create new branch")
-    ] = False,
-    name: Annotated[
-        Optional[str],
-        typer.Option("--name", "-n", help="Custom worktree folder name")
-    ] = None,
-) -> None:
-    """
-    🌳 Create a new worktree for a project.
-    
-    Creates a worktree in 22_worktrees/<project>-<branch> (default).
-    
-    Examples:
-        devbase dev worktree-add MedSempreMVC_GIT feature/nova-rotina
-        devbase dev worktree-add MyProject feature/xyz --create
-        devbase dev worktree-add MyProject feature/xyz --name "my-feature-xyz"
-    """
-    from devbase.utils.worktree import add_worktree, get_worktree_dir
-    from devbase.utils.vscode import generate_vscode_workspace
-
-    root: Path = ctx.obj["root"]
-    project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
-    
-    if not project_path.exists():
-        console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
-        raise typer.Exit(1)
-    
-    if not (project_path / ".git").exists():
-        console.print(f"[red]✗ Project '{project_name}' is not a git repository.[/red]")
-        raise typer.Exit(1)
-    
-    worktrees_dir = get_worktree_dir(root)
-    worktree_path = add_worktree(project_path, worktrees_dir, project_name, branch, create, custom_name=name)
-    
-    if worktree_path:
-        # Generate workspace file
-        generate_vscode_workspace(worktree_path, worktree_path.name)
-        
-        console.print(Panel(
-            f"[bold green]✅ Worktree created![/bold green]\n\n"
-            f"Location: [cyan]{worktree_path}[/cyan]\n"
-            f"Branch: [yellow]{branch}[/yellow]\n\n"
-            f"Open with: [dim]devbase dev open {worktree_path.name}[/dim]",
-            border_style="green"
-        ))
-
-
-@app.command(name="worktree-list")
-def worktree_list(
-    ctx: typer.Context,
-    project_name: Annotated[str, typer.Argument(help="Project name to list worktrees for")] = None,
-) -> None:
-    """
-    🌳 List worktrees for a project or all projects.
-    
-    Examples:
-        devbase dev worktree-list
-        devbase dev worktree-list MedSempreMVC_GIT
-    """
-    from rich.table import Table
-    from devbase.utils.worktree import list_worktrees
-
-    root: Path = ctx.obj["root"]
-    apps_dir = root / "20-29_CODE" / "21_monorepo_apps"
-    
-    if project_name:
-        projects = [apps_dir / project_name]
-        if not projects[0].exists():
-            console.print(f"[red]✗ Project '{project_name}' not found.[/red]")
-            raise typer.Exit(1)
-    else:
-        projects = [p for p in apps_dir.iterdir() if p.is_dir() and (p / ".git").exists()]
-    
-    table = Table(title="Git Worktrees", show_header=True, header_style="bold magenta")
-    table.add_column("Project", style="cyan")
-    table.add_column("Branch", style="yellow")
-    table.add_column("Path")
-    table.add_column("Commit", style="dim")
-    
-    total = 0
-    for project in sorted(projects, key=lambda x: x.name):
-        worktrees = list_worktrees(project)
-        for wt in worktrees:
-            # Skip main worktree (it's the project itself)
-            if Path(wt["path"]) == project:
-                continue
-            table.add_row(
-                project.name,
-                wt.get("branch", "(detached)"),
-                Path(wt["path"]).name,
-                wt.get("commit", "")
-            )
-            total += 1
-    
-    if total == 0:
-        console.print("[dim]No worktrees found.[/dim]")
-        console.print("\nCreate one with:\n  [cyan]devbase dev worktree-add <project> <branch>[/cyan]")
-    else:
-        console.print(table)
-        console.print(f"\n[dim]Total: {total} worktrees[/dim]")
-
-
-@app.command(name="worktree-remove")
-def worktree_remove(
-    ctx: typer.Context,
-    worktree_name: Annotated[str, typer.Argument(help="Worktree name (from 22_worktrees/)")],
-    force: Annotated[
-        bool,
-        typer.Option("--force", "-f", help="Force removal even with uncommitted changes")
-    ] = False,
-) -> None:
-    """
-    🌳 Remove a worktree.
-    
-    Examples:
-        devbase dev worktree-remove MedSempreMVC_GIT--feature-xyz
-        devbase dev worktree-remove MyProject--hotfix --force
-    """
-    from devbase.utils.worktree import remove_worktree, get_worktree_dir
-
-    root: Path = ctx.obj["root"]
-    worktrees_dir = get_worktree_dir(root)
-    worktree_path = worktrees_dir / worktree_name
-    
-    if not worktree_path.exists():
-        console.print(f"[red]✗ Worktree '{worktree_name}' not found.[/red]")
-        raise typer.Exit(1)
-    
-    # Try to determine parent project from metadata
-    project_name = None
-    meta_file = worktree_path / ".devbase.json"
-    
-    if meta_file.exists():
-        try:
-            import json
-            meta = json.loads(meta_file.read_text(encoding="utf-8"))
-            project_name = meta.get("parent_project")
-        except:
-            pass
-            
-    # Fallback to legacy naming convention
-    if not project_name:
-        project_name = worktree_name.split("--")[0]
-    project_path = root / "20-29_CODE" / "21_monorepo_apps" / project_name
-    
-    if not project_path.exists():
-        console.print(f"[yellow]⚠ Parent project '{project_name}' not found. Removing directory only.[/yellow]")
-        import shutil
-        shutil.rmtree(worktree_path)
-        console.print(f"[green]✓[/green] Removed worktree directory: {worktree_name}")
-        return
-    
-    success = remove_worktree(project_path, worktree_path, force)
-    if not success:
-        raise typer.Exit(1)
