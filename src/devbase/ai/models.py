@@ -44,6 +44,10 @@ class OrganizationSuggestion(BaseModel):
         min_length=10,
         description="Explanation of why this organization was suggested",
     )
+    metadata: dict = Field(
+        default_factory=dict,
+        description="Semantic metadata for the file (title, description, scope, etc.)"
+    )
 
 
 class Insight(BaseModel):

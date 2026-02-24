@@ -18,14 +18,17 @@ Commands:
 import os
 import json
 import re
+import shutil
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List
 
 import typer
+import questionary
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.table import Table
 from typing_extensions import Annotated
 
@@ -68,8 +71,8 @@ def _get_service():
     return AIService(provider)
 
 
-@app.command()
-def config() -> None:
+@app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+def config(ctx: typer.Context) -> None:
     """Configure AI provider API key.
     
     Interactively prompts for and saves the Groq API key
@@ -129,7 +132,8 @@ def config() -> None:
         except Exception:
             pass
         
-        console.print(f"\n[green]✓[/green] API key saved to: [cyan]{config_file}[/cyan]")
+        console.print(f"\n[green]✓[/green] Configuration written successfully.")
+        console.print(f"[dim]Saved to: {config_file}[/dim]")
         
         # Test connection
         console.print("\n[dim]Testing connection...[/dim]")
@@ -145,19 +149,35 @@ def config() -> None:
         raise typer.Exit(1)
 
 
-@app.command()
-def organize(
-    path: Annotated[str, typer.Argument(help="File to organize")],
+@app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+def organize(ctx: typer.Context,
+    path: Annotated[
+        Optional[str], 
+        typer.Argument(help="File or directory to organize")
+    ] = None,
     auto: Annotated[
         bool,
         typer.Option("--auto", "-a", help="Move file automatically without confirmation"),
     ] = False,
-    ctx: typer.Context = None,
 ) -> None:
     """Suggest organization for a file using AI."""
     from devbase.ai.exceptions import DevBaseAIError
+    import questionary
     
+    # Interactive selection if path is missing
+    if not path:
+        console.print("[yellow]ℹ No path provided. Entering interactive mode...[/yellow]")
+        path = questionary.text(
+            "Which file or directory do you want to organize?",
+            instruction="Enter path (e.g., ./my-file.txt or . )"
+        ).ask()
+        
+        if not path:
+            console.print("[red]✗[/red] Operation cancelled.")
+            return
+
     file_path = Path(path)
+
     if not file_path.exists():
         console.print(f"[red]✗[/red] File not found: {path}")
         raise typer.Exit(1)
@@ -185,16 +205,68 @@ def organize(
     table.add_row("Reasoning:", suggestion.reasoning)
     
     console.print(Panel(table, title="[bold]📁 Organization Suggestion[/bold]", border_style="blue"))
+    
+    # ── Execution Logic ──────────────────────────────────────────────────
+    
+    target_dir = (workspace_root / suggestion.destination) if workspace_root else Path(suggestion.destination)
+    new_file_name = suggestion.new_name or file_path.name
+    final_path = target_dir / new_file_name
+    
+    def perform_move():
+        try:
+            # Ensure destination exists
+            target_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Metadata Injection (for Markdown files)
+            if file_path.suffix.lower() == ".md" and suggestion.metadata:
+                try:
+                    content = file_path.read_text(encoding="utf-8")
+                    
+                    # Today's date
+                    from datetime import date
+                    today = date.today().isoformat()
+                    
+                    # Build Frontmatter
+                    meta = suggestion.metadata
+                    header = "---\n"
+                    header += f"title: \"{meta.get('title', 'Untitled')}\"\n"
+                    header += f"description: \"{meta.get('description', '')}\"\n"
+                    header += f"version: \"{meta.get('version', '1.0.0')}\"\n"
+                    header += f"generated: \"{today}\"\n"
+                    header += f"scope: \"{meta.get('scope', 'General')}\"\n"
+                    header += "---\n\n"
+                    
+                    # Avoid double header if already exists
+                    if not content.startswith("---"):
+                        file_path.write_text(header + content, encoding="utf-8")
+                except Exception as e:
+                    console.print(f"[dim]Note: Metadata injection failed: {e}[/dim]")
+
+            # Check for conflict
+            if final_path.exists():
+                console.print(f"[yellow]⚠ Conflict:[/yellow] {final_path} already exists.")
+                if not questionary.confirm("Overwrite?").ask():
+                    console.print("[red]✗[/red] Aborted.")
+                    return
+
+            # Perform Move
+            shutil.move(str(file_path), str(final_path))
+            console.print(f"\n[green]✓ Successfully moved to:[/green] [bold]{final_path}[/bold]")
+        except Exception as e:
+            console.print(f"[red]✗ Failed to move file: {e}[/red]")
+
     if auto:
-        console.print("\n[yellow]⚠[/yellow] Auto-move not implemented yet.")
+        perform_move()
     else:
-        console.print("\n[dim]Use --auto to move the file automatically.[/dim]")
+        if questionary.confirm(f"\nMove file to {suggestion.destination}?").ask():
+            perform_move()
+        else:
+            console.print("\n[dim]No changes made. Use --auto to skip this prompt.[/dim]")
 
 
-@app.command()
-def insights(
+@app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+def insights(ctx: typer.Context,
     path: Annotated[Optional[str], typer.Option("--path", "-p", help="Directory to analyze")] = None,
-    ctx: typer.Context = None,
 ) -> None:
     """Generate insights about workspace structure."""
     from devbase.ai.exceptions import DevBaseAIError
@@ -230,7 +302,7 @@ def insights(
         console.print(f"   {insight.description}\n")
 
 
-@app.command()
+@app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 def status(ctx: typer.Context) -> None:
     """Check AI provider configuration status."""
     console.print("\n[bold]🤖 AI Status[/bold]\n")
@@ -271,150 +343,212 @@ def status(ctx: typer.Context) -> None:
 
 @app.command("index")
 def index(
+    ctx: typer.Context,
     rebuild: Annotated[bool, typer.Option("--rebuild", help="Force rebuild of entire index")] = False,
-    ctx: typer.Context = None,
 ) -> None:
-    """🔍 Index workspace for semantic search."""
+    """🔍 Index workspace for semantic search (Local RAG)."""
     try:
         from devbase.services.search_engine import SearchEngine
     except ImportError as e:
-        console.print(f"[red]Import error:[/red] {e}")
+        console.print(f"[red]✗ System modules missing:[/red] {e}")
         raise typer.Exit(1)
 
     engine = SearchEngine()
-    root = ctx.obj["root"] if ctx and ctx.obj and ctx.obj.get("root") else Path.cwd()
+    root = ctx.obj["root"]
     
-    with console.status("[bold blue]Indexing workspace...[/bold blue]"):
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        console=console,
+        transient=True
+    ) as progress:
+        task = progress.add_task("[cyan]Indexing Knowledge Graph...", total=None)
         try:
+            # We assume rebuild_index takes a progress callback or handles it internally
             engine.rebuild_index(root)
+            progress.update(task, description="[green]✓ Knowledge Graph indexed.")
         except Exception as e:
-            console.print(f"[red]Error:[/red] {e}")
+            console.print(f"[red]✗ Indexing failed:[/red] {e}")
             raise typer.Exit(1)
-    console.print("[green]✓[/green] Indexing complete.")
+    console.print(Panel("[bold green]✓ Semantic Index Ready[/bold green]\nYou can now use [cyan]devbase ai chat[/cyan] for context-aware questions.", border_style="green"))
 
 
 @app.command("chat")
 def chat(
-    prompt: Annotated[str, typer.Argument(help="Message to AI")],
-    model: Annotated[Optional[str], typer.Option("--model", "-m", help="Provider model")] = None,
-    temperature: Annotated[float, typer.Option("--temp", "-t", help="Creativity (0.0-1.0)")] = 0.5,
+    ctx: typer.Context,
+    prompt: Annotated[List[str], typer.Argument(help="Message to AI")],
+    temperature: Annotated[float, typer.Option("--temp", "-t", help="Creativity (0.0-1.0)")] = 0.2,
 ) -> None:
-    """💬 Chat with your workspace using RAG."""
+    """💬 Chat with your workspace using RAG (Context-Aware)."""
     provider = _get_provider()
+    
+    # Re-join prompt if it was split by shell
+    final_user_prompt = " ".join(prompt)
     
     # Try RAG Retrieval
     context = ""
     try:
         from devbase.services.search_engine import SearchEngine
         engine = SearchEngine()
-        with console.status("[bold blue]Retrieving context...[/bold blue]"):
-             results = engine.search(prompt, limit=3)
+        with Progress(SpinnerColumn(), TextColumn("[dim]Consulting Knowledge Base...[/dim]"), console=console, transient=True) as progress:
+             progress.add_task("searching", total=None)
+             results = engine.search(final_user_prompt, limit=5)
              if results:
-                 context = "\n\n".join([f"Source: {r.file_path}\n{r.content}" for r in results])
-                 console.print(f"[dim]Found {len(results)} relevant context chunks.[/dim]")
+                 context = "\n\n".join([f"SOURCE [{r.file_path}]:\n{r.content}" for r in results])
     except Exception:
         pass
 
-    final_prompt = prompt
+    final_prompt = final_user_prompt
     if context:
-        final_prompt = f"Use the following context to answer the user's question.\nContext:\n{context}\n\nQuestion: {prompt}"
+        final_prompt = f"""You are the DevBase AI Assistant. Answer the question using ONLY the provided workspace context.
+If the answer is not in the context, state that you don't know based on the current workspace data.
 
-    with console.status("[bold blue]Thinking...[/bold blue]"):
+WORKSPACE CONTEXT:
+{context}
+
+USER QUESTION: {final_user_prompt}
+"""
+
+    with Progress(SpinnerColumn(), TextColumn("[bold cyan]Synthesizing response...[/bold cyan]"), console=console, transient=True) as progress:
+        progress.add_task("thinking", total=None)
         try:
-            # We assume provider has a generate method (re-mapped from complete in some versions)
-            # or we use complete directly. GroqProvider uses complete.
-            try:
-                response_text = provider.complete(final_prompt, temperature=temperature)
-            except AttributeError:
-                # Fallback to generate if implemented in some PRs
-                response = provider.generate(final_prompt, temperature=temperature)
-                response_text = response.content
-            
+            response_text = provider.complete(final_prompt, temperature=temperature)
             console.print()
-            console.print(Panel(response_text, title="[bold green]🤖 AI Response[/bold green]", border_style="green"))
+            console.print(Panel(response_text, title="[bold green]🤖 Workspace Intelligence[/bold green]", border_style="green", padding=(1, 2)))
         except Exception as e:
-            console.print(f"[red]Error:[/red] {e}")
+            console.print(f"[red]✗ Synthesis error:[/red] {e}")
             raise typer.Exit(1)
 
 
 @app.command("classify")
 def classify(
     text: Annotated[str, typer.Argument(help="Text to classify")],
-    categories: Annotated[str, typer.Option("--categories", "-c", help="Comma-separated list")] = "feature,bug,docs,chore,refactor",
+    categories: Annotated[str, typer.Option("--categories", "-c", help="Target categories")] = "feature,bug,docs,refactor",
 ) -> None:
-    """🏷️ Classify text into a category."""
+    """🏷️ Classify text into a technical category."""
     provider = _get_provider()
-    category_list = [c.strip() for c in categories.split(",")]
-    with console.status("[bold blue]Classifying...[/bold blue]"):
+    prompt = f"""You are a Systems Architect. Classify the following engineering input into exactly ONE of these categories: [{categories}].
+Respond with only the category name.
+
+INPUT: {text}
+"""
+    with Progress(SpinnerColumn(), TextColumn("[bold blue]Classifying semantic intent...[/bold blue]"), console=console, transient=True) as progress:
+        progress.add_task("task", total=None)
         try:
-            # Note: provider.classify might be expected by some PRs
-            result = provider.complete(f"Classify this text into one of [{','.join(category_list)}]: {text}\n\nCategory:")
-            console.print(f"\n[bold green]Category:[/bold green] {result.strip()}")
+            result = provider.complete(prompt, temperature=0.0)
+            console.print(f"\n[bold]Classification:[/bold] [cyan]{result.strip().lower()}[/cyan]")
         except Exception as e:
-            console.print(f"[red]Error:[/red] {e}")
+            console.print(f"[red]✗ Classification failed:[/red] {e}")
 
 
 @app.command("summarize")
 def summarize(
     text: Annotated[str, typer.Argument(help="Text to summarize")],
-    max_length: Annotated[int, typer.Option("--max-length", "-l")] = 50,
+    max_length: Annotated[int, typer.Option("--max-length", "-l")] = 100,
 ) -> None:
-    """📝 Summarize text."""
+    """📝 Generate a technical executive summary."""
     provider = _get_provider()
-    with console.status("[bold blue]Summarizing...[/bold blue]"):
+    prompt = f"""You are a Systems Architect. Summarize this technical text focusing on DECISIONS and IMPACT.
+Limit to {max_length} words. Maintain original language.
+
+TEXT: {text}
+"""
+    with Progress(SpinnerColumn(), TextColumn("[bold magenta]Synthesizing summary...[/bold magenta]"), console=console, transient=True) as progress:
+        progress.add_task("task", total=None)
         try:
-            result = provider.complete(f"Summarize this text in max {max_length} words: {text}")
-            console.print(f"\n[bold green]Summary:[/bold green]\n{result.strip()}")
+            result = provider.complete(prompt, temperature=0.2)
+            console.print(Panel(result.strip(), title="[bold]📝 Executive Summary[/bold]", border_style="magenta"))
         except Exception as e:
-            console.print(f"[red]Error:[/red] {e}")
+            console.print(f"[red]✗ Summary failed:[/red] {e}")
 
 
 @routine_app.command("briefing")
-def briefing() -> None:
-    """🌅 Daily morning briefing."""
+def briefing(ctx: typer.Context) -> None:
+    """🌅 High-level morning briefing (Status & Goals)."""
     try:
         from devbase.services.routine_agent import RoutineAgent
     except ImportError as e:
-        console.print(f"[red]Import error:[/red] {e}")
+        console.print(f"[red]✗ System modules missing:[/red] {e}")
         raise typer.Exit(1)
 
-    agent = RoutineAgent()
-    pending = agent.get_yesterday_pending()
-    console.print()
-    console.print(Panel("\n".join([f"- {task}" for task in pending]), title="[bold yellow]🌅 Morning Briefing: Pending Tasks[/bold yellow]", border_style="yellow"))
+    root = ctx.obj["root"]
+    agent = RoutineAgent(root_path=root)
+    
+    with Progress(SpinnerColumn(), TextColumn("[bold yellow]Generating daily briefing...[/bold yellow]"), console=console, transient=True) as progress:
+        progress.add_task("briefing", total=None)
+        yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        summary = agent.generate_daybook_summary(yesterday_str)
+        pending = agent.get_yesterday_pending()
+
+    # ── UI Display ───────────────────────────────────────────────────
+    
+    console.print(Panel.fit(
+        f"[bold cyan]Good Morning![/bold cyan]\nToday is {datetime.now().strftime('%A, %B %d')}",
+        border_style="blue"
+    ))
+
+    # Yesterday's Narrative
+    console.print(Panel(
+        summary.log_narrative,
+        title="[bold]📅 Yesterday Recap[/bold]",
+        subtitle=f"Commits: {summary.metrics.get('commits', 0)}",
+        border_style="dim"
+    ))
+
+    # Pending Tasks
+    table = Table(show_header=False, box=None, padding=(0, 1))
+    for task in pending:
+        table.add_row(f"  [yellow]➜[/yellow] {task}")
+    
+    console.print(Panel(table, title="[bold yellow]🔜 Pending from Journal[/bold yellow]", border_style="yellow"))
 
 
 @routine_app.command("triage")
 def triage(
     ctx: typer.Context,
-    apply: Annotated[bool, typer.Option("--apply", help="Automatically move files")] = False,
+    auto: Annotated[bool, typer.Option("--auto", "-a", help="Move files automatically")] = False,
 ) -> None:
-    """📥 Inbox triage and classification."""
-    from rich.prompt import Confirm
+    """📥 Intelligent Inbox Triage."""
     try:
         from devbase.services.routine_agent import RoutineAgent
     except ImportError as e:
-        console.print(f"[red]Import error:[/red] {e}")
+        console.print(f"[red]✗ System modules missing:[/red] {e}")
         raise typer.Exit(1)
 
-    root = ctx.obj["root"] if ctx and ctx.obj and "root" in ctx.obj else None
+    root = ctx.obj["root"]
     agent = RoutineAgent(root_path=root)
     files = agent.scan_inbox()
+    
     if not files:
-        console.print("[green]Inbox is empty! 🎉[/green]")
+        console.print(Panel("[green]✓ Inbox is clean. You are in total control![/green]", title="[bold]📥 Triage[/bold]", border_style="green"))
         return
 
+    console.print(f"\n[bold]Found {len(files)} items in Inbox.[/bold]\n")
+
     for file_path in files:
-        console.print(f"📄 [bold]{file_path.name}[/bold]")
-        try:
-            content = file_path.read_text(encoding="utf-8")
-            with console.status("  Analyzing..."):
-                result = agent.classify_inbox_item(content)
-            category = result["category"]
-            console.print(f"  ➜ Suggested: [cyan]{category}[/cyan]")
-            if apply or Confirm.ask(f"  Move to {category}?", default=False):
-                if agent.move_to_category(file_path, category):
-                    console.print(f"  [green]✓ Moved[/green]")
-        except Exception as e:
-            console.print(f"  [red]✗ Error: {e}[/red]")
-        console.print()
+        suggestion = None
+        # 1. AI Analysis (with Spinner)
+        with Progress(SpinnerColumn(), TextColumn(f"[cyan]Analyzing [bold]{file_path.name}[/bold]...[/cyan]"), console=console, transient=True) as progress:
+            progress.add_task("analyze", total=None)
+            try:
+                from devbase.services.container import ServiceContainer
+                service = ServiceContainer(root).ai
+                suggestion = service.suggest_organization(str(file_path), workspace_root=root)
+            except Exception as e:
+                console.print(f"   [red]✗ AI Error:[/red] {e}")
+                continue
+
+        # 2. Results and Interaction (Outside Progress context)
+        if suggestion:
+            console.print(f"📄 [bold]{file_path.name}[/bold]")
+            console.print(f"   [dim]Target:[/dim] [green]{suggestion.destination}[/green]")
+            console.print(f"   [dim]Reason:[/dim] {suggestion.reasoning}\n")
+            
+            if auto or questionary.confirm(f"   Move to {suggestion.destination}?").ask():
+                agent.move_to_category(file_path, suggestion.destination)
+                console.print(f"   [green]✓ Organized.[/green]")
+            else:
+                console.print(f"   [yellow]⚠ Skipped.[/yellow]")
+        
+        console.print("[dim]──────────────────────────────────────────────────[/dim]")

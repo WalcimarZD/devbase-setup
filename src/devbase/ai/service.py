@@ -16,25 +16,49 @@ from devbase.ai.models import Insight, OrganizationSuggestion, WorkspaceAnalysis
 logger = logging.getLogger(__name__)
 
 # System prompts for AI interactions
-ORGANIZATION_SYSTEM_PROMPT = """You are a file organization assistant for a Johnny.Decimal workspace.
-Johnny.Decimal is a system for organizing files using numbered categories.
-Respond ONLY with valid JSON in this exact format:
+ORGANIZATION_SYSTEM_PROMPT = """You are a Principal Systems Architect. Your task is to analyze the NATURE and INTENT of a document to place it within a Johnny.Decimal hierarchy.
+
+LOGICAL CATEGORIZATION FRAMEWORK:
+1. SYSTEMIC (00-09): Documents that establish metadata, meta-processes, and "rules of the game." If the file defines HOW work is governed, audited, or structured across the entire workspace, it belongs here.
+2. EPISTEMIC (10-19): Documents that represent specialized technical knowledge, research, architectural blueprints, or high-level decisions. If the file is a source of truth for "the design" but not "the build," it belongs here.
+3. PRODUCTIVE (20-29): The active workshop. Source code, monorepos, and files that are directly part of a project's implementation.
+4. INSTRUMENTAL (30-39): Tools, scripts, and logs that support the infrastructure.
+
+DECISION HEURISTIC:
+- Analyze if the content is META (rules about work), ARCHITECTURAL (design of the system), or IMPLEMENTATION (the code itself).
+- Maintain the original language's nuance.
+- Use only the provided directory structure as a baseline, but suggest the most logical functional fit.
+
+JSON Format:
 {
-  "destination": "XX-XX_AREA/XX_category/optional_subcategory",
-  "new_name": "suggested-name.ext" or null,
-  "confidence": 0.85,
-  "reasoning": "Brief explanation here"
+  "destination": "XX-XX_AREA/XX_category",
+  "new_name": "semantic-descriptive-name.md",
+  "confidence": 0.98,
+  "reasoning": "A deep semantic analysis explaining WHY this specific functional area was chosen based on the document's intent.",
+  "metadata": {
+    "title": "Human Readable Title",
+    "description": "Executive summary",
+    "scope": "Who or what this affects",
+    "version": "1.0.0"
+  }
 }"""
 
-INSIGHTS_SYSTEM_PROMPT = """You are a workspace analyst for a Johnny.Decimal organized workspace.
-Respond ONLY with valid JSON in this exact format:
+INSIGHTS_SYSTEM_PROMPT = """You are a Systems Auditor specializing in High-Performance Engineering Workspaces.
+Analyze the provided directory tree to detect structural entropy, knowledge silos, or naming inconsistencies.
+
+FOCUS AREAS:
+1. ARCHITECTURE: Is the Johnny.Decimal structure being respected? Are areas being mixed?
+2. OPTIMIZATION: Are there redundant paths or cluttered deep hierarchies?
+3. ORGANIZATION: Is the naming convention (kebab-case) and area boundaries enforced?
+
+JSON Format:
 {
   "score": 85,
   "insights": [
     {
       "category": "architecture|optimization|organization",
-      "title": "Brief title",
-      "description": "Detailed explanation and recommendation",
+      "title": "Concise high-level finding",
+      "description": "Deep analysis of the impact and a specific recommendation to fix it.",
       "severity": "info|suggestion|warning"
     }
   ]
@@ -46,6 +70,21 @@ class AIService:
     def __init__(self, provider: LLMProvider) -> None:
         self.provider = provider
     
+    def _get_workspace_tree(self, root: Path) -> str:
+        """Generates a text representation of the directory tree."""
+        tree = []
+        try:
+            # Only list top 2 levels of directories to keep context window clean
+            for item in sorted(root.glob("*")):
+                if item.is_dir() and not item.name.startswith("."):
+                    tree.append(item.name)
+                    for sub in sorted(item.glob("*")):
+                        if sub.is_dir() and not sub.name.startswith("."):
+                            tree.append(f"  {item.name}/{sub.name}")
+        except Exception:
+            pass
+        return "\n".join(tree) if tree else "Empty or inaccessible"
+
     def _safe_json_extract(self, text: str) -> Dict[str, Any]:
         """Extracts and parses the first JSON object found in text."""
         try:
@@ -76,24 +115,29 @@ class AIService:
         if not path.exists():
             raise ValueError(f"File not found: {file_path}")
         
+        # Context Gathering
+        tree_context = ""
+        if workspace_root:
+            tree_context = f"\nAVAILABLE DIRECTORIES:\n{self._get_workspace_tree(workspace_root)}"
+        
         file_name = path.name
         file_ext = path.suffix.lower()
         file_size = path.stat().st_size
         
         content_preview = ""
-        if file_ext in {".md", ".txt", ".py"} and file_size < 50000:
+        if file_ext in {".md", ".txt", ".py", ".pdf", ".docx"} and file_size < 100000:
             try:
-                content_preview = path.read_text(encoding="utf-8")[:500]
+                content_preview = path.read_text(encoding="utf-8")[:1000]
             except Exception:
                 content_preview = "[Unable to read file content]"
         
-        prompt = f"Analyze file: {file_name}\nExt: {file_ext}\nContent: {content_preview}"
+        prompt = f"FILE TO ORGANIZE: {file_name}\nPREVIEW: {content_preview}\n{tree_context}"
 
         response = self.provider.complete(
             prompt,
             system_prompt=ORGANIZATION_SYSTEM_PROMPT,
-            temperature=0.1,
-            max_tokens=300,
+            temperature=0.0, # Maximum precision
+            max_tokens=400,
         )
         
         data = self._safe_json_extract(response)
@@ -103,6 +147,7 @@ class AIService:
             new_name=data.get("new_name"),
             confidence=float(data.get("confidence", 0.3)),
             reasoning=data.get("reasoning", "AI response parsing failed or returned invalid data."),
+            metadata=data.get("metadata", {})
         )
 
     def generate_insights(self, workspace_path: str = ".") -> WorkspaceAnalysis:
