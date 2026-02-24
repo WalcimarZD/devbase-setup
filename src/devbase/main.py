@@ -31,24 +31,25 @@ try:
 except Exception:
     __version__ = "5.1.0-alpha.4"
 
-# Progressive Disclosure panel assignments with explicit descending ordering
+# Progressive Disclosure panel assignments with logical ordering
+# Prefix with numbers to control lexicographic order
 PANEL_MAP: dict[str, tuple[str, str]] = {
     # name: (help text, panel)
-    "core":        ("🏠 [bold green]Workspace Management[/bold green]\nSetup, health checks, and environment repair.", "04. 🟢 Essentials (Start Here)"),
-    "dev":         ("📦 [bold green]Project Lifecycle[/bold green]\nScaffold new projects and manage development worktrees.", "04. 🟢 Essentials (Start Here)"),
-    "nav":         ("🧭 [bold green]Smart Navigation[/bold green]\nJump between Johnny.Decimal folders instantly.", "04. 🟢 Essentials (Start Here)"),
-    
-    "ops":         ("📊 [bold blue]Daily Operations[/bold blue]\nActivity tracking, backups, and automation maintenance.", "03. 🟡 Daily Workflow"),
-    "quick":       ("⚡ [bold blue]Productivity Shortcuts[/bold blue]\nOne-command workflows for repetitive tasks.", "03. 🟡 Daily Workflow"),
-    "audit":       ("🛡️ [bold blue]System Auditing[/bold blue]\nEnforce naming conventions and Johnny.Decimal integrity.", "03. 🟡 Daily Workflow"),
-    "docs":        ("📚 [bold blue]Documentation[/bold blue]\nGenerate and manage workspace documentation.", "03. 🟡 Daily Workflow"),
-    
-    "ai":          ("🧠 [bold magenta]Cognitive Engine[/bold magenta]\nAI-powered organization, RAG search, and triage.", "02. 🔵 Advanced & AI"),
-    "pkm":         ("🧠 [bold magenta]Knowledge Management[/bold magenta]\nBuild and query your personal knowledge graph.", "02. 🔵 Advanced & AI"),
-    "analytics":   ("📈 [bold magenta]Usage Analytics[/bold magenta]\nProductivity insights and data-driven reporting.", "02. 🔵 Advanced & AI"),
-    "study":       ("📚 [bold magenta]Learning System[/bold magenta]\nSpaced repetition and technical study management.", "02. 🔵 Advanced & AI"),
-    
-    "self-update": ("🔄 [bold white]System Update[/bold white]\nUpdate DevBase to the latest version.", "01. ⚙️ System & Maintenance"),
+    "core":        ("🏠 [bold green]Workspace Management[/bold green]\nSetup, health checks, and environment repair.", "01 🟢 Essentials (Start Here)"),
+    "dev":         ("📦 [bold green]Project Lifecycle[/bold green]\nScaffold new projects and manage development worktrees.", "01 🟢 Essentials (Start Here)"),
+    "nav":         ("🧭 [bold green]Smart Navigation[/bold green]\nJump between Johnny.Decimal folders instantly.", "01 🟢 Essentials (Start Here)"),
+
+    "ops":         ("📊 [bold blue]Daily Operations[/bold blue]\nActivity tracking, backups, and automation maintenance.", "02 🟡 Daily Workflow"),
+    "quick":       ("⚡ [bold blue]Productivity Shortcuts[/bold blue]\nOne-command workflows for repetitive tasks.", "02 🟡 Daily Workflow"),
+    "audit":       ("🛡️ [bold blue]System Auditing[/bold blue]\nEnforce naming conventions and Johnny.Decimal integrity.", "02 🟡 Daily Workflow"),
+    "docs":        ("📚 [bold blue]Documentation[/bold blue]\nGenerate and manage workspace documentation.", "02 🟡 Daily Workflow"),
+
+    "self-update": ("🔄 [bold white]System Update[/bold white]\nUpdate DevBase to the latest version.", "03 ⚙️ System & Maintenance"),
+
+    "ai":          ("🧠 [bold magenta]Cognitive Engine[/bold magenta]\nAI-powered organization, RAG search, and triage.", "04 🔵 Advanced & AI"),
+    "pkm":         ("🧠 [bold magenta]Knowledge Management[/bold magenta]\nBuild and query your personal knowledge graph.", "04 🔵 Advanced & AI"),
+    "analytics":   ("📈 [bold magenta]Usage Analytics[/bold magenta]\nProductivity insights and data-driven reporting.", "04 🔵 Advanced & AI"),
+    "study":       ("📚 [bold magenta]Learning System[/bold magenta]\nSpaced repetition and technical study management.", "04 🔵 Advanced & AI"),
 }
 
 # Initialize Typer app with rich help
@@ -74,6 +75,8 @@ def _discover_commands() -> None:
 
     Each entry point in the 'devbase.commands' group is loaded lazily
     and registered as a Typer sub-app with its panel assignment.
+
+    Commands are registered in panel order to ensure correct display order.
     """
     eps = entry_points()
 
@@ -83,26 +86,68 @@ def _discover_commands() -> None:
     else:
         command_eps = eps.get("devbase.commands", [])
 
-    for ep in command_eps:
-        try:
-            cmd_app = ep.load()
-            help_text, panel = PANEL_MAP.get(
-                ep.name, (f"{ep.name} commands", "02. 🔵 Advanced & AI")
-            )
-            app.add_typer(
-                cmd_app,
-                name=ep.name,
-                help=help_text,
-                rich_help_panel=panel,
-            )
-        except Exception as e:
-            # Always visible — a silent drop here is worse than a noisy warning.
-            print(
-                f"[devbase] WARNING: failed to load plugin '{ep.name}': "
-                f"{type(e).__name__}: {e}",
-                file=sys.stderr,
-            )
-            logger.debug("Plugin load traceback:", exc_info=True)
+    # Convert to list and create a mapping for ordered registration
+    eps_list = list(command_eps)
+    eps_by_name = {ep.name: ep for ep in eps_list}
+
+    # Define registration order by panel priority
+    registration_order = [
+        # 01. Essentials (Start Here)
+        "core", "dev", "nav",
+        # 02. Daily Workflow
+        "ops", "quick", "audit", "docs",
+        # 03. System & Maintenance
+        "self-update",
+        # 04. Advanced & AI
+        "ai", "analytics", "pkm", "study",
+    ]
+
+    # Register in specified order, then any remaining commands
+    registered = set()
+    for cmd_name in registration_order:
+        if cmd_name in eps_by_name:
+            ep = eps_by_name[cmd_name]
+            registered.add(cmd_name)
+            try:
+                cmd_app = ep.load()
+                help_text, panel = PANEL_MAP.get(
+                    ep.name, (f"{ep.name} commands", "04 🔵 Advanced & AI")
+                )
+                app.add_typer(
+                    cmd_app,
+                    name=ep.name,
+                    help=help_text,
+                    rich_help_panel=panel,
+                )
+            except Exception as e:
+                print(
+                    f"[devbase] WARNING: failed to load plugin '{ep.name}': "
+                    f"{type(e).__name__}: {e}",
+                    file=sys.stderr,
+                )
+                logger.debug("Plugin load traceback:", exc_info=True)
+
+    # Register any remaining commands not in the order list
+    for ep in eps_list:
+        if ep.name not in registered:
+            try:
+                cmd_app = ep.load()
+                help_text, panel = PANEL_MAP.get(
+                    ep.name, (f"{ep.name} commands", "04 🔵 Advanced & AI")
+                )
+                app.add_typer(
+                    cmd_app,
+                    name=ep.name,
+                    help=help_text,
+                    rich_help_panel=panel,
+                )
+            except Exception as e:
+                print(
+                    f"[devbase] WARNING: failed to load plugin '{ep.name}': "
+                    f"{type(e).__name__}: {e}",
+                    file=sys.stderr,
+                )
+                logger.debug("Plugin load traceback:", exc_info=True)
 
 
 # Discover and register commands at import-time
@@ -188,7 +233,7 @@ def main(
 
 # ── Self-update command ─────────────────────────────────────────────
 
-@app.command(name="self-update", rich_help_panel="01. ⚙️ System & Maintenance")
+@app.command(name="self-update", rich_help_panel="03 ⚙️ System & Maintenance")
 def self_update() -> None:
     """🔄 Update DevBase to the latest version (works from anywhere)."""
     import subprocess as sp
