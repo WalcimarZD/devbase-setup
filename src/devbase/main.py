@@ -12,6 +12,7 @@ Version: Dynamic (see __init__.py)
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from importlib.metadata import entry_points
 from pathlib import Path
@@ -25,27 +26,40 @@ from devbase.utils.workspace import detect_workspace_root
 
 logger = logging.getLogger(__name__)
 
-# Progressive Disclosure panel assignments
-# Commands not listed here default to "🔵 Advanced"
+try:
+    __version__ = "5.1.0-alpha.4"
+except Exception:
+    __version__ = "5.1.0-alpha.4"
+
+# Progressive Disclosure panel assignments with explicit descending ordering
 PANEL_MAP: dict[str, tuple[str, str]] = {
     # name: (help text, panel)
-    "core":      ("🏠 Workspace health & setup",     "🟢 Essentials (Start Here)"),
-    "dev":       ("📦 Create and manage projects",    "🟢 Essentials (Start Here)"),
-    "nav":       ("🧭 Navigate folders quickly",      "🟢 Essentials (Start Here)"),
-    "audit":     ("🛡️ Consistency & Health",          "🟡 Daily Workflow"),
-    "ops":       ("📊 Track activities & backup",     "🟡 Daily Workflow"),
-    "quick":     ("⚡ One-command shortcuts",          "🟡 Daily Workflow"),
-    "docs":      ("📚 Generate documentation",        "🟡 Daily Workflow"),
-    "pkm":       ("🧠 Knowledge graph & linking",     "🔵 Advanced"),
-    "study":     ("📚 Learning & spaced repetition",  "🔵 Advanced"),
-    "analytics": ("📈 Productivity insights",         "🔵 Advanced"),
-    "ai":        ("🧠 AI-powered features",           "🔵 Advanced"),
+    "core":        ("🏠 [bold green]Workspace Management[/bold green]\nSetup, health checks, and environment repair.", "04. 🟢 Essentials (Start Here)"),
+    "dev":         ("📦 [bold green]Project Lifecycle[/bold green]\nScaffold new projects and manage development worktrees.", "04. 🟢 Essentials (Start Here)"),
+    "nav":         ("🧭 [bold green]Smart Navigation[/bold green]\nJump between Johnny.Decimal folders instantly.", "04. 🟢 Essentials (Start Here)"),
+    
+    "ops":         ("📊 [bold blue]Daily Operations[/bold blue]\nActivity tracking, backups, and automation maintenance.", "03. 🟡 Daily Workflow"),
+    "quick":       ("⚡ [bold blue]Productivity Shortcuts[/bold blue]\nOne-command workflows for repetitive tasks.", "03. 🟡 Daily Workflow"),
+    "audit":       ("🛡️ [bold blue]System Auditing[/bold blue]\nEnforce naming conventions and Johnny.Decimal integrity.", "03. 🟡 Daily Workflow"),
+    "docs":        ("📚 [bold blue]Documentation[/bold blue]\nGenerate and manage workspace documentation.", "03. 🟡 Daily Workflow"),
+    
+    "ai":          ("🧠 [bold magenta]Cognitive Engine[/bold magenta]\nAI-powered organization, RAG search, and triage.", "02. 🔵 Advanced & AI"),
+    "pkm":         ("🧠 [bold magenta]Knowledge Management[/bold magenta]\nBuild and query your personal knowledge graph.", "02. 🔵 Advanced & AI"),
+    "analytics":   ("📈 [bold magenta]Usage Analytics[/bold magenta]\nProductivity insights and data-driven reporting.", "02. 🔵 Advanced & AI"),
+    "study":       ("📚 [bold magenta]Learning System[/bold magenta]\nSpaced repetition and technical study management.", "02. 🔵 Advanced & AI"),
+    
+    "self-update": ("🔄 [bold white]System Update[/bold white]\nUpdate DevBase to the latest version.", "01. ⚙️ System & Maintenance"),
 }
 
 # Initialize Typer app with rich help
 app = typer.Typer(
     name="devbase",
-    help="🚀 DevBase - Personal Engineering Operating System",
+    help="""
+🚀 [bold cyan]DevBase Elite EOS v5.1.0-alpha.4[/bold cyan]
+
+The elite engineering operating system. Enforces [bold]Johnny.Decimal[/bold] 
+organization, automates environments, and provides [bold]AI-driven workflows[/bold].
+    """,
     add_completion=True,
     rich_markup_mode="rich",
     no_args_is_help=True,
@@ -73,7 +87,7 @@ def _discover_commands() -> None:
         try:
             cmd_app = ep.load()
             help_text, panel = PANEL_MAP.get(
-                ep.name, (f"{ep.name} commands", "🔵 Advanced")
+                ep.name, (f"{ep.name} commands", "02. 🔵 Advanced & AI")
             )
             app.add_typer(
                 cmd_app,
@@ -143,7 +157,8 @@ def main(
     # - running `core setup`, which IS the command that creates the workspace
     _help_requested = "--help" in sys.argv or "-h" in sys.argv
     _is_setup = ctx.invoked_subcommand == "core" and "setup" in sys.argv
-    if ctx.resilient_parsing or _help_requested or _is_setup:
+    _is_doctor = ctx.invoked_subcommand == "core" and "doctor" in sys.argv
+    if ctx.resilient_parsing or _help_requested or _is_setup or _is_doctor:
         ctx.obj = {"root": root.resolve() if root else Path.cwd(), "console": console, "verbose": verbose}
         return
 
@@ -173,21 +188,62 @@ def main(
 
 # ── Self-update command ─────────────────────────────────────────────
 
-@app.command(name="self-update")
+@app.command(name="self-update", rich_help_panel="01. ⚙️ System & Maintenance")
 def self_update() -> None:
-    """🔄 Update DevBase to the latest version."""
+    """🔄 Update DevBase to the latest version (works from anywhere)."""
     import subprocess as sp
+    import re
+    from pathlib import Path
 
     console.print("[bold]Checking for updates...[/bold]")
-    result = sp.run(
-        ["uv", "pip", "install", "--upgrade", "devbase"],
-        capture_output=True, text=True,
-    )
-    if result.returncode == 0:
-        console.print("[green]✓[/green] DevBase updated successfully.")
-    else:
-        console.print(f"[red]✗[/red] Update failed: {result.stderr.strip()}")
-        console.print("[dim]Try manually: uv pip install --upgrade devbase[/dim]")
+    
+    custom_env = os.environ.copy()
+    custom_env["UV_PYTHON_PREFERENCE"] = "only-managed"
+
+    # 1. Discover where I was installed from
+    try:
+        list_result = sp.run(["uv", "tool", "list"], capture_output=True, text=True, env=custom_env)
+        # Search for: devbase vX.Y.Z (from file:///D:/path/to/devbase)
+        match = re.search(r"devbase .* \(from (file:///|)(.*)\)", list_result.stdout)
+        
+        source_path = None
+        if match:
+            source_path = match.group(2).strip()
+            # Clean up Windows URI format if present (e.g., /D:/path -> D:/path)
+            if source_path.startswith("/") and source_path[2] == ":":
+                source_path = source_path[1:]
+            
+            console.print(f"[dim]Installation source detected: {source_path}[/dim]")
+
+        # 2. Try Standard Upgrade first
+        result = sp.run(["uv", "tool", "upgrade", "devbase"], capture_output=True, text=True, env=custom_env)
+        
+        if result.returncode == 0:
+            console.print("[green]✓[/green] DevBase updated via standard upgrade.")
+            return
+
+        # 3. Fallback to Source-based Reinstall
+        if source_path and Path(source_path).exists():
+            console.print(f"[dim]Standard upgrade failed. Re-installing from source...[/dim]")
+            # Important: run from the source_path context to be safe
+            result = sp.run(
+                ["uv", "tool", "install", ".", "--force", "--reinstall", "--with", ".[all]"],
+                cwd=source_path,
+                capture_output=True,
+                text=True,
+                env=custom_env
+            )
+            
+            if result.returncode == 0:
+                console.print("[green]✓[/green] DevBase updated successfully from source.")
+            else:
+                console.print(f"[red]✗[/red] Update failed: {result.stderr.strip()}")
+        else:
+            console.print(f"[red]✗[/red] Standard upgrade failed and source path not found.")
+            console.print("[dim]Try manually: uv tool install <path_to_repo> --force[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]✗[/red] Update process error: {e}")
 
 
 # Entry point for console script

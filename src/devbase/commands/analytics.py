@@ -91,14 +91,64 @@ REPORT_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
-@app.command()
-def report(
-    ctx: typer.Context,
-    open_browser: Annotated[bool, typer.Option("--open/--no-open", "-o", help="Open report in browser (default: True)")] = True,
-) -> None:
-    """
-    📈 Generate graphical analytics report using DuckDB.
-    """
+from rich.panel import Panel
+from rich.table import Table
+from rich.progress import Progress, SpinnerColumn, TextColumn
+
+# ── Terminal Summary Logic ──────────────────────────────────────────
+
+def show_terminal_summary(root: Path):
+    """Shows a quick productivity dashboard in the terminal."""
+    events_file = root / ".telemetry" / "events.jsonl"
+    
+    if not events_file.exists():
+        console.print(Panel(
+            "[yellow]No telemetry data found yet.[/yellow]\n\n"
+            "To start tracking your productivity, use:\n"
+            "[cyan]devbase ops track \"Finished feature X\"[/cyan]",
+            title="📈 Analytics",
+            border_style="yellow"
+        ))
+        return
+
+    try:
+        import duckdb
+        con = duckdb.connect(database=':memory:')
+        con.execute(f"CREATE TABLE events AS SELECT * FROM read_json_auto('{events_file}')")
+        
+        # Simple aggregation for terminal
+        summary = con.execute("""
+            SELECT 
+                count(*) as total,
+                count(DISTINCT strftime(timestamp, '%Y-%m-%d')) as days
+            FROM events
+            WHERE CAST(timestamp AS TIMESTAMP) >= (current_date - INTERVAL 7 DAY)
+        """).fetchone()
+        
+        total_last_week = summary[0]
+        active_days = summary[1]
+
+        table = Table(title="Weekly Activity", show_header=True, header_style="bold magenta", box=None)
+        table.add_column("Metric", style="dim")
+        table.add_column("Value", style="bold")
+        
+        table.add_row("Events (Last 7d)", str(total_last_week))
+        table.add_row("Active Days", f"{active_days}/7")
+        
+        console.print(Panel(table, title="🚀 Productivity Overview", border_style="blue", expand=False))
+        console.print("[dim]Tip: Use 'devbase analytics report' for a full graphical view.[/dim]")
+        
+    except Exception:
+        console.print("[red]✗ Could not parse telemetry data.[/red]")
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    """📈 Workspace Productivity Insights."""
+    if ctx.invoked_subcommand is None:
+        root: Path = ctx.obj["root"]
+        show_terminal_summary(root)
+
+# ── Graphical Report Command ─────────────────────────────────────────
     try:
         import duckdb
     except ImportError:
