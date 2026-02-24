@@ -35,21 +35,21 @@ except Exception:
 # Order is determined by first appearance of each panel during command registration
 PANEL_MAP: dict[str, tuple[str, str]] = {
     # name: (help text, panel)
-    "core":        ("🏠 [bold green]Workspace Management[/bold green]\nSetup, health checks, and environment repair.", "🟢 Essentials (Start Here)"),
-    "dev":         ("📦 [bold green]Project Lifecycle[/bold green]\nScaffold new projects and manage development worktrees.", "🟢 Essentials (Start Here)"),
-    "nav":         ("🧭 [bold green]Smart Navigation[/bold green]\nJump between Johnny.Decimal folders instantly.", "🟢 Essentials (Start Here)"),
+    "core":        ("🏠 [bold green]Workspace Management[/bold green]\nSetup, health checks, and environment repair.", "E🟢 Essentials (Start Here)"),
+    "dev":         ("📦 [bold green]Project Lifecycle[/bold green]\nScaffold new projects and manage development worktrees.", "E🟢 Essentials (Start Here)"),
+    "nav":         ("🧭 [bold green]Smart Navigation[/bold green]\nJump between Johnny.Decimal folders instantly.", "E🟢 Essentials (Start Here)"),
 
-    "ops":         ("📊 [bold blue]Daily Operations[/bold blue]\nActivity tracking, backups, and automation maintenance.", "🟡 Daily Workflow"),
-    "quick":       ("⚡ [bold blue]Productivity Shortcuts[/bold blue]\nOne-command workflows for repetitive tasks.", "🟡 Daily Workflow"),
-    "audit":       ("🛡️ [bold blue]System Auditing[/bold blue]\nEnforce naming conventions and Johnny.Decimal integrity.", "🟡 Daily Workflow"),
-    "docs":        ("📚 [bold blue]Documentation[/bold blue]\nGenerate and manage workspace documentation.", "🟡 Daily Workflow"),
+    "ops":         ("📊 [bold blue]Daily Operations[/bold blue]\nActivity tracking, backups, and automation maintenance.", "A🟡 Daily Workflow"),
+    "quick":       ("⚡ [bold blue]Productivity Shortcuts[/bold blue]\nOne-command workflows for repetitive tasks.", "A🟡 Daily Workflow"),
+    "audit":       ("🛡️ [bold blue]System Auditing[/bold blue]\nEnforce naming conventions and Johnny.Decimal integrity.", "A🟡 Daily Workflow"),
+    "docs":        ("📚 [bold blue]Documentation[/bold blue]\nGenerate and manage workspace documentation.", "A🟡 Daily Workflow"),
 
-    "self-update": ("🔄 [bold white]System Update[/bold white]\nUpdate DevBase to the latest version.", "⚙️ System & Maintenance"),
+    "self-update": ("🔄 [bold white]System Update[/bold white]\nUpdate DevBase to the latest version.", "B⚙️ System & Maintenance"),
 
-    "ai":          ("🧠 [bold magenta]Cognitive Engine[/bold magenta]\nAI-powered organization, RAG search, and triage.", "🔵 Advanced & AI"),
-    "pkm":         ("🧠 [bold magenta]Knowledge Management[/bold magenta]\nBuild and query your personal knowledge graph.", "🔵 Advanced & AI"),
-    "analytics":   ("📈 [bold magenta]Usage Analytics[/bold magenta]\nProductivity insights and data-driven reporting.", "🔵 Advanced & AI"),
-    "study":       ("📚 [bold magenta]Learning System[/bold magenta]\nSpaced repetition and technical study management.", "🔵 Advanced & AI"),
+    "ai":          ("🧠 [bold magenta]Cognitive Engine[/bold magenta]\nAI-powered organization, RAG search, and triage.", "C🔵 Advanced & AI"),
+    "pkm":         ("🧠 [bold magenta]Knowledge Management[/bold magenta]\nBuild and query your personal knowledge graph.", "C🔵 Advanced & AI"),
+    "analytics":   ("📈 [bold magenta]Usage Analytics[/bold magenta]\nProductivity insights and data-driven reporting.", "C🔵 Advanced & AI"),
+    "study":       ("📚 [bold magenta]Learning System[/bold magenta]\nSpaced repetition and technical study management.", "C🔵 Advanced & AI"),
 }
 
 # Initialize Typer app with rich help
@@ -112,7 +112,7 @@ def _discover_commands() -> None:
             try:
                 cmd_app = ep.load()
                 help_text, panel = PANEL_MAP.get(
-                    ep.name, (f"{ep.name} commands", "🔵 Advanced & AI")
+                    ep.name, (f"{ep.name} commands", "C🔵 Advanced & AI")
                 )
                 app.add_typer(
                     cmd_app,
@@ -134,7 +134,7 @@ def _discover_commands() -> None:
             try:
                 cmd_app = ep.load()
                 help_text, panel = PANEL_MAP.get(
-                    ep.name, (f"{ep.name} commands", "🔵 Advanced & AI")
+                    ep.name, (f"{ep.name} commands", "C🔵 Advanced & AI")
                 )
                 app.add_typer(
                     cmd_app,
@@ -157,7 +157,6 @@ _discover_commands()
 
 # ── Self-update command (registered AFTER other commands for correct panel ordering) ─
 
-@app.command(name="self-update", rich_help_panel="⚙️ System & Maintenance")
 def self_update() -> None:
     """🔄 Update DevBase to the latest version (works from anywhere)."""
     import subprocess as sp
@@ -213,6 +212,10 @@ def self_update() -> None:
 
     except Exception as e:
         console.print(f"[red]✗[/red] Update process error: {e}")
+
+
+# Register self-update command AFTER all other commands
+app.command(name="self-update", rich_help_panel="B⚙️ System & Maintenance")(self_update)
 
 
 def version_callback(value: bool) -> None:
