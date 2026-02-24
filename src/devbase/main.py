@@ -32,24 +32,24 @@ except Exception:
     __version__ = "5.1.0-alpha.4"
 
 # Progressive Disclosure panel assignments with logical ordering
-# Prefix with numbers to control lexicographic order
+# Order is determined by first appearance of each panel during command registration
 PANEL_MAP: dict[str, tuple[str, str]] = {
     # name: (help text, panel)
-    "core":        ("🏠 [bold green]Workspace Management[/bold green]\nSetup, health checks, and environment repair.", "01 🟢 Essentials (Start Here)"),
-    "dev":         ("📦 [bold green]Project Lifecycle[/bold green]\nScaffold new projects and manage development worktrees.", "01 🟢 Essentials (Start Here)"),
-    "nav":         ("🧭 [bold green]Smart Navigation[/bold green]\nJump between Johnny.Decimal folders instantly.", "01 🟢 Essentials (Start Here)"),
+    "core":        ("🏠 [bold green]Workspace Management[/bold green]\nSetup, health checks, and environment repair.", "🟢 Essentials (Start Here)"),
+    "dev":         ("📦 [bold green]Project Lifecycle[/bold green]\nScaffold new projects and manage development worktrees.", "🟢 Essentials (Start Here)"),
+    "nav":         ("🧭 [bold green]Smart Navigation[/bold green]\nJump between Johnny.Decimal folders instantly.", "🟢 Essentials (Start Here)"),
 
-    "ops":         ("📊 [bold blue]Daily Operations[/bold blue]\nActivity tracking, backups, and automation maintenance.", "02 🟡 Daily Workflow"),
-    "quick":       ("⚡ [bold blue]Productivity Shortcuts[/bold blue]\nOne-command workflows for repetitive tasks.", "02 🟡 Daily Workflow"),
-    "audit":       ("🛡️ [bold blue]System Auditing[/bold blue]\nEnforce naming conventions and Johnny.Decimal integrity.", "02 🟡 Daily Workflow"),
-    "docs":        ("📚 [bold blue]Documentation[/bold blue]\nGenerate and manage workspace documentation.", "02 🟡 Daily Workflow"),
+    "ops":         ("📊 [bold blue]Daily Operations[/bold blue]\nActivity tracking, backups, and automation maintenance.", "🟡 Daily Workflow"),
+    "quick":       ("⚡ [bold blue]Productivity Shortcuts[/bold blue]\nOne-command workflows for repetitive tasks.", "🟡 Daily Workflow"),
+    "audit":       ("🛡️ [bold blue]System Auditing[/bold blue]\nEnforce naming conventions and Johnny.Decimal integrity.", "🟡 Daily Workflow"),
+    "docs":        ("📚 [bold blue]Documentation[/bold blue]\nGenerate and manage workspace documentation.", "🟡 Daily Workflow"),
 
-    "self-update": ("🔄 [bold white]System Update[/bold white]\nUpdate DevBase to the latest version.", "03 ⚙️ System & Maintenance"),
+    "self-update": ("🔄 [bold white]System Update[/bold white]\nUpdate DevBase to the latest version.", "⚙️ System & Maintenance"),
 
-    "ai":          ("🧠 [bold magenta]Cognitive Engine[/bold magenta]\nAI-powered organization, RAG search, and triage.", "04 🔵 Advanced & AI"),
-    "pkm":         ("🧠 [bold magenta]Knowledge Management[/bold magenta]\nBuild and query your personal knowledge graph.", "04 🔵 Advanced & AI"),
-    "analytics":   ("📈 [bold magenta]Usage Analytics[/bold magenta]\nProductivity insights and data-driven reporting.", "04 🔵 Advanced & AI"),
-    "study":       ("📚 [bold magenta]Learning System[/bold magenta]\nSpaced repetition and technical study management.", "04 🔵 Advanced & AI"),
+    "ai":          ("🧠 [bold magenta]Cognitive Engine[/bold magenta]\nAI-powered organization, RAG search, and triage.", "🔵 Advanced & AI"),
+    "pkm":         ("🧠 [bold magenta]Knowledge Management[/bold magenta]\nBuild and query your personal knowledge graph.", "🔵 Advanced & AI"),
+    "analytics":   ("📈 [bold magenta]Usage Analytics[/bold magenta]\nProductivity insights and data-driven reporting.", "🔵 Advanced & AI"),
+    "study":       ("📚 [bold magenta]Learning System[/bold magenta]\nSpaced repetition and technical study management.", "🔵 Advanced & AI"),
 }
 
 # Initialize Typer app with rich help
@@ -91,18 +91,19 @@ def _discover_commands() -> None:
     eps_by_name = {ep.name: ep for ep in eps_list}
 
     # Define registration order by panel priority
+    # Essentials FIRST, then Daily, then Advanced, then any remaining
+    # (System & Maintenance via self-update is registered AFTER this function)
     registration_order = [
-        # 01. Essentials (Start Here)
+        # Z. Essentials (Start Here)
         "core", "dev", "nav",
-        # 02. Daily Workflow
+        # Y. Daily Workflow
         "ops", "quick", "audit", "docs",
-        # 03. System & Maintenance
-        "self-update",
-        # 04. Advanced & AI
+        # W. Advanced & AI
         "ai", "analytics", "pkm", "study",
+        # X. System & Maintenance (registered separately after)
     ]
 
-    # Register in specified order, then any remaining commands
+    # Register in specified order: Essentials → Daily → Advanced (System & Maintenance via @app.command() last)
     registered = set()
     for cmd_name in registration_order:
         if cmd_name in eps_by_name:
@@ -111,7 +112,7 @@ def _discover_commands() -> None:
             try:
                 cmd_app = ep.load()
                 help_text, panel = PANEL_MAP.get(
-                    ep.name, (f"{ep.name} commands", "04 🔵 Advanced & AI")
+                    ep.name, (f"{ep.name} commands", "🔵 Advanced & AI")
                 )
                 app.add_typer(
                     cmd_app,
@@ -133,7 +134,7 @@ def _discover_commands() -> None:
             try:
                 cmd_app = ep.load()
                 help_text, panel = PANEL_MAP.get(
-                    ep.name, (f"{ep.name} commands", "04 🔵 Advanced & AI")
+                    ep.name, (f"{ep.name} commands", "🔵 Advanced & AI")
                 )
                 app.add_typer(
                     cmd_app,
@@ -150,8 +151,68 @@ def _discover_commands() -> None:
                 logger.debug("Plugin load traceback:", exc_info=True)
 
 
-# Discover and register commands at import-time
+# Discover and register commands at import-time (Essentials, Daily, Advanced)
 _discover_commands()
+
+
+# ── Self-update command (registered AFTER other commands for correct panel ordering) ─
+
+@app.command(name="self-update", rich_help_panel="⚙️ System & Maintenance")
+def self_update() -> None:
+    """🔄 Update DevBase to the latest version (works from anywhere)."""
+    import subprocess as sp
+    import re
+    from pathlib import Path
+
+    console.print("[bold]Checking for updates...[/bold]")
+
+    custom_env = os.environ.copy()
+    custom_env["UV_PYTHON_PREFERENCE"] = "only-managed"
+
+    # 1. Discover where I was installed from
+    try:
+        list_result = sp.run(["uv", "tool", "list"], capture_output=True, text=True, env=custom_env)
+        # Search for: devbase vX.Y.Z (from file:///D:/path/to/devbase)
+        match = re.search(r"devbase .* \(from (file:///|)(.*)\)", list_result.stdout)
+
+        source_path = None
+        if match:
+            source_path = match.group(2).strip()
+            # Clean up Windows URI format if present (e.g., /D:/path -> D:/path)
+            if source_path.startswith("/") and source_path[2] == ":":
+                source_path = source_path[1:]
+
+            console.print(f"[dim]Installation source detected: {source_path}[/dim]")
+
+        # 2. Try Standard Upgrade first
+        result = sp.run(["uv", "tool", "upgrade", "devbase"], capture_output=True, text=True, env=custom_env)
+
+        if result.returncode == 0:
+            console.print("[green]✓[/green] DevBase updated via standard upgrade.")
+            return
+
+        # 3. Fallback to Source-based Reinstall
+        if source_path and Path(source_path).exists():
+            console.print(f"[dim]Standard upgrade failed. Re-installing from source...[/dim]")
+            # Important: run from the source_path context to be safe
+            result = sp.run(
+                ["uv", "tool", "install", ".", "--force", "--reinstall", "--with", ".[all]"],
+                cwd=source_path,
+                capture_output=True,
+                text=True,
+                env=custom_env
+            )
+
+            if result.returncode == 0:
+                console.print("[green]✓[/green] DevBase updated successfully from source.")
+            else:
+                console.print(f"[red]✗[/red] Update failed: {result.stderr.strip()}")
+        else:
+            console.print(f"[red]✗[/red] Standard upgrade failed and source path not found.")
+            console.print("[dim]Try manually: uv tool install <path_to_repo> --force[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]✗[/red] Update process error: {e}")
 
 
 def version_callback(value: bool) -> None:
@@ -229,66 +290,6 @@ def main(
 
     if verbose:
         console.print(f"[dim]Workspace: {workspace_root}[/dim]")
-
-
-# ── Self-update command ─────────────────────────────────────────────
-
-@app.command(name="self-update", rich_help_panel="03 ⚙️ System & Maintenance")
-def self_update() -> None:
-    """🔄 Update DevBase to the latest version (works from anywhere)."""
-    import subprocess as sp
-    import re
-    from pathlib import Path
-
-    console.print("[bold]Checking for updates...[/bold]")
-    
-    custom_env = os.environ.copy()
-    custom_env["UV_PYTHON_PREFERENCE"] = "only-managed"
-
-    # 1. Discover where I was installed from
-    try:
-        list_result = sp.run(["uv", "tool", "list"], capture_output=True, text=True, env=custom_env)
-        # Search for: devbase vX.Y.Z (from file:///D:/path/to/devbase)
-        match = re.search(r"devbase .* \(from (file:///|)(.*)\)", list_result.stdout)
-        
-        source_path = None
-        if match:
-            source_path = match.group(2).strip()
-            # Clean up Windows URI format if present (e.g., /D:/path -> D:/path)
-            if source_path.startswith("/") and source_path[2] == ":":
-                source_path = source_path[1:]
-            
-            console.print(f"[dim]Installation source detected: {source_path}[/dim]")
-
-        # 2. Try Standard Upgrade first
-        result = sp.run(["uv", "tool", "upgrade", "devbase"], capture_output=True, text=True, env=custom_env)
-        
-        if result.returncode == 0:
-            console.print("[green]✓[/green] DevBase updated via standard upgrade.")
-            return
-
-        # 3. Fallback to Source-based Reinstall
-        if source_path and Path(source_path).exists():
-            console.print(f"[dim]Standard upgrade failed. Re-installing from source...[/dim]")
-            # Important: run from the source_path context to be safe
-            result = sp.run(
-                ["uv", "tool", "install", ".", "--force", "--reinstall", "--with", ".[all]"],
-                cwd=source_path,
-                capture_output=True,
-                text=True,
-                env=custom_env
-            )
-            
-            if result.returncode == 0:
-                console.print("[green]✓[/green] DevBase updated successfully from source.")
-            else:
-                console.print(f"[red]✗[/red] Update failed: {result.stderr.strip()}")
-        else:
-            console.print(f"[red]✗[/red] Standard upgrade failed and source path not found.")
-            console.print("[dim]Try manually: uv tool install <path_to_repo> --force[/dim]")
-
-    except Exception as e:
-        console.print(f"[red]✗[/red] Update process error: {e}")
 
 
 # Entry point for console script
