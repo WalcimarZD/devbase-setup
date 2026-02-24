@@ -57,3 +57,10 @@ test_output/
 # DevBase State (should be local)
 .devbase_state.json
 .coverage
+
+12_private_vault/
+
+# Added by DevBase Doctor (Isolation Rules)
+20-29_CODE/
+90-99_ARCHIVE_COLD/
+30-39_OPERATIONS/31_backups/

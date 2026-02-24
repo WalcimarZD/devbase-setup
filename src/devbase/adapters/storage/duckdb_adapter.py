@@ -367,7 +367,7 @@ def get_recent_events(limit: int = 50, conn: duckdb.DuckDBPyConnection | None = 
         conn = get_connection()
 
     # Fetch as dicts
-    df = conn.execute(
+    rows = conn.execute(
         """
         SELECT 
             timestamp,
@@ -380,18 +380,17 @@ def get_recent_events(limit: int = 50, conn: duckdb.DuckDBPyConnection | None = 
         LIMIT ?
         """,
         [limit]
-    ).fetchdf()
+    ).fetchall()
     
-    # Convert dataframe to list of dicts with isoformat timestamps
     events = []
-    for _, row in df.iterrows():
+    for row in rows:
         events.append({
-            "timestamp": row['timestamp'].isoformat() if hasattr(row['timestamp'], 'isoformat') else str(row['timestamp']),
-            "event_type": row['event_type'],
-            "category": row['event_type'], # compat
-            "project": row['project'],
-            "message": row['message'],
-            "metadata": row['metadata']
+            "timestamp": row[0].isoformat() if hasattr(row[0], 'isoformat') else str(row[0]),
+            "event_type": row[1],
+            "category": row[1], # compat
+            "project": row[2],
+            "message": row[3],
+            "metadata": row[4]
         })
     return events
 

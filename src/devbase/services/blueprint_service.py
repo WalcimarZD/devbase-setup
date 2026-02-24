@@ -83,7 +83,7 @@ Return ONLY a valid JSON object with this exact schema:
 Do not include markdown blocks or extra text.
 """
 
-        response = provider.generate(prompt, temperature=0.2, model="llama-3.3-70b-versatile")
+        response = provider.generate(prompt, temperature=0.2, model="llama-3.3-70b-versatile", max_tokens=2048)
         raw_json = response.content.strip()
 
         # Cleanup potential markdown fencing

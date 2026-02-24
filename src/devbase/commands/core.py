@@ -11,7 +11,7 @@ import shutil
 import typer
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.table import Table
 from rich.prompt import Confirm
 from typing_extensions import Annotated
@@ -209,6 +209,8 @@ def setup(
             raise typer.Exit(0)
 
     console.print(Panel.fit(f"[bold cyan]DevBase Setup v{SCRIPT_VERSION}[/bold cyan]\nWorkspace: [yellow]{root}[/yellow]", border_style="cyan"))
+    if dry_run:
+        console.print("[yellow]⚠️  DRY-RUN MODE: No changes will be made[/yellow]\n")
     fs, state_mgr = get_filesystem(str(root), dry_run=dry_run), get_state_manager(root)
     current_state = state_mgr.get_state()
     
@@ -220,7 +222,7 @@ def setup(
 
     console.print("[bold]Building your EOS environment...[/bold]")
     with Progress(SpinnerColumn(spinner_name="dots"), TextColumn("[progress.description]{task.description}"), 
-                  typer.rich_utils.rich.progress.BarColumn(bar_width=None), TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                  BarColumn(bar_width=None), TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
                   console=console, transient=True) as progress:
         total_task = progress.add_task("[cyan]Initializing...", total=len(modules))
         for name, run_func in modules:

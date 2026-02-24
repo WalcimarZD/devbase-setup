@@ -14,3 +14,8 @@ __pycache__/
 .github/
 __target__/
 .DS_Store
+
+venv/
+.telemetry/
+.devbase/
+

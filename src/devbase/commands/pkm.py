@@ -504,8 +504,10 @@ status: active
         )
     else:
         # Open in editor (VS Code)
+        import sys
         console.print(f"Opening [cyan]{filename}[/cyan]...")
-        subprocess.run(["code", str(file_path)], check=False)
+        shell = sys.platform == "win32"
+        subprocess.run(["code", str(file_path)], shell=shell, check=False)
 
 
 @app.command()

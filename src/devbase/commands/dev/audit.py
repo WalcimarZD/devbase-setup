@@ -57,7 +57,7 @@ def audit(
         'use-cases', 'dtos', 'mappers', 'interfaces',
         'persistence', 'migrations', 'external', 'messaging',
         'api', 'cli', 'web', 'unit', 'integration', 'e2e',
-        'ISSUE_TEMPLATE',
+        'ISSUE_TEMPLATE', 'venv', 'venv-dev', '.venv',
     ]
 
     violations = []

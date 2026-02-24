@@ -99,9 +99,10 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 def show_terminal_summary(root: Path):
     """Shows a quick productivity dashboard in the terminal."""
-    events_file = root / ".telemetry" / "events.jsonl"
+    from devbase.adapters.storage.duckdb_adapter import get_db_path
+    db_path = get_db_path(root)
     
-    if not events_file.exists():
+    if not db_path.exists():
         console.print(Panel(
             "[yellow]No telemetry data found yet.[/yellow]\n\n"
             "To start tracking your productivity, use:\n"
@@ -113,8 +114,7 @@ def show_terminal_summary(root: Path):
 
     try:
         import duckdb
-        con = duckdb.connect(database=':memory:')
-        con.execute(f"CREATE TABLE events AS SELECT * FROM read_json_auto('{events_file}')")
+        con = duckdb.connect(database=str(db_path), read_only=True)
         
         # Simple aggregation for terminal
         summary = con.execute("""
@@ -148,7 +148,12 @@ def main(ctx: typer.Context):
         root: Path = ctx.obj["root"]
         show_terminal_summary(root)
 
-# ── Graphical Report Command ─────────────────────────────────────────
+@app.command()
+def report(
+    ctx: typer.Context,
+    open_browser: Annotated[bool, typer.Option("--open/--no-open", help="Open the report in the browser automatically")] = True,
+):
+    """📊 [bold]Generate a full graphical productivity report.[/bold]"""
     try:
         import duckdb
     except ImportError:
@@ -156,64 +161,58 @@ def main(ctx: typer.Context):
         console.print("Run: [green]pip install duckdb[/green] or [green]uv add duckdb[/green]")
         return
 
-    root: Path = ctx.obj["root"]
-    events_file = root / ".telemetry" / "events.jsonl"
+    from devbase.adapters.storage.duckdb_adapter import get_db_path
+    db_path = get_db_path(root)
 
-    if not events_file.exists():
-        console.print("[yellow]⚠️  No telemetry data found[/yellow]")
+    if not db_path.exists():
+        console.print("[yellow]⚠️  No telemetry database found[/yellow]")
         return
 
     # DuckDB Analysis
-    con = duckdb.connect(database=':memory:')
-    
-    # Load data (handling both schema v1 and v2 is tricky in SQL directly if columns differ too much,
-    # but we will try to select common fields or use read_json_auto flexibility)
+    con = duckdb.connect(database=str(db_path), read_only=True)
     
     try:
-        con.execute(f"CREATE TABLE raw_events AS SELECT * FROM read_json_auto('{events_file}')")
-        
         # Standardize columns (Schema V2)
-        # If schema v1, some cols might be missing. We check available cols.
-        columns = [c[1] for c in con.execute("PRAGMA table_info(raw_events)").fetchall()]
+        # Using the existing 'events' table
+        columns = [c[1] for c in con.execute("PRAGMA table_info(events)").fetchall()]
         
         has_category = 'category' in columns
-        has_type = 'type' in columns
+        has_type = 'event_type' in columns
         
         # Normalize to 'category'
-        # We want to select "category" if available, else "type", but handle mixed rows where one might be null.
-        # Construct a COALESCE clause based on available columns.
-        
         cols_to_check = []
-        if has_category: cols_to_check.append("category")
-        if has_type: cols_to_check.append("type")
+        if 'metadata' in columns:
+            # We can extract from JSON metadata if needed, but let's stick to columns for now
+            pass
         
-        if not cols_to_check:
-            # Neither exists
-            cat_expr = "'unknown' as category"
-        else:
-            # coalesce(category, type, 'unknown')
-            cols_str = ", ".join(cols_to_check)
-            cat_expr = f"coalesce({cols_str}, 'unknown') as category"
+        cat_expr = "event_type as category" # Simple mapping for now
 
         # Safe Select
-        # Cast timestamp to TIMESTAMP to ensure comparison works
-        df = con.execute(f"""
+        rows = con.execute(f"""
             SELECT 
                 timestamp,
                 {cat_expr},
                 coalesce(message, '') as message,
                 'event_id' as event_id
-            FROM raw_events
+            FROM events
             WHERE CAST(timestamp AS TIMESTAMP) >= (current_date - INTERVAL 7 DAY)
-        """).fetchdf()
+        """).fetchall()
         
         # Calculate Metrics
-        total_events = len(df)
+        total_events = len(rows)
         focus_score = 85 # Placeholder logic for optimization later
         
         # Prepare JSON for Vega-Lite
-        # Convert timestamp to ISO string for JSON serialization
-        json_data = df.to_json(orient='records', date_format='iso')
+        import json
+        records = []
+        for r in rows:
+            records.append({
+                "timestamp": r[0].isoformat() if hasattr(r[0], "isoformat") else str(r[0]),
+                "category": r[1],
+                "message": r[2],
+                "event_id": r[3]
+            })
+        json_data = json.dumps(records)
 
         # Rendering
         html = REPORT_TEMPLATE.replace("{{ GENERATED_AT }}", datetime.now().strftime("%Y-%m-%d %H:%M"))

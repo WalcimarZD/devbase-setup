@@ -130,7 +130,7 @@ class GroqProvider:
         prompt: str,
         *,
         model: str | None = None,
-        max_tokens: int = 512,
+        max_tokens: int = 4096,
         temperature: float = 0.7,
     ) -> LLMResponse:
         """Generate text completion using Groq API."""
