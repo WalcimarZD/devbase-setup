@@ -64,8 +64,18 @@ class TelemetryService:
             full_metadata.update(metadata)
 
         # Log to DuckDB
-        project_name = infer_project_name(context)
+        project_name = metadata.get("project_override") if metadata and "project_override" in metadata else infer_project_name(context)
 
+        event_data = {
+            "timestamp": datetime.now().isoformat(),
+            "event_type": action,
+            "message": message,
+            "project": project_name,
+            "category": category, # for easier querying
+            "metadata": full_metadata
+        }
+
+        # 1. DuckDB Write
         try:
             log_event(
                 event_type=action,
@@ -73,9 +83,16 @@ class TelemetryService:
                 project=project_name,
                 metadata=json.dumps(full_metadata)
             )
-        except Exception:
-            # Telemetry should never crash the app
-            pass
+        except Exception: pass
+
+        # 2. JSONL Fallback (for analytics compatibility)
+        try:
+            log_dir = self.root / ".telemetry"
+            log_dir.mkdir(exist_ok=True)
+            log_file = log_dir / "events.jsonl"
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(event_data) + "\n")
+        except Exception: pass
 
         # Trigger Active Assistance (Flow Detection)
         # We do this after logging so the current event counts towards the flow

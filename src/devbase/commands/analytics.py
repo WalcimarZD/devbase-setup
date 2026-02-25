@@ -116,7 +116,7 @@ def show_terminal_summary(root: Path):
         import duckdb
         con = duckdb.connect(database=str(db_path), read_only=True)
         
-        # Simple aggregation for terminal
+        # Simple aggregation using standard fetchall() (NO PANDAS REQUIRED HERE)
         summary = con.execute("""
             SELECT 
                 count(*) as total,
@@ -125,8 +125,8 @@ def show_terminal_summary(root: Path):
             WHERE CAST(timestamp AS TIMESTAMP) >= (current_date - INTERVAL 7 DAY)
         """).fetchone()
         
-        total_last_week = summary[0]
-        active_days = summary[1]
+        total_last_week = summary[0] if summary else 0
+        active_days = summary[1] if summary else 0
 
         table = Table(title="Weekly Activity", show_header=True, header_style="bold magenta", box=None)
         table.add_column("Metric", style="dim")

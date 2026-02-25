@@ -24,6 +24,7 @@ console = Console()
 def track(
     ctx: typer.Context,
     message: Annotated[str, typer.Argument(help="Activity message")],
+    project: Annotated[Optional[str], typer.Option("--project", "-p", help="Project name (auto-inferred if not specified)")] = None,
     event_type: Annotated[
         Optional[str],
         typer.Option("--type", "-t", help="Event type (auto-detected if not specified)"),
@@ -33,19 +34,6 @@ def track(
     📝 Track an activity or task.
     
     Logs activities to telemetry for later analysis with stats/weekly commands.
-    
-    AUTO-DETECTION:
-    - If you're inside a project folder, it auto-tags with project name
-    - Activity type is inferred from your location:
-      * code/packages → "coding"
-      * knowledge → "learning"
-      * vault → "personal"
-      * ai → "ai"
-    
-    Example:
-        cd 20-29_CODE/21_monorepo_apps/my-api
-        devbase ops track "Implemented OAuth2"
-        # → Auto-tagged as: [coding:my-api]
     """
     root: Path = ctx.obj["root"]
 
@@ -54,10 +42,12 @@ def track(
     telemetry = get_telemetry(root)
     event = telemetry.track(
         message=message,
-        category=event_type
+        category=event_type,
+        metadata={"project_override": project} if project else None
     )
 
-    console.print(f"[green]✓[/green] Tracked: [[cyan]{event['metadata']['category']}[/cyan]] {message}")
+    proj_display = f":{event['project']}" if event['project'] else ""
+    console.print(f"[green]✓[/green] Tracked: [[cyan]{event['metadata']['category']}{proj_display}[/cyan]] {message}")
 
 
 @app.command()
