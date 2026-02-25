@@ -48,27 +48,16 @@ app.add_typer(routine_app, name="routine")
 console = Console()
 
 
-def _get_provider():
-    """Get the configured LLM provider (Groq)."""
-    try:
-        from devbase.ai.providers.groq import GroqProvider
-        return GroqProvider()
-    except ImportError:
-        console.print(
-            "[red]✗[/red] AI features require the 'groq' package.\n"
-            "Install with: [cyan]pip install devbase[ai][/cyan]"
-        )
-        raise typer.Exit(1)
-    except Exception as e:
-        console.print(f"[red]✗[/red] Failed to initialize AI provider: {e}")
-        raise typer.Exit(1)
+def _get_service(ctx: typer.Context):
+    """Get the AIService from the container."""
+    from devbase.services.container import ServiceContainer
+    root = ctx.obj.get("root", Path.cwd())
+    return ServiceContainer(root).ai
 
 
-def _get_service():
-    """Get the AIService with configured provider."""
-    from devbase.ai.service import AIService
-    provider = _get_provider()
-    return AIService(provider)
+def _get_provider(ctx: typer.Context):
+    """Get the active provider from the AIService."""
+    return _get_service(ctx).provider
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -76,18 +65,22 @@ def config(ctx: typer.Context) -> None:
     """Configure AI provider API key.
     
     Interactively prompts for and saves the Groq API key
-    to ~/.devbase/config.toml for persistent use.
+    to config.toml for persistent use.
     """
     import toml
-    from devbase.utils.paths import get_devbase_dir, get_config_path
+    from devbase.utils.paths import get_config_path
     
     root: Path = ctx.obj["root"]
-    config_dir = get_devbase_dir(root)
     config_file = get_config_path(root)
     
     console.print("\n[bold]🤖 AI Configuration[/bold]\n")
-    console.print("This command configures your Groq API key for AI features.")
-    console.print("Get your API key at: [cyan]https://console.groq.com/keys[/cyan]\n")
+    
+    # Prompt for Provider
+    provider_name = questionary.select(
+        "Select AI Provider",
+        choices=["groq", "mock"],
+        default="groq"
+    ).ask()
     
     # Load existing config if present
     existing_config: dict = {}
@@ -97,40 +90,35 @@ def config(ctx: typer.Context) -> None:
         except Exception:
             pass
     
-    # Check current key status
-    current_key = existing_config.get("ai", {}).get("groq_api_key", "")
-    if current_key:
-        masked = current_key[:8] + "..." + current_key[-4:] if len(current_key) > 12 else "****"
-        console.print(f"Current key: [dim]{masked}[/dim]\n")
-    
-    # Prompt for API key
-    api_key = typer.prompt(
-        "Enter Groq API Key",
-        hide_input=True,
-        default="",
-    )
-    
-    if not api_key:
-        console.print("[yellow]⚠[/yellow] No API key entered. Configuration unchanged.")
-        raise typer.Exit(0)
-    
-    # Create config directory if needed
-    config_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Update config
     if "ai" not in existing_config:
         existing_config["ai"] = {}
-    existing_config["ai"]["groq_api_key"] = api_key
+    
+    existing_config["ai"]["provider"] = provider_name
+    
+    if provider_name == "groq":
+        console.print("\nGet your API key at: [cyan]https://console.groq.com/keys[/cyan]\n")
+        
+        # Check current key status
+        current_key = existing_config.get("ai", {}).get("groq_api_key", "")
+        if current_key:
+            masked = current_key[:8] + "..." + current_key[-4:] if len(current_key) > 12 else "****"
+            console.print(f"Current key: [dim]{masked}[/dim]\n")
+        
+        # Prompt for API key
+        api_key = typer.prompt(
+            "Enter Groq API Key",
+            hide_input=True,
+            default="",
+        )
+        
+        if api_key:
+            existing_config["ai"]["groq_api_key"] = api_key
     
     # Save config
     try:
+        config_file.parent.mkdir(parents=True, exist_ok=True)
         with open(config_file, "w") as f:
             toml.dump(existing_config, f)
-        
-        try:
-            config_file.chmod(0o600)
-        except Exception:
-            pass
         
         console.print(f"\n[green]✓[/green] Configuration written successfully.")
         console.print(f"[dim]Saved to: {config_file}[/dim]")
@@ -138,9 +126,9 @@ def config(ctx: typer.Context) -> None:
         # Test connection
         console.print("\n[dim]Testing connection...[/dim]")
         try:
-            provider = _get_provider()
-            provider.validate_connection()
-            console.print("[green]✓[/green] Connection successful! AI features are ready.")
+            service = _get_service(ctx)
+            service.provider.validate_connection()
+            console.print(f"[green]✓[/green] Connection successful! Active provider: [bold]{provider_name}[/bold]")
         except Exception as e:
             console.print(f"[yellow]⚠[/yellow] Connection test failed: {e}")
     
@@ -161,7 +149,6 @@ def organize(ctx: typer.Context,
     ] = False,
 ) -> None:
     """Suggest organization for a file using AI."""
-    from devbase.ai.exceptions import DevBaseAIError
     import questionary
     
     # Interactive selection if path is missing
@@ -187,9 +174,9 @@ def organize(ctx: typer.Context,
     with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console, transient=True) as progress:
         progress.add_task(description="🤖 Analyzing file...", total=None)
         try:
-            service = _get_service()
+            service = _get_service(ctx)
             suggestion = service.suggest_organization(str(file_path), workspace_root=workspace_root)
-        except DevBaseAIError as e:
+        except Exception as e:
             console.print(f"[red]✗[/red] AI analysis failed: {e}")
             raise typer.Exit(1)
     
@@ -269,8 +256,6 @@ def insights(ctx: typer.Context,
     path: Annotated[Optional[str], typer.Option("--path", "-p", help="Directory to analyze")] = None,
 ) -> None:
     """Generate insights about workspace structure."""
-    from devbase.ai.exceptions import DevBaseAIError
-    
     workspace_path = Path(path) if path else (ctx.obj["root"] if ctx and ctx.obj and ctx.obj.get("root") else Path.cwd())
     if not workspace_path.exists():
         console.print(f"[red]✗[/red] Path not found: {workspace_path}")
@@ -279,9 +264,9 @@ def insights(ctx: typer.Context,
     with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console, transient=True) as progress:
         progress.add_task(description="🔍 Analyzing workspace structure...", total=None)
         try:
-            service = _get_service()
+            service = _get_service(ctx)
             analysis = service.generate_insights(str(workspace_path))
-        except DevBaseAIError as e:
+        except Exception as e:
             console.print(f"[red]✗[/red] AI analysis failed: {e}")
             raise typer.Exit(1)
     
@@ -306,39 +291,24 @@ def insights(ctx: typer.Context,
 def status(ctx: typer.Context) -> None:
     """Check AI provider configuration status."""
     console.print("\n[bold]🤖 AI Status[/bold]\n")
-    env_key = os.environ.get("GROQ_API_KEY", "")
-    if env_key:
-        masked = env_key[:8] + "..." + env_key[-4:] if len(env_key) > 12 else "****"
-        console.print(f"[green]✓[/green] GROQ_API_KEY env var: [dim]{masked}[/dim]")
-    else:
-        console.print("[dim]✗[/dim] GROQ_API_KEY env var: not set")
     
-    from devbase.utils.paths import get_config_path
-    root: Path = ctx.obj["root"]
-    config_file = get_config_path(root)
-    if config_file.exists():
-        try:
-            import toml
-            config = toml.load(config_file)
-            config_key = config.get("ai", {}).get("groq_api_key", "")
-            if config_key:
-                masked = config_key[:8] + "..." + config_key[-4:] if len(config_key) > 12 else "****"
-                console.print(f"[green]✓[/green] Config file key: [dim]{masked}[/dim]")
-            else:
-                console.print("[dim]✗[/dim] Config file key: not set")
-        except Exception:
-            console.print("[yellow]⚠[/yellow] Config file: parse error")
-    else:
-        console.print(f"[dim]✗[/dim] Config file not found")
-    
-    console.print("\n[dim]Testing connection...[/dim]")
     try:
-        provider = _get_provider()
+        service = _get_service(ctx)
+        provider = service.provider
+        provider_type = provider.__class__.__name__
+        
+        console.print(f"Active Provider: [bold cyan]{provider_type}[/bold cyan]")
+        
+        # Test connection
+        console.print("\n[dim]Testing connection...[/dim]")
         provider.validate_connection()
         console.print("[green]✓[/green] Connection: OK")
-        console.print(f"[green]✓[/green] Model: {provider.model}")
+        
+        if hasattr(provider, "model"):
+             console.print(f"[green]✓[/green] Model: {provider.model}")
+             
     except Exception as e:
-        console.print(f"[red]✗[/red] Connection failed: {e}")
+        console.print(f"[red]✗[/red] AI Status check failed: {e}")
 
 
 @app.command("index")
@@ -381,7 +351,8 @@ def chat(
     temperature: Annotated[float, typer.Option("--temp", "-t", help="Creativity (0.0-1.0)")] = 0.2,
 ) -> None:
     """💬 Chat with your workspace using RAG (Context-Aware)."""
-    provider = _get_provider()
+    service = _get_service(ctx)
+    provider = service.provider
     
     # Re-join prompt if it was split by shell
     final_user_prompt = " ".join(prompt)
@@ -423,44 +394,94 @@ USER QUESTION: {final_user_prompt}
 
 @app.command("classify")
 def classify(
+    ctx: typer.Context,
     text: Annotated[str, typer.Argument(help="Text to classify")],
     categories: Annotated[str, typer.Option("--categories", "-c", help="Target categories")] = "feature,bug,docs,refactor",
 ) -> None:
     """🏷️ Classify text into a technical category."""
-    provider = _get_provider()
-    prompt = f"""You are a Systems Architect. Classify the following engineering input into exactly ONE of these categories: [{categories}].
-Respond with only the category name.
-
-INPUT: {text}
-"""
+    service = _get_service(ctx)
+    category_list = [c.strip() for c in categories.split(",")]
+    
     with Progress(SpinnerColumn(), TextColumn("[bold blue]Classifying semantic intent...[/bold blue]"), console=console, transient=True) as progress:
         progress.add_task("task", total=None)
         try:
-            result = provider.complete(prompt, temperature=0.0)
-            console.print(f"\n[bold]Classification:[/bold] [cyan]{result.strip().lower()}[/cyan]")
+            result = service.classify(text, category_list)
+            console.print(f"\n[bold]Classification:[/bold] [cyan]{result}[/cyan]")
         except Exception as e:
-            console.print(f"[red]✗ Classification failed:[/red] {e}")
+            console.print(f"[red]✗[/red] Classification failed: {e}")
 
 
 @app.command("summarize")
 def summarize(
+    ctx: typer.Context,
     text: Annotated[str, typer.Argument(help="Text to summarize")],
     max_length: Annotated[int, typer.Option("--max-length", "-l")] = 100,
 ) -> None:
     """📝 Generate a technical executive summary."""
-    provider = _get_provider()
-    prompt = f"""You are a Systems Architect. Summarize this technical text focusing on DECISIONS and IMPACT.
-Limit to {max_length} words. Maintain original language.
-
-TEXT: {text}
-"""
+    service = _get_service(ctx)
+    
     with Progress(SpinnerColumn(), TextColumn("[bold magenta]Synthesizing summary...[/bold magenta]"), console=console, transient=True) as progress:
         progress.add_task("task", total=None)
         try:
-            result = provider.complete(prompt, temperature=0.2)
-            console.print(Panel(result.strip(), title="[bold]📝 Executive Summary[/bold]", border_style="magenta"))
+            result = service.summarize(text, max_length)
+            console.print(Panel(result, title="[bold]📝 Executive Summary[/bold]", border_style="magenta"))
         except Exception as e:
-            console.print(f"[red]✗ Summary failed:[/red] {e}")
+            console.print(f"[red]✗[/red] Summary failed: {e}")
+
+
+@app.command("draft")
+def draft(
+    ctx: typer.Context,
+    message: Annotated[Optional[str], typer.Argument(help="Commit message to analyze")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """📝 Generate a technical note based on a Git commit."""
+    import subprocess
+    import json as json_lib
+    
+    # Get message if not provided
+    if not message:
+        try:
+            message = subprocess.check_output(
+                ["git", "log", "-1", "--pretty=%B"], 
+                stderr=subprocess.DEVNULL, 
+                text=True
+            ).strip()
+        except subprocess.CalledProcessError:
+            if not json_output:
+                console.print("[red]✗[/red] Failed to get last commit message. Are you in a Git repo?")
+            raise typer.Exit(1)
+    
+    if not message:
+        if not json_output:
+            console.print("[yellow]⚠[/yellow] Empty commit message.")
+        return
+
+    try:
+        service = _get_service()
+        if json_output:
+            suggestion = service.suggest_draft(message)
+            console.print(json_lib.dumps(suggestion))
+            return
+
+        with Progress(SpinnerColumn(), TextColumn("[bold cyan]Drafting technical note...[/bold cyan]"), console=console, transient=True) as progress:
+            progress.add_task("thinking", total=None)
+            suggestion = service.suggest_draft(message)
+            
+            note = suggestion.get("note", "No note generated.")
+            category = suggestion.get("category", "JOURNAL").upper()
+            
+            console.print()
+            console.print(Panel(
+                f"[bold]Note:[/bold] {note}\n[bold]Category:[/bold] [cyan]{category}[/cyan]",
+                title="[bold green]📝 AI Draft Suggestion[/bold green]",
+                border_style="green"
+            ))
+            
+    except Exception as e:
+        if not json_output:
+            console.print(f"[red]✗ Drafting failed:[/red] {e}")
+        raise typer.Exit(1)
 
 
 @routine_app.command("briefing")

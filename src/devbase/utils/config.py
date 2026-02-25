@@ -50,6 +50,25 @@ class Config:
                 ],
             },
         },
+        # v5.1 Audit & Governance Configuration
+        "audit": {
+            "rules": {
+                "johnny_decimal": {
+                    "enabled": True,
+                    "pattern": r"^\d{2}-\d{2}_[A-Z][a-zA-Z0-9_]*$",
+                },
+                "naming": {
+                    "markdown_kebab_case": True,
+                },
+                "patterns": {
+                    "prohibited_patterns": [
+                        r"TODO: MUST_FIX",
+                        r"FIXME: SECURITY",
+                        r"DEBUG_ONLY",
+                    ],
+                },
+            },
+        },
     }
 
 
