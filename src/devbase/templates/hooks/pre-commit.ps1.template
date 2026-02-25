@@ -78,7 +78,24 @@ function Check-LintAndFormat {
     }
 }
 
+# === GOVERNANCE AUDIT ===
+function Check-Governance {
+    Write-Host "  Running DevBase Governance Audit..."
+
+    # Invocar o comando de auditoria do devbase
+    devbase dev audit
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Governance Audit failed. Fix the issues before committing." -ForegroundColor Red
+        Write-Host "   Or use: git commit --no-verify" -ForegroundColor Gray
+        exit 1
+    }
+
+    Write-Host "  ✅ Governance Audit passed" -ForegroundColor Green
+}
+
 # === EXECUTAR CHECKS ===
+Check-Governance
 Check-Credentials
 Check-LintAndFormat
 

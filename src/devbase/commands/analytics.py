@@ -235,3 +235,49 @@ def report(
         console.print(f"[red]Analytics Error: {e}[/red]")
         if "raw_events" in str(e): # Maybe empty file
              console.print("[yellow]Could not process events file. Is it empty?[/yellow]")
+
+@app.command("flow-summary")
+def flow_summary(ctx: typer.Context):
+    """
+    📈 Resumo de atividade técnica (Comandos e Commits) nas últimas 24h.
+    """
+    from devbase.adapters.storage.duckdb_adapter import get_db_path
+    root: Path = ctx.obj["root"]
+    db_path = get_db_path(root)
+    
+    if not db_path.exists():
+        console.print("[yellow]Nenhum dado de telemetria encontrado.[/yellow]")
+        return
+
+    try:
+        import duckdb
+        con = duckdb.connect(database=str(db_path), read_only=True)
+        
+        # Query: Agrupar por hora nas últimas 24h
+        query = """
+            SELECT 
+                strftime(timestamp, '%Y-%m-%d %H:00') as start_time,
+                count(CASE WHEN event_type = 'command' THEN 1 END) as commands,
+                count(CASE WHEN event_type = 'commit' THEN 1 END) as commits
+            FROM events
+            WHERE timestamp >= (current_timestamp - INTERVAL 24 HOUR)
+            GROUP BY 1
+            ORDER BY 1 DESC
+        """
+        results = con.execute(query).fetchall()
+
+        table = Table(title="Flow Summary (Last 24h)", show_header=True, header_style="bold cyan")
+        table.add_column("Horário Início", style="dim")
+        table.add_column("Comandos Executados", justify="right")
+        table.add_column("Commits Realizados", justify="right")
+
+        if not results:
+            table.add_row("Sem atividade", "0", "0")
+        else:
+            for row in results:
+                table.add_row(str(row[0]), str(row[1]), str(row[2]))
+
+        console.print(table)
+        
+    except Exception as e:
+        console.print(f"[red]Erro ao processar Analytics: {e}[/red]")
