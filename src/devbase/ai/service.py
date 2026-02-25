@@ -64,6 +64,22 @@ JSON Format:
   ]
 }"""
 
+DRAFT_SYSTEM_PROMPT = """You are a Technical Writer specializing in Engineering Journals.
+Analyze the Git commit message and generate a concise, professional technical note.
+Suggest a classification based on the nature of the change.
+
+CATEGORIES:
+- JOURNAL: Daily progress, small fixes, reflections.
+- COOKBOOK: Reusable patterns, complex configurations, "how-to" solutions.
+- ADR: Architectural decisions, significant trade-offs, new system components.
+
+JSON Format:
+{
+  "note": "Short technical summary of the change and its impact.",
+  "category": "JOURNAL|COOKBOOK|ADR",
+  "confidence": 0.95
+}"""
+
 class AIService:
     """Central orchestrator for AI-powered workspace features."""
     
@@ -96,6 +112,54 @@ class AIService:
         except (json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to extract JSON from AI response: {e}")
             return {}
+
+    def suggest_draft(self, message: str) -> Dict[str, Any]:
+        """Suggests a technical note and category based on a commit message."""
+        response = self.provider.complete(
+            f"COMMIT MESSAGE: {message}",
+            system_prompt=DRAFT_SYSTEM_PROMPT,
+            temperature=0.0,
+            max_tokens=300,
+        )
+        return self._safe_json_extract(response)
+
+    def classify(
+        self,
+        text: str,
+        categories: list[str],
+    ) -> str:
+        """Classify text into one of the given categories."""
+        categories_str = ", ".join(categories)
+        prompt = f"""Classify the following text into exactly ONE of these categories: {categories_str}
+
+Text: {text}
+
+Respond with ONLY the category name, nothing else."""
+
+        response = self.provider.complete(prompt, temperature=0.0, max_tokens=50)
+        result = response.strip().lower()
+
+        for category in categories:
+            if category.lower() in result:
+                return category
+
+        return categories[0] if categories else "unknown"
+
+    def summarize(
+        self,
+        text: str,
+        max_length: int = 100,
+    ) -> str:
+        """Summarize text to specified length."""
+        prompt = f"""Summarize the following text in {max_length} words or less.
+Be concise and capture the key points.
+
+Text: {text}
+
+Summary:"""
+
+        response = self.provider.complete(prompt, max_tokens=max_length * 2, temperature=0.3)
+        return response.strip()
 
     def suggest_organization(
         self,

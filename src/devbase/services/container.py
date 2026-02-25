@@ -52,5 +52,7 @@ class ServiceContainer:
         @requires: devbase[ai] extra.
         """
         from devbase.ai.service import AIService
-        from devbase.ai.providers.groq import GroqProvider
-        return AIService(GroqProvider())
+        from devbase.ai.factory import AIProviderFactory
+        
+        provider = AIProviderFactory.get_provider(self.root)
+        return AIService(provider)

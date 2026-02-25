@@ -129,6 +129,7 @@ class GroqProvider:
         self,
         prompt: str,
         *,
+        system_prompt: str | None = None,
         model: str | None = None,
         max_tokens: int = 4096,
         temperature: float = 0.7,
@@ -137,11 +138,16 @@ class GroqProvider:
         model = model or self.default_model
         start_time = time.perf_counter()
 
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
         for attempt in range(self.max_retries):
             try:
                 response = self.client.chat.completions.create(
                     model=model,
-                    messages=[{"role": "user", "content": prompt}],
+                    messages=messages,
                     max_tokens=max_tokens,
                     temperature=temperature,
                 )
