@@ -339,7 +339,7 @@ def open_project(
     open_in_vscode(project_path)
 
 
-@app.command(name="restore")
+@app.command(name="restore-packages")
 def restore_packages(
     ctx: typer.Context,
     project_name: Annotated[str, typer.Argument(help="Project name to restore packages for")],
@@ -350,12 +350,6 @@ def restore_packages(
 ) -> None:
     """
     📦 Restore NuGet packages for a .NET project.
-
-    Downloads nuget.exe automatically if needed and runs restore.
-
-    Examples:
-        devbase dev restore MedSempreMVC_GIT
-        devbase dev restore MyProject --solution MyProject.Web.sln
     """
     from devbase.utils.nuget import nuget_restore, is_dotnet_project
 
@@ -371,11 +365,62 @@ def restore_packages(
 
     if not is_dotnet_project(project_path):
         console.print(f"[yellow]⚠ '{project_name}' does not appear to be a .NET project.[/yellow]")
-        console.print("[dim]No .sln or packages.config found.[/dim]")
         raise typer.Exit(1)
 
     success = nuget_restore(project_path, solution, root=root)
     if not success:
+        raise typer.Exit(1)
+
+
+@app.command(name="restore")
+def restore_project(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Project name to restore from archive")],
+) -> None:
+    """
+    🔄 Restore an archived project.
+
+    Moves the project from 90-99_ARCHIVE_COLD back to 21_monorepo_apps.
+    Scans all years in the archive folder to find the project.
+    """
+    import shutil
+    from devbase.utils.telemetry import get_telemetry
+
+    root: Path = ctx.obj["root"]
+    telemetry = get_telemetry(root)
+    
+    archive_root = root / "90-99_ARCHIVE_COLD" / "92_archived_projects"
+    dest_dir = root / "20-29_CODE" / "21_monorepo_apps"
+    
+    # Find project in archive
+    found_path = None
+    if archive_root.exists():
+        for year_dir in archive_root.iterdir():
+            if year_dir.is_dir():
+                target = year_dir / name
+                if target.exists():
+                    found_path = target
+                    break
+    
+    if not found_path:
+        console.print(f"[red]✗ Project '{name}' not found in archives.[/red]")
+        raise typer.Exit(1)
+
+    dest_path = dest_dir / name
+    if dest_path.exists():
+        console.print(f"[red]✗ Project '{name}' already exists in active projects.[/red]")
+        raise typer.Exit(1)
+
+    try:
+        console.print(f"\n[bold blue]Restoring project...[/bold blue]")
+        console.print(f"[dim]Source: {found_path}[/dim]")
+        
+        shutil.move(str(found_path), str(dest_path))
+        
+        console.print(f"[green]✓[/green] Project restored to: [bold]{dest_path}[/bold]")
+        telemetry.track(f"Restored project {name}", category="lifecycle", action="restore_project")
+    except Exception as e:
+        console.print(f"[red]✗ Restore failed: {e}[/red]")
         raise typer.Exit(1)
 
 
@@ -453,32 +498,44 @@ def info_project(
 @app.command(name="list")
 def list_projects(
     ctx: typer.Context,
+    archived: Annotated[bool, typer.Option("--archived", "-a", help="List archived projects instead of active ones")] = False,
 ) -> None:
     """
     📂 List all projects.
 
-    Scans 20-29_CODE/21_monorepo_apps and displays a table of projects.
+    Scans workspace and displays a table of active or archived projects.
     """
     from devbase.utils.telemetry import get_telemetry
 
     root: Path = ctx.obj["root"]
     telemetry = get_telemetry(root)
 
-    projects_dir = root / "20-29_CODE" / "21_monorepo_apps"
+    if archived:
+        projects_dir = root / "90-99_ARCHIVE_COLD" / "92_archived_projects"
+        title = "Archived Projects"
+    else:
+        projects_dir = root / "20-29_CODE" / "21_monorepo_apps"
+        title = "Active Projects"
 
     console.print()
-    console.print("[bold]Project List[/bold]")
+    console.print(f"[bold]{title}[/bold]")
     console.print(f"[dim]Location: {projects_dir}[/dim]\n")
 
     if not projects_dir.exists():
-        console.print("[yellow]⚠ Projects folder not found.[/yellow]")
+        console.print(f"[dim]No {title.lower()} found.[/dim]")
         return
 
-    projects = [p for p in projects_dir.iterdir() if p.is_dir()]
+    # Deep scan for archived projects (they are nested by year)
+    if archived:
+        projects = []
+        for year_dir in projects_dir.iterdir():
+            if year_dir.is_dir():
+                projects.extend([p for p in year_dir.iterdir() if p.is_dir()])
+    else:
+        projects = [p for p in projects_dir.iterdir() if p.is_dir()]
 
     if not projects:
-        console.print("[dim]No projects found.[/dim]")
-        console.print("\nCreate one with:\n  [cyan]devbase dev new <name>[/cyan]")
+        console.print(f"[dim]No {title.lower()} found.[/dim]")
         return
 
     table = Table(show_header=True, header_style="bold magenta")
@@ -509,21 +566,22 @@ def list_projects(
             gov_badge = "[green]Full[/green]"
 
         mtime = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
-
         table.add_row(p.name, mtime, gov_badge)
 
-    worktrees_dir = root / "20-29_CODE" / "22_worktrees"
-    if worktrees_dir.exists():
-        for wt in sorted(worktrees_dir.iterdir(), key=lambda x: x.name):
-            if wt.is_dir():
-                mtime = datetime.fromtimestamp(wt.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
-                table.add_row(wt.name, mtime, "[magenta]Worktree[/magenta]")
-                projects.append(wt)
+    # Add worktrees to active list
+    if not archived:
+        worktrees_dir = root / "20-29_CODE" / "22_worktrees"
+        if worktrees_dir.exists():
+            for wt in sorted(worktrees_dir.iterdir(), key=lambda x: x.name):
+                if wt.is_dir():
+                    mtime = datetime.fromtimestamp(wt.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+                    table.add_row(wt.name, mtime, "[magenta]Worktree[/magenta]")
+                    projects.append(wt)
 
     console.print(table)
     console.print(f"\n[dim]Total: {len(projects)} projects[/dim]")
 
-    telemetry.track("Listed projects", category="discovery", action="list_projects")
+    telemetry.track(f"Listed {'archived' if archived else 'active'} projects", action="list_projects")
 
 
 @app.command()
