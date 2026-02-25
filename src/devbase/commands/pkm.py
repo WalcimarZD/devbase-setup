@@ -433,9 +433,59 @@ status: draft
 
 
 @app.command()
+def cookbook(
+    ctx: typer.Context,
+    entry: Annotated[Optional[str], typer.Argument(help="Cookbook entry text")] = None,
+) -> None:
+    """
+    📖 Add entry to your technical Cookbook (Reusable patterns).
+    
+    Cookbooks are stored in '10-19_KNOWLEDGE/10_references/cookbook.md'.
+    
+    Example:
+        devbase pkm cookbook "Python Typer Subcommands pattern"
+    """
+    from datetime import datetime
+    import subprocess
+    
+    root: Path = ctx.obj["root"]
+    file_path = root / "10-19_KNOWLEDGE" / "10_references" / "cookbook.md"
+    
+    # Create if missing
+    if not file_path.exists():
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        content = f"""---
+type: cookbook
+created: {datetime.now().strftime('%Y-%m-%d')}
+tags: [cookbook, patterns]
+---
+
+# Technical Cookbook
+
+## 🧩 Patterns & Solutions
+
+"""
+        file_path.write_text(content, encoding="utf-8")
+        console.print(f"[green]✓[/green] Created new cookbook: [cyan]{file_path.name}[/cyan]")
+    
+    if entry:
+        timestamp = datetime.now().strftime("%Y-%m-%d")
+        with open(file_path, "a", encoding="utf-8") as f:
+            f.write(f"\n### {entry}\n")
+            f.write(f"**Data:** {timestamp}\n\n---\n")
+        
+        console.print(f"[green]✓[/green] Added to Cookbook: [cyan]{entry}[/cyan]")
+    else:
+        # Open in editor
+        console.print(f"Opening [cyan]cookbook.md[/cyan]...")
+        subprocess.run(["code", str(file_path)], shell=True, check=False)
+
+
+@app.command()
 def journal(
     ctx: typer.Context,
     entry: Annotated[Optional[str], typer.Argument(help="Entry text (if empty, opens file)")] = None,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Append silently")] = False,
 ) -> None:
     """
     📔 Add entry to weekly journal (auto-created).
@@ -482,7 +532,8 @@ status: active
 
 """
         file_path.write_text(content, encoding="utf-8")
-        console.print(f"[green]✓[/green] Created new journal: [cyan]{file_path.name}[/cyan]")
+        if not quiet:
+            console.print(f"[green]✓[/green] Created new journal: [cyan]{file_path.name}[/cyan]")
     
     # Action
     if entry:
@@ -491,7 +542,8 @@ status: active
         with open(file_path, "a", encoding="utf-8") as f:
             f.write(f"- [{timestamp}] {entry}\n")
         
-        console.print(f"[green]✓[/green] Added entry to [cyan]{filename}[/cyan]")
+        if not quiet:
+            console.print(f"[green]✓[/green] Added entry to [cyan]{filename}[/cyan]")
         
         # Telemetry
         from devbase.utils.telemetry import get_telemetry

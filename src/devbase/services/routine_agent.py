@@ -100,6 +100,32 @@ class RoutineAgent:
             logger.error(f"Failed to fetch logs: {e}")
             return []
 
+    def get_flow_summary_stats(self) -> str:
+        """Fetch command and commit stats for last 24h."""
+        conn = get_connection()
+        query = """
+            SELECT 
+                strftime(timestamp, '%Y-%m-%d %H:00') as start_time,
+                count(CASE WHEN event_type = 'command' THEN 1 END) as commands,
+                count(CASE WHEN event_type = 'commit' THEN 1 END) as commits
+            FROM events
+            WHERE timestamp >= (current_timestamp - INTERVAL 24 HOUR)
+            GROUP BY 1
+            ORDER BY 1 DESC
+        """
+        try:
+            results = conn.execute(query).fetchall()
+            if not results:
+                return "Sem atividade técnica registrada nas últimas 24h."
+            
+            lines = ["Resumo de atividade técnica (24h):"]
+            for row in results:
+                lines.append(f"- {row[0]}: {row[1]} comandos, {row[2]} commits")
+            return "\n".join(lines)
+        except Exception as e:
+            logger.debug(f"Failed to fetch flow summary: {e}")
+            return "Estatísticas de atividade indisponíveis."
+
     def generate_daybook_summary(self, target_date: str) -> DaybookSummary:
         """
         Generate a full summary for the daybook.
@@ -117,6 +143,8 @@ class RoutineAgent:
             DaybookSummary object
         """
         logs = self.get_daily_logs(target_date)
+        flow_stats = self.get_flow_summary_stats()
+        system_prompt = f"Aqui está o resumo da atividade técnica do usuário nas últimas 24h: {flow_stats}"
 
         # Prepare content for AI
         if not logs:
@@ -148,7 +176,11 @@ Logs:
 {sanitized.content}
 
 Response:"""
-                focus_resp = self.provider.generate(focus_prompt, temperature=0.3)
+                focus_resp = self.provider.generate(
+                    focus_prompt, 
+                    system_prompt=system_prompt,
+                    temperature=0.3
+                )
                 focus = focus_resp.content.strip()
 
                 # Prompt for Narrative
@@ -161,7 +193,11 @@ Logs:
 {sanitized.content}
 
 Narrative:"""
-                narrative_resp = self.provider.generate(narrative_prompt, temperature=0.5)
+                narrative_resp = self.provider.generate(
+                    narrative_prompt, 
+                    system_prompt=system_prompt,
+                    temperature=0.5
+                )
                 narrative = narrative_resp.content.strip()
 
             except Exception as e:

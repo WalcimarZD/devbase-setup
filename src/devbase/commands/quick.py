@@ -1,21 +1,195 @@
 """
-Quick Action Commands: quickstart, sync, note
-==============================================
-Composite commands for common workflows and instant knowledge capture.
+Quick Action Commands: quickstart, sync, note, and Interactive Dashboard
+========================================================================
+Composite commands for common workflows and interactive center for PKM.
 """
 import re
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Optional, List
 
 import typer
+import questionary
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
+from rich.style import Style
 from typing_extensions import Annotated
 
-app = typer.Typer(help="Quick action commands")
+app = typer.Typer(help="⚡ Productivity Shortcuts: One-command workflows and Interactive Dashboard.")
 console = Console()
 
+def get_pulse_data(root: Path):
+    """Extract productivity metrics from workspace Markdown files."""
+    data = {
+        "oven_tasks": 0,
+        "journal_last": "N/A",
+        "icebox_items": 0
+    }
+    
+    # 1. OVEN.md tasks
+    oven_path = root / "00-09_SYSTEM" / "02_planning" / "OVEN.md"
+    try:
+        if oven_path.exists():
+            content = oven_path.read_text(encoding="utf-8")
+            data["oven_tasks"] = len(re.findall(r"-\s*\[\s*\]", content))
+    except Exception:
+        pass
+        
+    # 2. JOURNAL.md last entry
+    journal_dir = root / "10-19_KNOWLEDGE" / "12_private-vault" / "journal"
+    try:
+        if journal_dir.exists():
+            journals = list(journal_dir.glob("weekly-*.md"))
+            if journals:
+                latest_journal = max(journals, key=lambda p: p.stat().st_mtime)
+                mtime = datetime.fromtimestamp(latest_journal.stat().st_mtime)
+                data["journal_last"] = mtime.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        pass
+        
+    # 3. ICEBOX.md items
+    icebox_path = root / "00-09_SYSTEM" / "02_planning" / "icebox.md"
+    try:
+        if icebox_path.exists():
+            content = icebox_path.read_text(encoding="utf-8")
+            # Count entries (usually ### [INBOX] or similar)
+            data["icebox_items"] = len(re.findall(r"###\s*\[", content))
+    except Exception:
+        pass
+        
+    return data
+
+def render_pulse(data):
+    """Render the Workspace Pulse panel."""
+    oven_label = "tarefa pendente" if data['oven_tasks'] == 1 else "tarefas pendentes"
+    icebox_label = "item capturado" if data['icebox_items'] == 1 else "itens capturados"
+    
+    pulse_content = (
+        f"🔥 [bold red]OVEN:[/bold red] {data['oven_tasks']} {oven_label}\n"
+        f"📔 [bold blue]JOURNAL:[/bold blue] Última atividade em {data['journal_last']}\n"
+        f"🧊 [bold cyan]ICEBOX:[/bold cyan] {data['icebox_items']} {icebox_label}"
+    )
+    console.print(Panel(pulse_content, title="[bold white]W O R K S P A C E   P U L S E[/bold white]", border_style="bright_blue", expand=False))
+
+def open_in_code(path: Path):
+    """Open a path in VS Code ensuring Windows compatibility."""
+    try:
+        # Use shell=True for Windows and ensure string path
+        # Using f-string to ensure quotes around path
+        subprocess.run(f'code "{path}"', shell=sys.platform == "win32", check=False)
+        console.print(f"[dim]✓ Abrindo {path.name} no VS Code...[/dim]")
+    except Exception as e:
+        console.print(f"[red]✗ Erro ao abrir VS Code: {e}[/red]")
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    """Interactive Productivity Dashboard entry point."""
+    if ctx.invoked_subcommand is not None:
+        return
+
+    # Use ServiceContainer to get the root path safely
+    services = ctx.obj.get("services")
+    if not services:
+        from devbase.services.container import ServiceContainer
+        services = ServiceContainer(ctx.obj["root"])
+    
+    root = services.root
+    
+    # Clear terminal
+    if sys.platform == "win32":
+        subprocess.run("cls", shell=True)
+    else:
+        subprocess.run("clear", shell=True)
+
+    console.print()
+    # Step 1: Pulse
+    pulse_data = get_pulse_data(root)
+    render_pulse(pulse_data)
+    console.print()
+
+    # Step 2: Interactive Menu
+    choice = questionary.select(
+        "Selecione uma ação de produtividade:",
+        choices=[
+            "📖 Ver Forno (OVEN.md)",
+            "📝 Escrever no Diário",
+            "🔍 Pesquisar no Cookbook",
+            "❄️ Capturar para o Icebox",
+            "⚙️ Sync Workspace",
+            "🚪 Sair"
+        ],
+        style=questionary.Style([
+            ('qmark', 'fg:#673ab7 bold'),
+            ('question', 'bold'),
+            ('answer', 'fg:#f44336 bold'),
+            ('pointer', 'fg:#673ab7 bold'),
+            ('highlighted', 'fg:#673ab7 bold'),
+            ('selected', 'fg:#cc2127'),
+            ('separator', 'fg:#cc2127'),
+            ('instruction', ''),
+        ])
+    ).ask()
+
+    if choice == "📖 Ver Forno (OVEN.md)":
+        oven_path = root / "00-09_SYSTEM" / "02_planning" / "OVEN.md"
+        if oven_path.exists():
+            content = oven_path.read_text(encoding="utf-8")
+            tasks = re.findall(r"-\s*\[\s*\]\s*(.*)", content)
+            
+            if tasks:
+                table = Table(title="🔥 Tarefas no Forno", box=None)
+                table.add_column("ID", style="dim")
+                table.add_column("Tarefa")
+                for i, task in enumerate(tasks, 1):
+                    table.add_row(str(i), task)
+                console.print(table)
+            else:
+                console.print("[yellow]Nenhuma tarefa pendente no OVEN.md[/yellow]")
+            
+            if questionary.confirm("Abrir arquivo no VS Code?").ask():
+                open_in_code(oven_path)
+        else:
+            console.print(f"[red]OVEN.md não encontrado em {oven_path}[/red]")
+
+    elif choice == "📝 Escrever no Diário":
+        from devbase.commands.pkm import journal
+        journal(ctx)
+
+    elif choice == "🔍 Pesquisar no Cookbook":
+        query = questionary.text("O que você deseja buscar no Cookbook?").ask()
+        if query:
+            cookbook_path = root / "10-19_KNOWLEDGE" / "10_references" / "cookbook.md"
+            if cookbook_path.exists():
+                # Use Select-String logic via Python
+                content = cookbook_path.read_text(encoding="utf-8")
+                matches = []
+                for i, line in enumerate(content.splitlines(), 1):
+                    if query.lower() in line.lower():
+                        matches.append((i, line.strip()))
+                
+                if matches:
+                    console.print(f"\n[bold green]✓ Encontrado {len(matches)} resultado(s):[/bold green]")
+                    for line_no, text in matches:
+                        console.print(f"  [dim]L{line_no}:[/dim] {text.replace(query, f'[bold yellow]{query}[/bold yellow]')}")
+                else:
+                    console.print(f"[yellow]Nenhum resultado para '{query}' no Cookbook.[/yellow]")
+            else:
+                console.print("[red]Cookbook não encontrado.[/red]")
+
+    elif choice == "❄️ Capturar para o Icebox":
+        idea = questionary.text("Qual ideia você deseja capturar?").ask()
+        if idea:
+            from devbase.commands.pkm import icebox
+            icebox(ctx, idea)
+
+    elif choice == "⚙️ Sync Workspace":
+        sync(ctx)
+
+    elif choice == "🚪 Sair":
+        console.print("[dim]Até logo![/dim]")
 
 @app.command()
 def note(
@@ -75,13 +249,7 @@ tags: [{"til" if til else "note"}, quick]
     console.print(f"[green]✓[/green] Note saved: [cyan]{filepath.relative_to(root)}[/cyan]")
     
     if edit:
-        try:
-            import shutil
-            if shutil.which("code"):
-                subprocess.run(["code", str(filepath)], check=False)
-                console.print("[dim]Opened in VS Code[/dim]")
-        except Exception:
-            pass
+        open_in_code(filepath)
     
     console.print()
 
@@ -173,8 +341,6 @@ def sync(ctx: typer.Context) -> None:
     console.print("[bold cyan]🔄 Workspace Sync[/bold cyan]\n")
 
     # Import command modules
-    from rich.panel import Panel
-
     from devbase.commands.core import doctor, hydrate
     from devbase.commands.operations import backup
 
