@@ -18,12 +18,24 @@ devbase-setup.code-workspace
 !.cursorrules
 .DS_Store
 temp_workspace/
+test_workspace/
 pollution.txt
+.claude/
+.cline/
 
-# Python
+# Environment & Dependencies
+.venv/
+venv/
+ENV/
+env/
+.env
+.python-version
+.uv/
+
+# Python & Build
 __pycache__/
 *.py[cod]
-*.class
+*$py.class
 *.so
 .Python
 build/
@@ -43,28 +55,32 @@ wheels/
 *.egg
 MANIFEST
 
-# Pytest
+# Pytest & Coverage
 .pytest_cache/
-
-# Local Test Output
-test_output/
+.coverage
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
 
 # VS Code
-.vscode/
+.vscode/*
 !.vscode/extensions.json
-!.vscode/settings.json
+!.vscode/launch.json
 
-# DevBase State (should be local)
+# DevBase Specific (Local State & Telemetry)
 .devbase_state.json
-.coverage
-
+.telemetry/
+*.db
+*.duckdb
+debug_report.md
 12_private_vault/
+test_output/
 
-# Added by DevBase Doctor (Isolation Rules)
-20-29_CODE/
-90-99_ARCHIVE_COLD/
-30-39_OPERATIONS/31_backups/
-
-# AI Tools
-.claude/
-.cline/
+# Isolation Rules (Projects in workspace)
+20-29_CODE/21_monorepo_apps/*/
+20-29_CODE/22_worktrees/*/
+20-29_CODE/23_playground/*/
+90-99_ARCHIVE_COLD/92_archived_projects/*/
+30-39_OPERATIONS/31_backups/*/
