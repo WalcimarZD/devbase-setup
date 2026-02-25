@@ -7,9 +7,17 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased] - In Progress
 
+### Added
+- **System Maintenance (`devbase system`)**: New command group for environment updates and self-repair.
+- **Active Diagnostics**: Refactored `debug` command to use real-time probes (ENV, DATA, AI, SPACE) instead of static tests.
+- **Project Lifecycle**: Added `dev restore` to recover projects from archives and `dev list --archived` to browse the cold archive.
+- **Interactive Navigation**: `nav` command now features an interactive selection menu via `questionary`.
+
 ### Changed
-- Modified src/devbase/main.py
-- Modified src/devbase/commands/audit.py
+- **Router Architecture**: Implemented Pure Router Pattern in `main.py` for deterministic help ordering and lazy loading.
+- **Telemetry Engine**: Added JSONL fallback logging for improved data resilience and compatibility with external analytics.
+- **Enhanced UI**: Improved terminal help descriptions with Neo-Glassmorphism aesthetic cues and forced ASCII panel ordering.
+- **Dependencies**: Added `pandas` to project requirements for advanced analytics support.
 
 ## [5.1.0-alpha.3] - 2025-12-28
 

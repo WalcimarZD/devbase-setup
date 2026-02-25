@@ -44,6 +44,7 @@ ai = [
 db = [
     # Embedded OLAP database for telemetry and analytics
     "duckdb>=0.10.0",
+    "pandas>=2.0.0",
 ]
 viz = [
     # Knowledge graph visualization
@@ -63,6 +64,7 @@ db = "devbase.main:cli_main"
 
 [project.entry-points."devbase.commands"]
 core = "devbase.commands.core:app"
+system = "devbase.commands.system:app"
 dev = "devbase.commands.dev:app"
 nav = "devbase.commands.navigation:app"
 audit = "devbase.commands.audit:app"
