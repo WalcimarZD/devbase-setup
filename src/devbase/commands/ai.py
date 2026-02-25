@@ -458,7 +458,7 @@ def draft(
         return
 
     try:
-        service = _get_service()
+        service = _get_service(ctx)
         if json_output:
             suggestion = service.suggest_draft(message)
             console.print(json_lib.dumps(suggestion))
@@ -573,3 +573,4 @@ def triage(
                 console.print(f"   [yellow]⚠ Skipped.[/yellow]")
         
         console.print("[dim]──────────────────────────────────────────────────[/dim]")
+
