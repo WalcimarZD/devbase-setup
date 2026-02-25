@@ -19,6 +19,10 @@ from typing_extensions import Annotated
 from devbase.commands.debug import debug_cmd
 from devbase.utils.filesystem import get_filesystem
 from devbase.utils.state import get_state_manager
+from devbase.utils.paths import (
+    JD_SYSTEM, JD_KNOWLEDGE, JD_CODE, JD_OPERATIONS, JD_MEDIA, JD_ARCHIVE,
+    JD_PLANNING, JD_TEMPLATES, JD_REFERENCES, JD_PUBLIC_GARDEN, JD_PRIVATE_VAULT
+)
 
 app = typer.Typer(help="Core workspace commands")
 console = Console()
@@ -35,35 +39,35 @@ POLICY_VERSION = "5.0"
 # Data-driven folder structure
 FOLDER_STRUCTURE = {
     "Core Structure": [
-        "00-09_SYSTEM",
-        "10-19_KNOWLEDGE",
-        "20-29_CODE",
-        "30-39_OPERATIONS",
-        "40-49_MEDIA_ASSETS",
-        "90-99_ARCHIVE_COLD",
+        JD_SYSTEM,
+        JD_KNOWLEDGE,
+        JD_CODE,
+        JD_OPERATIONS,
+        JD_MEDIA,
+        JD_ARCHIVE,
     ],
     "Knowledge Management": [
-        "10-19_KNOWLEDGE/11_public_garden",
-        "10-19_KNOWLEDGE/12_private_vault",
+        JD_PUBLIC_GARDEN,
+        JD_PRIVATE_VAULT,
     ],
     "Code Templates": [
-        "20-29_CODE/21_monorepo_apps",
-        "20-29_CODE/22_worktrees",
-        "20-29_CODE/23_playground",
+        f"{JD_CODE}/21_monorepo_apps",
+        f"{JD_CODE}/22_worktrees",
+        f"{JD_CODE}/23_playground",
     ],
     "AI Integration": [
-        "00-09_SYSTEM/05_templates",
+        JD_TEMPLATES,
     ],
     "Operations": [
-        "30-39_OPERATIONS/31_backups",
-        "30-39_OPERATIONS/32_automation",
+        f"{JD_OPERATIONS}/31_backups",
+        f"{JD_OPERATIONS}/32_automation",
     ],
     "Media Assets": [
-        "40-49_MEDIA_ASSETS/40_images",
-        "40-49_MEDIA_ASSETS/41_videos",
-        "40-49_MEDIA_ASSETS/42_audio",
-        "40-49_MEDIA_ASSETS/43_fonts",
-        "40-49_MEDIA_ASSETS/44_design_sources",
+        f"{JD_MEDIA}/40_images",
+        f"{JD_MEDIA}/41_videos",
+        f"{JD_MEDIA}/42_audio",
+        f"{JD_MEDIA}/43_fonts",
+        f"{JD_MEDIA}/44_design_sources",
     ],
 }
 
@@ -97,17 +101,17 @@ def create_governance_files(fs) -> None:
             "*.pyc\n"
             ".DS_Store\n\n"
             "# Areas with independent lifecycles (Managed as separate repos or too large)\n"
-            "20-29_CODE/\n"
-            "30-39_OPERATIONS/31_backups/\n"
-            "40-49_MEDIA_ASSETS/\n"
-            "90-99_ARCHIVE_COLD/\n\n"
+            f"{JD_CODE}/\n"
+            f"{JD_OPERATIONS}/31_backups/\n"
+            f"{JD_MEDIA}/\n"
+            f"{JD_ARCHIVE}/\n\n"
             "# Security (Air-Gap Protection)\n"
-            "10-19_KNOWLEDGE/12_private_vault/\n"
+            f"{JD_PRIVATE_VAULT}/\n"
             "*.env\n"
         )
 
-    if not fs.exists("00-09_SYSTEM/00.00_index.md"):
-        fs.write_atomic("00-09_SYSTEM/00.00_index.md",
+    if not fs.exists(f"{JD_SYSTEM}/00.00_index.md"):
+        fs.write_atomic(f"{JD_SYSTEM}/00.00_index.md",
             "# Johnny.Decimal Index\n\n"
             "Master index of the workspace.\n"
         )
@@ -117,20 +121,20 @@ def run_setup_core(fs, policy_version=None):
     run_setup_module(fs, "Core Structure", policy_version)
     create_governance_files(fs)
     required_subfolders = [
-        '00-09_SYSTEM/00_inbox', '00-09_SYSTEM/01_dotfiles',
-        '00-09_SYSTEM/05_templates', '00-09_SYSTEM/07_documentation',
-        '10-19_KNOWLEDGE/10_guides_and_references', '10-19_KNOWLEDGE/11_public_garden',
-        '10-19_KNOWLEDGE/12_private_vault', '10-19_KNOWLEDGE/13_architecture_and_specs',
-        '10-19_KNOWLEDGE/14_library', '20-29_CODE/21_monorepo_apps',
-        '20-29_CODE/22_worktrees', '20-29_CODE/23_playground',
-        '30-39_OPERATIONS/31_backups', '30-39_OPERATIONS/32_automation',
-        '40-49_MEDIA_ASSETS/40_images', '40-49_MEDIA_ASSETS/41_videos',
-        '40-49_MEDIA_ASSETS/42_audio', '40-49_MEDIA_ASSETS/43_fonts',
-        '40-49_MEDIA_ASSETS/44_design_sources',
+        f'{JD_SYSTEM}/00_inbox', f'{JD_SYSTEM}/01_dotfiles',
+        JD_TEMPLATES, f'{JD_SYSTEM}/07_documentation',
+        f'{JD_KNOWLEDGE}/10_guides_and_references', JD_PUBLIC_GARDEN,
+        JD_PRIVATE_VAULT, f'{JD_KNOWLEDGE}/13_architecture_and_specs',
+        f'{JD_KNOWLEDGE}/14_library', f'{JD_CODE}/21_monorepo_apps',
+        f'{JD_CODE}/22_worktrees', f'{JD_CODE}/23_playground',
+        f'{JD_OPERATIONS}/31_backups', f'{JD_OPERATIONS}/32_automation',
+        f'{JD_MEDIA}/40_images', f'{JD_MEDIA}/41_videos',
+        f'{JD_MEDIA}/42_audio', f'{JD_MEDIA}/43_fonts',
+        f'{JD_MEDIA}/44_design_sources',
     ]
     for subfolder in required_subfolders:
         fs.ensure_dir(subfolder)
-    copy_built_in_templates(fs, "core/00-09_SYSTEM", "00-09_SYSTEM")
+    copy_built_in_templates(fs, f"core/{JD_SYSTEM}", JD_SYSTEM)
 
 
 def run_setup_pkm(fs, policy_version=None):
@@ -163,7 +167,7 @@ def copy_built_in_templates(fs, category: str, destination: str):
 
 def run_setup_code(fs, policy_version=None):
     run_setup_module(fs, "Code Templates", policy_version)
-    copy_built_in_templates(fs, "code", "00-09_SYSTEM/05_templates")
+    copy_built_in_templates(fs, "code", JD_TEMPLATES)
 
 
 def run_setup_ai(fs, policy_version=None):

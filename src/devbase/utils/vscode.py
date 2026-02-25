@@ -71,29 +71,23 @@ def generate_vscode_workspace(project_path: Path, project_name: str) -> Path:
     return workspace_file
 
 
-def open_in_vscode(project_path: Path) -> bool:
+def open_in_vscode(path: Path) -> bool:
     """
-    Open a project in VS Code.
+    Open a project or file in VS Code ensuring Windows compatibility.
     
     Args:
-        project_path: Path to project or workspace file
+        path: Path to project, file or workspace file
         
     Returns:
         True if successful
     """
     import subprocess
-    
-    # Look for workspace file first
-    workspace_files = list(project_path.glob("*.code-workspace"))
-    target = workspace_files[0] if workspace_files else project_path
+    import sys
     
     try:
-        subprocess.run(["code", str(target)], check=True)
-        console.print(f"[green]✓[/green] Opened in VS Code")
+        shell = sys.platform == "win32"
+        subprocess.run(f'code "{path}"', shell=shell, check=False)
         return True
-    except FileNotFoundError:
-        console.print("[yellow]⚠ VS Code not found in PATH. Install VS Code or add to PATH.[/yellow]")
-        return False
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         console.print(f"[red]✗ Failed to open VS Code: {e}[/red]")
         return False

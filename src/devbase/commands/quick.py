@@ -18,6 +18,11 @@ from rich.table import Table
 from rich.style import Style
 from typing_extensions import Annotated
 
+from devbase.utils.paths import (
+    JD_PLANNING, JD_JOURNAL, JD_REFERENCES, JD_PUBLIC_GARDEN
+)
+from devbase.utils.vscode import open_in_vscode
+
 app = typer.Typer(help="⚡ Productivity Shortcuts: One-command workflows and Interactive Dashboard.")
 console = Console()
 
@@ -30,16 +35,16 @@ def get_pulse_data(root: Path):
     }
     
     # 1. OVEN.md tasks
-    oven_path = root / "00-09_SYSTEM" / "02_planning" / "OVEN.md"
+    oven_path = root / JD_PLANNING / "OVEN.md"
     try:
         if oven_path.exists():
             content = oven_path.read_text(encoding="utf-8")
             data["oven_tasks"] = len(re.findall(r"-\s*\[\s*\]", content))
-    except Exception:
+    except (FileNotFoundError, PermissionError):
         pass
         
     # 2. JOURNAL.md last entry
-    journal_dir = root / "10-19_KNOWLEDGE" / "12_private-vault" / "journal"
+    journal_dir = root / JD_JOURNAL
     try:
         if journal_dir.exists():
             journals = list(journal_dir.glob("weekly-*.md"))
@@ -47,17 +52,17 @@ def get_pulse_data(root: Path):
                 latest_journal = max(journals, key=lambda p: p.stat().st_mtime)
                 mtime = datetime.fromtimestamp(latest_journal.stat().st_mtime)
                 data["journal_last"] = mtime.strftime("%Y-%m-%d %H:%M")
-    except Exception:
+    except (FileNotFoundError, PermissionError):
         pass
         
     # 3. ICEBOX.md items
-    icebox_path = root / "00-09_SYSTEM" / "02_planning" / "icebox.md"
+    icebox_path = root / JD_PLANNING / "icebox.md"
     try:
         if icebox_path.exists():
             content = icebox_path.read_text(encoding="utf-8")
             # Count entries (usually ### [INBOX] or similar)
             data["icebox_items"] = len(re.findall(r"###\s*\[", content))
-    except Exception:
+    except (FileNotFoundError, PermissionError):
         pass
         
     return data
@@ -73,16 +78,6 @@ def render_pulse(data):
         f"🧊 [bold cyan]ICEBOX:[/bold cyan] {data['icebox_items']} {icebox_label}"
     )
     console.print(Panel(pulse_content, title="[bold white]W O R K S P A C E   P U L S E[/bold white]", border_style="bright_blue", expand=False))
-
-def open_in_code(path: Path):
-    """Open a path in VS Code ensuring Windows compatibility."""
-    try:
-        # Use shell=True for Windows and ensure string path
-        # Using f-string to ensure quotes around path
-        subprocess.run(f'code "{path}"', shell=sys.platform == "win32", check=False)
-        console.print(f"[dim]✓ Abrindo {path.name} no VS Code...[/dim]")
-    except Exception as e:
-        console.print(f"[red]✗ Erro ao abrir VS Code: {e}[/red]")
 
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
@@ -134,7 +129,7 @@ def main(ctx: typer.Context):
     ).ask()
 
     if choice == "📖 Ver Forno (OVEN.md)":
-        oven_path = root / "00-09_SYSTEM" / "02_planning" / "OVEN.md"
+        oven_path = root / JD_PLANNING / "OVEN.md"
         if oven_path.exists():
             content = oven_path.read_text(encoding="utf-8")
             tasks = re.findall(r"-\s*\[\s*\]\s*(.*)", content)
@@ -147,10 +142,10 @@ def main(ctx: typer.Context):
                     table.add_row(str(i), task)
                 console.print(table)
             else:
-                console.print("[yellow]Nenhuma tarefa pendente no OVEN.md[/yellow]")
+                console.print(f"[yellow]Nenhuma tarefa pendente no OVEN.md[/yellow]")
             
             if questionary.confirm("Abrir arquivo no VS Code?").ask():
-                open_in_code(oven_path)
+                open_in_vscode(oven_path)
         else:
             console.print(f"[red]OVEN.md não encontrado em {oven_path}[/red]")
 
@@ -161,7 +156,7 @@ def main(ctx: typer.Context):
     elif choice == "🔍 Pesquisar no Cookbook":
         query = questionary.text("O que você deseja buscar no Cookbook?").ask()
         if query:
-            cookbook_path = root / "10-19_KNOWLEDGE" / "10_references" / "cookbook.md"
+            cookbook_path = root / JD_REFERENCES / "cookbook.md"
             if cookbook_path.exists():
                 # Use Select-String logic via Python
                 content = cookbook_path.read_text(encoding="utf-8")
@@ -218,13 +213,13 @@ def note(
     # Determine save location
     date = datetime.now()
     if til:
-        base_dir = root / "10-19_KNOWLEDGE" / "11_public_garden" / "til"
+        base_dir = root / JD_PUBLIC_GARDEN / "til"
         # Temporal organization (Fase 4 prep)
         year_dir = base_dir / str(date.year)
         month_dir = year_dir / f"{date.month:02d}-{date.strftime('%B').lower()}"
         save_dir = month_dir
     else:
-        save_dir = root / "10-19_KNOWLEDGE" / "11_public_garden" / "notes"
+        save_dir = root / JD_PUBLIC_GARDEN / "notes"
     
     save_dir.mkdir(parents=True, exist_ok=True)
     
@@ -249,7 +244,7 @@ tags: [{"til" if til else "note"}, quick]
     console.print(f"[green]✓[/green] Note saved: [cyan]{filepath.relative_to(root)}[/cyan]")
     
     if edit:
-        open_in_code(filepath)
+        open_in_vscode(filepath)
     
     console.print()
 

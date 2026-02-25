@@ -11,6 +11,12 @@ from rich.console import Console
 from rich.table import Table
 from typing_extensions import Annotated
 
+from devbase.utils.paths import (
+    JD_KNOWLEDGE, JD_PUBLIC_GARDEN, JD_REFERENCES, JD_PRIVATE_VAULT,
+    JD_JOURNAL, JD_PLANNING, JD_ARCHIVE
+)
+from devbase.utils.vscode import open_in_vscode
+
 app = typer.Typer(help="Personal Knowledge Management commands")
 console = Console()
 
@@ -107,7 +113,7 @@ def graph(
     ] = False,
     global_scope: Annotated[
         bool,
-        typer.Option("--global", help="Include archive (90-99_ARCHIVE_COLD) in graph"),
+        typer.Option("--global", help=f"Include archive ({JD_ARCHIVE}) in graph"),
     ] = False,
 ) -> None:
     """
@@ -195,7 +201,7 @@ def graph(
 @app.command()
 def links(
     ctx: typer.Context,
-    note: Annotated[str, typer.Argument(help="Note path (relative to 10-19_KNOWLEDGE)")],
+    note: Annotated[str, typer.Argument(help=f"Note path (relative to {JD_KNOWLEDGE})")],
 ) -> None:
     """
     🔗 Show connections for a specific note.
@@ -269,7 +275,7 @@ def index(
 
     root: Path = ctx.obj["root"]
 
-    target_dir = root / "10-19_KNOWLEDGE" / "11_public_garden" / folder
+    target_dir = root / JD_PUBLIC_GARDEN / folder
 
     if not target_dir.exists():
         console.print(f"[red]✗[/red] Folder not found: {folder}")
@@ -356,10 +362,10 @@ def new(
     📝 Create a new note and queue for AI classification.
 
     Creates a new note in the appropriate folder based on Diataxis type:
-    - tutorial -> 10-19_KNOWLEDGE/10_references (placeholder)
-    - how-to -> 10-19_KNOWLEDGE/10_references
-    - reference -> 10-19_KNOWLEDGE/10_references
-    - explanation -> 10-19_KNOWLEDGE/10_references
+    - tutorial -> {JD_REFERENCES} (placeholder)
+    - how-to -> {JD_REFERENCES}
+    - reference -> {JD_REFERENCES}
+    - explanation -> {JD_REFERENCES}
 
     (Note: In v5.1, we default to '10_references' or '11_public_garden' until
      more granular mapping is defined. Using '10_references' for now.)
@@ -394,8 +400,8 @@ def new(
         slug += ".md"
 
     # Determine target directory
-    # Defaulting to 10-19_KNOWLEDGE/10_references as a safe default for now
-    target_dir = root / "10-19_KNOWLEDGE" / "10_references"
+    # Defaulting to {JD_REFERENCES} as a safe default for now
+    target_dir = root / JD_REFERENCES
     target_dir.mkdir(parents=True, exist_ok=True)
 
     file_path = target_dir / slug
@@ -432,6 +438,20 @@ status: draft
         console.print("[yellow]⚠ Failed to enqueue AI task[/yellow]")
 
 
+def load_pkm_template(template_name: str) -> str:
+    """Load a PKM template from the package templates directory."""
+    import devbase
+    pkg_root = Path(devbase.__file__).parent
+    template_path = pkg_root / "templates" / "pkm" / f"{template_name}.md.template"
+    
+    if not template_path.exists():
+        console.print(f"[red]✗ Template error:[/red] {template_name} not found.")
+        console.print(f"[dim]Expected at: {template_path}[/dim]")
+        raise typer.Exit(1)
+        
+    return template_path.read_text(encoding="utf-8")
+
+
 @app.command()
 def cookbook(
     ctx: typer.Context,
@@ -440,31 +460,21 @@ def cookbook(
     """
     📖 Add entry to your technical Cookbook (Reusable patterns).
     
-    Cookbooks are stored in '10-19_KNOWLEDGE/10_references/cookbook.md'.
+    Cookbooks are stored in '{JD_REFERENCES}/cookbook.md'.
     
     Example:
         devbase pkm cookbook "Python Typer Subcommands pattern"
     """
     from datetime import datetime
-    import subprocess
     
     root: Path = ctx.obj["root"]
-    file_path = root / "10-19_KNOWLEDGE" / "10_references" / "cookbook.md"
+    file_path = root / JD_REFERENCES / "cookbook.md"
     
     # Create if missing
     if not file_path.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        content = f"""---
-type: cookbook
-created: {datetime.now().strftime('%Y-%m-%d')}
-tags: [cookbook, patterns]
----
-
-# Technical Cookbook
-
-## 🧩 Patterns & Solutions
-
-"""
+        template = load_pkm_template("cookbook")
+        content = template.format(created_date=datetime.now().strftime('%Y-%m-%d'))
         file_path.write_text(content, encoding="utf-8")
         console.print(f"[green]✓[/green] Created new cookbook: [cyan]{file_path.name}[/cyan]")
     
@@ -478,7 +488,7 @@ tags: [cookbook, patterns]
     else:
         # Open in editor
         console.print(f"Opening [cyan]cookbook.md[/cyan]...")
-        subprocess.run(["code", str(file_path)], shell=True, check=False)
+        open_in_vscode(file_path)
 
 
 @app.command()
@@ -491,7 +501,7 @@ def journal(
     📔 Add entry to weekly journal (auto-created).
     
     If entry text is provided:
-    - Appends to '10-19_KNOWLEDGE/12_private-vault/journal/weekly-YYYY-Www.md'
+    - Appends to '{JD_JOURNAL}/weekly-YYYY-Www.md'
     - Tracks telemetry
     
     If no text:
@@ -501,7 +511,6 @@ def journal(
         devbase pkm journal "Learned about DuckDB today"
     """
     from datetime import datetime
-    import subprocess
     
     root: Path = ctx.obj["root"]
     
@@ -510,27 +519,19 @@ def journal(
     year, week, weekday = today.isocalendar()
     filename = f"weekly-{year}-W{week:02d}.md"
     
-    journal_dir = root / "10-19_KNOWLEDGE" / "12_private-vault" / "journal"
+    journal_dir = root / JD_JOURNAL
     journal_dir.mkdir(parents=True, exist_ok=True)
     
     file_path = journal_dir / filename
     
     # Create if missing
     if not file_path.exists():
-        start_of_week = today # Approximation for created date
-        content = f"""---
-type: journal
-template: weekly-retrospective
-created: {start_of_week.strftime('%Y-%m-%d')}
-tags: [journal, retrospective]
-status: active
----
-
-# Weekly Journal ({year}-W{week:02d})
-
-## 📅 Log
-
-"""
+        template = load_pkm_template("weekly-journal")
+        content = template.format(
+            created_date=today.strftime('%Y-%m-%d'),
+            year=year,
+            week=week
+        )
         file_path.write_text(content, encoding="utf-8")
         if not quiet:
             console.print(f"[green]✓[/green] Created new journal: [cyan]{file_path.name}[/cyan]")
@@ -556,10 +557,8 @@ status: active
         )
     else:
         # Open in editor (VS Code)
-        import sys
         console.print(f"Opening [cyan]{filename}[/cyan]...")
-        shell = sys.platform == "win32"
-        subprocess.run(["code", str(file_path)], shell=shell, check=False)
+        open_in_vscode(file_path)
 
 
 @app.command()
@@ -569,7 +568,7 @@ def icebox(
     tag: Annotated[Optional[str], typer.Option("--tag", "-t", help="Section tag (default: 'Novas Ideias')")] = None,
 ) -> None:
     """
-    🧊 Add item to Icebox (02_planning/icebox.md).
+    🧊 Add item to Icebox ({JD_PLANNING}/icebox.md).
     
     If idea text is provided:
     - Appends to Icebox file
@@ -581,11 +580,10 @@ def icebox(
     Example:
         devbase pkm icebox "Migrate to localized dates"
     """
-    import subprocess
     from datetime import datetime
     
     root: Path = ctx.obj["root"]
-    file_path = root / "00-09_SYSTEM" / "02_planning" / "icebox.md"
+    file_path = root / JD_PLANNING / "icebox.md"
     
     if not file_path.exists():
         console.print(f"[red]✗[/red] Icebox file not found at {file_path}")
@@ -615,4 +613,4 @@ def icebox(
     else:
          # Open in editor
         console.print(f"Opening [cyan]icebox.md[/cyan]...")
-        subprocess.run(["code", str(file_path)], check=False)
+        open_in_vscode(file_path)

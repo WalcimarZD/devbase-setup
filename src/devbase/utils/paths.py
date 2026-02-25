@@ -41,6 +41,25 @@ def resolve_workspace_path(
 
 
 # =============================================================================
+# Johnny.Decimal Path Registry
+# =============================================================================
+
+JD_SYSTEM = "00-09_SYSTEM"
+JD_KNOWLEDGE = "10-19_KNOWLEDGE"
+JD_CODE = "20-29_CODE"
+JD_OPERATIONS = "30-39_OPERATIONS"
+JD_MEDIA = "40-49_MEDIA_ASSETS"
+JD_ARCHIVE = "90-99_ARCHIVE_COLD"
+
+JD_PLANNING = f"{JD_SYSTEM}/02_planning"
+JD_TEMPLATES = f"{JD_SYSTEM}/05_templates"
+JD_REFERENCES = f"{JD_KNOWLEDGE}/10_references"
+JD_PUBLIC_GARDEN = f"{JD_KNOWLEDGE}/11_public_garden"
+JD_PRIVATE_VAULT = f"{JD_KNOWLEDGE}/12_private-vault"
+JD_JOURNAL = f"{JD_PRIVATE_VAULT}/journal"
+
+
+# =============================================================================
 # DevBase Directory Resolution (Portable Workspace Support)
 # =============================================================================
 

@@ -1,0 +1,11 @@
+---
+type: journal
+template: weekly-retrospective
+created: {created_date}
+tags: [journal, retrospective]
+status: active
+---
+
+# Weekly Journal ({year}-W{week:02d})
+
+## 📅 Log
