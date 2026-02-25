@@ -15,51 +15,58 @@ app = typer.Typer(help="Navigation commands")
 console = Console()
 
 
+import questionary
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    """🧭 Semantic navigation shortcuts."""
+    if ctx.invoked_subcommand is None:
+        root: Path = ctx.obj["root"]
+        locations = get_semantic_locations(root)
+        
+        # Interactive Selection
+        choice = questionary.select(
+            "Where do you want to go?",
+            choices=[questionary.Choice(title=f"{name} ({locations[name].relative_to(root)})", value=name) 
+                     for name in sorted(locations.keys())]
+        ).ask()
+        
+        if choice:
+            console.print(str(locations[choice]))
+
+@app.command()
+def list(ctx: typer.Context) -> None:
+    """📄 List all available semantic locations."""
+    root: Path = ctx.obj["root"]
+    locations = get_semantic_locations(root)
+    
+    console.print("\n[bold]Semantic Locations:[/bold]")
+    for name in sorted(locations.keys()):
+        path = locations[name].relative_to(root)
+        console.print(f"  [cyan]{name:12}[/cyan] → [dim]{path}[/dim]")
+
 @app.command()
 def goto(
     ctx: typer.Context,
-    location: Annotated[str, typer.Argument(help="Semantic location name")],
+    location: Annotated[str, typer.Argument(help="Semantic location name")] = None,
 ) -> None:
     """
-    🧭 Navigate to semantic workspace locations.
+    🧭 Resolve semantic path for shell navigation.
     
-    Available locations:
-    - code: Main application projects
-    - packages: Shared libraries/packages
-    - knowledge: Public notes and documentation
-    - vault: Private vault (Air-Gap protected)
-    - ai: AI models and configuration
-    - backups: Backup storage
-    - inbox: Temporary file inbox
-    - templates: Project templates
-    - dotfiles: Configuration dotfiles
-    
-    Example:
-        devbase nav goto code      # → 20-29_CODE/21_monorepo_apps
-        devbase nav goto vault     # → 10-19_KNOWLEDGE/12_private_vault
-    
-    Shell Integration:
-        Add to ~/.bashrc or ~/.zshrc:
-        
-        goto() {
-            cd $(devbase nav goto "$1")
-        }
-        
-        Then use: goto code
+    If location is missing, shows available options.
     """
     root: Path = ctx.obj["root"]
-
     locations = get_semantic_locations(root)
 
-    if location not in locations:
-        console.print(f"[red]✗ Unknown location: {location}[/red]\n")
-        console.print("[bold]Available locations:[/bold]")
+    if not location or location not in locations:
+        if location:
+            console.print(f"[red]✗ Unknown location: {location}[/red]")
+        
+        # Show options and path for shell integration
         for name in sorted(locations.keys()):
             path = locations[name].relative_to(root)
             console.print(f"  [cyan]{name:12}[/cyan] → [dim]{path}[/dim]")
         raise typer.Exit(1)
 
-    target = locations[location]
-
     # Print path for shell integration
-    console.print(str(target))
+    console.print(str(locations[location]))

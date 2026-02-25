@@ -322,8 +322,16 @@ def doctor(
 @app.command()
 def hydrate(
     ctx: typer.Context,
-    force: Annotated[bool, typer.Option("--force", "-f", help="Overwrite templates")] = False,
+    force: Annotated[bool, typer.Option("--force", "-f", help="Overwrite existing templates")] = False,
 ) -> None:
+    """
+    💧 [bold]Sync workspace with latest templates and configs.[/bold]
+
+    Updates the core Johnny.Decimal templates and internal configurations 
+    without affecting your personal data or projects.
+
+    [bold]USE CASE:[/bold] Use after a DevBase update to get new blueprints.
+    """
     root: Path = ctx.obj["root"]
     console.print("\n[bold]Hydrating workspace...[/bold]")
     fs = get_filesystem(str(root), dry_run=False)
@@ -341,6 +349,14 @@ def hydrate(
 
 @app.command(name="hydrate-icons")
 def hydrate_icons_cmd(ctx: typer.Context) -> None:
+    """
+    🎨 [bold]Apply custom icons to Johnny.Decimal folders.[/bold]
+
+    Matches icons (00.ico, 10.ico, etc.) to their respective areas 
+    to provide a visual, Neo-Glassmorphism aesthetic in your file explorer.
+
+    [bold]REQUIREMENTS:[/bold] Place icon files in [cyan]~/.devbase/icons/[/cyan]
+    """
     root: Path = ctx.obj["root"]
     console.print("\n[bold]Applying folder icons...[/bold]\n")
     from devbase.utils.icons import get_icon_dir, hydrate_icons
