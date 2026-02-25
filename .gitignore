@@ -64,3 +64,7 @@ test_output/
 20-29_CODE/
 90-99_ARCHIVE_COLD/
 30-39_OPERATIONS/31_backups/
+
+# AI Tools
+.claude/
+.cline/
