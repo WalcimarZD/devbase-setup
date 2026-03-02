@@ -78,25 +78,26 @@ class GroqProvider(LLMProvider):
         model: str = DEFAULT_MODEL,
         timeout: float = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        root: Optional[Path] = None,
     ) -> None:
         """Initialize Groq provider.
         
         Args:
-            api_key: Groq API key. If not provided, will attempt to read from:
-                1. GROQ_API_KEY environment variable
-                2. ~/.devbase/config.toml [ai].groq_api_key
+            api_key: Groq API key. If not provided, will attempt to read from config.
             model: Model to use for completions.
             timeout: Request timeout in seconds.
             max_retries: Number of retries on transient errors.
+            root: Workspace root path for local config resolution.
         
         Raises:
             InvalidAPIKeyError: If no API key is found.
         """
+        self.root = root
         # Resolve API key from multiple sources
         self._api_key = (
             api_key
             or os.environ.get("GROQ_API_KEY")
-            or _get_api_key_from_config()
+            or _get_api_key_from_config(self.root)
         )
         
         if not self._api_key:

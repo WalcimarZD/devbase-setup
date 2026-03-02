@@ -75,12 +75,4 @@ coverage.xml
 *.db
 *.duckdb
 debug_report.md
-12_private_vault/
 test_output/
-
-# Isolation Rules (Projects in workspace)
-20-29_CODE/21_monorepo_apps/*/
-20-29_CODE/22_worktrees/*/
-20-29_CODE/23_playground/*/
-90-99_ARCHIVE_COLD/92_archived_projects/*/
-30-39_OPERATIONS/31_backups/*/

@@ -62,7 +62,7 @@ def detect_context(current_dir: Path, workspace_root: Path) -> dict:
         ("20-29_CODE", "21_monorepo_apps"): "code",
         ("20-29_CODE", "22_monorepo_packages"): "packages",
         ("10-19_KNOWLEDGE", "11_public_garden"): "knowledge",
-        ("10-19_KNOWLEDGE", "12_private_vault"): "vault",
+        ("10-19_KNOWLEDGE", "12_private-vault"): "vault",
         ("30-39_OPERATIONS", "30_ai"): "ai",
         ("30-39_OPERATIONS", "31_backups"): "backups",
         ("00-09_SYSTEM", "00_inbox"): "inbox",

@@ -84,7 +84,6 @@ nav:
       - Note: cli/note.md
       - Quickstart: cli/quickstart.md
   - Architecture: architecture.md
-  - Contributing: contributing.md
 
 extra:
   social:

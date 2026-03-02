@@ -128,8 +128,8 @@ def close_connection() -> None:
         try:
             _connection.execute("CHECKPOINT;")
             _connection.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"DuckDB connection close failed: {e}")
         _connection = None
 
 
@@ -284,10 +284,9 @@ def init_schema(conn: duckdb.DuckDBPyConnection) -> None:
         );
     """)
 
-    # Insert initial schema version if not exists
-    result = conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()
-    if result and result[0] == 0:
-        conn.execute("INSERT INTO schema_version VALUES (?)", [SCHEMA_VERSION])
+    # Ensure schema version is up to date
+    conn.execute("DELETE FROM schema_version;")
+    conn.execute("INSERT INTO schema_version VALUES (?)", [SCHEMA_VERSION])
 
 
 def enqueue_ai_task(

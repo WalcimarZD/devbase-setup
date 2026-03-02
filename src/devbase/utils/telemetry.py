@@ -83,7 +83,8 @@ class TelemetryService:
                 project=project_name,
                 metadata=json.dumps(full_metadata)
             )
-        except Exception: pass
+        except Exception as e:
+            logger.debug(f"Telemetry DuckDB write failed: {e}")
 
         # 2. JSONL Fallback (for analytics compatibility)
         try:
@@ -92,14 +93,15 @@ class TelemetryService:
             log_file = log_dir / "events.jsonl"
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(event_data) + "\n")
-        except Exception: pass
+        except Exception as e:
+            logger.debug(f"Telemetry JSONL write failed: {e}")
 
         # Trigger Active Assistance (Flow Detection)
         # We do this after logging so the current event counts towards the flow
         try:
             check_flow_state()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Flow detection trigger failed: {e}")
 
         # Return event dict for callers who might need it (mostly legacy)
         return {

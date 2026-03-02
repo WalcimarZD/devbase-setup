@@ -128,7 +128,7 @@ class FileSystem:
     
     def copy_atomic(self, source_path: str, dest_path: str) -> None:
         """
-        Copy file atomically.
+        Copy file atomically using temp-and-rename pattern.
         
         Args:
             source_path: Source path (relative or absolute)
@@ -144,8 +144,25 @@ class FileSystem:
         if self.dry_run:
             return
         
+        if not source.exists():
+            raise FileNotFoundError(f"Source file not found: {source}")
+
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, dest)
+        
+        # Create a temporary file in the destination directory
+        temp_fd, temp_path = tempfile.mkstemp(
+            dir=dest.parent,
+            suffix=".tmp"
+        )
+        try:
+            os.close(temp_fd) # Close the file descriptor, shutil.copy2 will open it
+            shutil.copy2(source, temp_path)
+            # Atomic rename
+            os.replace(temp_path, dest)
+        except Exception:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            raise
 
 
 def get_filesystem(root_path: str, dry_run: bool = False) -> FileSystem:
@@ -156,7 +173,8 @@ def get_filesystem(root_path: str, dry_run: bool = False) -> FileSystem:
 def scan_directory(
     root: Path,
     extensions: Optional[Set[str]] = None,
-    ignored_dirs: Optional[Set[str]] = None
+    ignored_dirs: Optional[Set[str]] = None,
+    include_hidden: bool = False
 ) -> Generator[Path, None, None]:
     """
     Efficiently scan directory using os.walk with pruning.
@@ -170,6 +188,7 @@ def scan_directory(
         root: Directory to scan
         extensions: Optional set of file extensions to include (e.g. {'.py', '.md'})
         ignored_dirs: Optional set of directory names to ignore
+        include_hidden: If True, do not prune directories starting with '.'
 
     Yields:
         Path objects for matching files
@@ -187,14 +206,14 @@ def scan_directory(
 
     for dirpath, dirnames, filenames in os.walk(root):
         # Prune ignored directories in-place
-        # Also prune hidden directories (starting with .)
+        # Also prune hidden directories (starting with .) unless include_hidden is True
         dirnames[:] = [
             d for d in dirnames
-            if d not in ignored_dirs and not d.startswith('.')
+            if d not in ignored_dirs and (include_hidden or not d.startswith('.'))
         ]
 
         for f in filenames:
-            if f.startswith('.'):
+            if not include_hidden and f.startswith('.'):
                 continue
 
             # ⚡ Bolt Optimization:

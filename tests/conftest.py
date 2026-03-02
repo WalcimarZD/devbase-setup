@@ -21,7 +21,7 @@ def devbase_workspace(tmp_path: Path) -> Path:
         "00-09_SYSTEM/05_templates",
         "00-09_SYSTEM/07_documentation",
         "10-19_KNOWLEDGE/11_public_garden",
-        "10-19_KNOWLEDGE/12_private_vault",
+        "10-19_KNOWLEDGE/12_private-vault",
         "20-29_CODE/21_monorepo_apps",
         "20-29_CODE/22_worktrees",
         "30-39_OPERATIONS/31_backups",

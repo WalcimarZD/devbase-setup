@@ -46,7 +46,7 @@ export class DevBaseCommands {
         return new Promise((resolve, reject) => {
             const process = cp.spawn(cmd, fullArgs, {
                 cwd: this.workspaceRoot,
-                shell: true
+                shell: false
             });
 
             let stdout = '';

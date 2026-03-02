@@ -12,6 +12,7 @@ from typing import Optional, Any, Dict
 from devbase.ai.exceptions import ProviderError
 from devbase.ai.interface import LLMProvider
 from devbase.ai.models import Insight, OrganizationSuggestion, WorkspaceAnalysis
+from devbase.services.security.sanitizer import sanitize_context
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,12 @@ class AIService:
     def __init__(self, provider: LLMProvider) -> None:
         self.provider = provider
     
+    def _complete_sanitized(self, prompt: str, **kwargs: Any) -> str:
+        """Sanitizes prompt context before sending to provider."""
+        # Layer 1-4 Security Sanitization per TDD v1.2
+        sanitized = sanitize_context(prompt)
+        return self.provider.complete(sanitized.content, **kwargs)
+
     def _get_workspace_tree(self, root: Path) -> str:
         """Generates a text representation of the directory tree."""
         tree = []
@@ -115,7 +122,7 @@ class AIService:
 
     def suggest_draft(self, message: str) -> Dict[str, Any]:
         """Suggests a technical note and category based on a commit message."""
-        response = self.provider.complete(
+        response = self._complete_sanitized(
             f"COMMIT MESSAGE: {message}",
             system_prompt=DRAFT_SYSTEM_PROMPT,
             temperature=0.0,
@@ -136,7 +143,7 @@ Text: {text}
 
 Respond with ONLY the category name, nothing else."""
 
-        response = self.provider.complete(prompt, temperature=0.0, max_tokens=50)
+        response = self._complete_sanitized(prompt, temperature=0.0, max_tokens=50)
         result = response.strip().lower()
 
         for category in categories:
@@ -158,7 +165,7 @@ Text: {text}
 
 Summary:"""
 
-        response = self.provider.complete(prompt, max_tokens=max_length * 2, temperature=0.3)
+        response = self._complete_sanitized(prompt, max_tokens=max_length * 2, temperature=0.3)
         return response.strip()
 
     def suggest_organization(
@@ -197,7 +204,7 @@ Summary:"""
         
         prompt = f"FILE TO ORGANIZE: {file_name}\nPREVIEW: {content_preview}\n{tree_context}"
 
-        response = self.provider.complete(
+        response = self._complete_sanitized(
             prompt,
             system_prompt=ORGANIZATION_SYSTEM_PROMPT,
             temperature=0.0, # Maximum precision
@@ -222,7 +229,7 @@ Summary:"""
         # (Summary logic omitted for brevity in this patch, simplified for demonstration)
         prompt = f"Analyze workspace structure at: {path.name}"
         
-        response = self.provider.complete(
+        response = self._complete_sanitized(
             prompt,
             system_prompt=INSIGHTS_SYSTEM_PROMPT,
             temperature=0.4,

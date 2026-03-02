@@ -24,10 +24,7 @@ from devbase.utils.workspace import detect_workspace_root
 logger = logging.getLogger(__name__)
 
 # Version Marker
-try:
-    __version__ = "5.1.0-alpha.5"
-except Exception:
-    __version__ = "5.1.0-alpha.5"
+__version__ = "5.1.0-alpha.5"
 
 # Unified Panel Mapping (Forced ASCII Ordering)
 PANEL_MAP: dict[str, tuple[str, str]] = {
@@ -123,7 +120,11 @@ def main(
     try:
         from devbase.services.container import ServiceContainer
         ctx.obj["services"] = ServiceContainer(workspace_root)
-    except Exception: pass
+    except Exception as e:
+        logger.error(f"Failed to initialize ServiceContainer: {e}")
+        if verbose:
+            import traceback
+            logger.error(traceback.format_exc())
 
 # Entry Point
 def cli_main():

@@ -10,6 +10,7 @@ import toml
 from devbase.ai.interface import LLMProvider, ConfigurationError
 from devbase.ai.providers.mock import MockProvider
 from devbase.ai.providers.groq import GroqProvider
+from devbase.utils.paths import get_config_path
 
 
 class AIProviderFactory:
@@ -28,13 +29,13 @@ class AIProviderFactory:
         Raises:
             ConfigurationError: If provider configuration is invalid or API key is missing.
         """
-        config_path = root_path / "config.toml"
+        config_path = get_config_path(root_path)
         config: Dict[str, Any] = {}
         
         if config_path.exists():
             try:
                 config = toml.load(config_path)
-            except Exception as e:
+            except Exception:
                 # If we can't load config, we'll use fallbacks
                 pass
         
@@ -46,10 +47,7 @@ class AIProviderFactory:
         
         # Default to groq
         try:
-            # We pass the root_path to GroqProvider if it supports it, 
-            # but standard GroqProvider might look for its own config.
-            # Based on groq.py, it attempts to find config on its own.
-            return GroqProvider()
+            return GroqProvider(root=root_path)
         except Exception as e:
             # Catch InvalidAPIKeyError or others and wrap in ConfigurationError
             error_msg = str(e)
