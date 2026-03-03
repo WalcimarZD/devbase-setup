@@ -28,7 +28,6 @@ dependencies = [
     # Template Engine
     "jinja2>=3.1.6",
     "toml>=0.10.2",
-    "copier>=9.1.0",
     # Knowledge Management
     "networkx>=3.2",
     "python-frontmatter>=1.1.0",
@@ -44,11 +43,16 @@ ai = [
 db = [
     # Embedded OLAP database for telemetry and analytics
     "duckdb>=0.10.0",
-    "pandas>=2.0.0",
 ]
 viz = [
     # Knowledge graph visualization
     "pyvis>=0.3.2",
+]
+dev = [
+    # Project scaffolding (developer tooling only)
+    "copier>=9.1.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
 ]
 notifications = [
     # Desktop notifications (cross-platform)

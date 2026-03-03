@@ -5,25 +5,22 @@ Manages routine and cognitive capital ("Life-OS").
 
 Responsibilities:
 - Daily briefing generation
-- Daybook summarization
+- Daybook summarisation
 - Inbox triage and classification
 
-Author: DevBase Team
-Version: 5.1.0
+Dependencies are injected via the constructor (DIP) so the service
+remains independently testable.
 """
 from __future__ import annotations
 
-import json
 import logging
-import re
-import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Optional
 
-from devbase.adapters.ai.groq_adapter import GroqProvider
-from devbase.adapters.storage.duckdb_adapter import get_connection
-from devbase.config.taxonomy import JD_TAXONOMY, list_areas
+from devbase.adapters.storage.event_repository import EventRepository
+from devbase.ai.interface import LLMProvider
+from devbase.config.taxonomy import list_areas
 from devbase.services.security.sanitizer import sanitize_context
 
 logger = logging.getLogger("devbase.routine_agent")
@@ -31,6 +28,7 @@ logger = logging.getLogger("devbase.routine_agent")
 
 class DaybookSummary(NamedTuple):
     """Structured summary for the daybook."""
+
     date: str
     focus: str
     log_narrative: str
@@ -38,223 +36,127 @@ class DaybookSummary(NamedTuple):
 
 
 class RoutineAgent:
+    """Agent for managing daily routine and cognitive load.
+
+    Integrates telemetry events, the knowledge base, and AI to provide
+    briefings and summaries.
+
+    Args:
+        root_path: Workspace root (defaults to CWD).
+        provider: LLM provider (resolved lazily if omitted).
+        events: Event repository (instantiated lazily if omitted).
     """
-    Agent for managing daily routine and cognitive load.
 
-    Integrates telemetry (events), knowledge base (journal), and AI
-    to provide briefings and summaries.
-    """
-
-    def __init__(self, root_path: Path | None = None):
-        """
-        Initialize RoutineAgent.
-
-        Args:
-            root_path: Root directory of the workspace (defaults to CWD)
-        """
+    def __init__(
+        self,
+        root_path: Optional[Path] = None,
+        provider: Optional[LLMProvider] = None,
+        events: Optional[EventRepository] = None,
+    ) -> None:
         self.root_path = root_path or Path.cwd()
         self.journal_path = self.root_path / "12_private_vault" / "journal"
-        self._provider: GroqProvider | None = None
+        self._provider = provider
+        self._events = events
 
     @property
-    def provider(self) -> GroqProvider:
-        """Lazy-load AI provider."""
+    def provider(self) -> LLMProvider:
+        """Lazily resolve the LLM provider via the factory."""
         if self._provider is None:
-            self._provider = GroqProvider()
+            from devbase.ai.factory import AIProviderFactory
+            self._provider = AIProviderFactory.get_provider(self.root_path)
         return self._provider
 
+    @property
+    def events(self) -> EventRepository:
+        """Lazily create the event repository."""
+        if self._events is None:
+            self._events = EventRepository()
+        return self._events
+
     def get_daily_logs(self, target_date: str) -> list[dict[str, Any]]:
-        """
-        Fetch 'track' events for a specific date.
+        """Fetch 'track' events for a specific date.
 
         Args:
-            target_date: Date string in YYYY-MM-DD format
+            target_date: Date string in YYYY-MM-DD format.
 
         Returns:
-            List of event dictionaries
+            List of event dicts, ordered by timestamp ascending.
         """
-        conn = get_connection()
-
-        # DuckDB query to filter by date (ignoring time)
-        query = """
-            SELECT timestamp, message, project, metadata
-            FROM events
-            WHERE event_type = 'track'
-            AND strftime(timestamp, '%Y-%m-%d') = ?
-            ORDER BY timestamp ASC
-        """
-
-        try:
-            results = conn.execute(query, [target_date]).fetchall()
-            logs = []
-            for row in results:
-                ts, msg, proj, meta = row
-                logs.append({
-                    "timestamp": ts,
-                    "message": msg,
-                    "project": proj,
-                    "metadata": meta
-                })
-            return logs
-        except Exception as e:
-            logger.error(f"Failed to fetch logs: {e}")
-            return []
+        return self.events.find_by_date(target_date, event_type="track")
 
     def get_flow_summary_stats(self) -> str:
-        """Fetch command and commit stats for last 24h."""
-        conn = get_connection()
-        query = """
-            SELECT 
-                strftime(timestamp, '%Y-%m-%d %H:00') as start_time,
-                count(CASE WHEN event_type = 'command' THEN 1 END) as commands,
-                count(CASE WHEN event_type = 'commit' THEN 1 END) as commits
-            FROM events
-            WHERE timestamp >= (current_timestamp - INTERVAL 24 HOUR)
-            GROUP BY 1
-            ORDER BY 1 DESC
-        """
-        try:
-            results = conn.execute(query).fetchall()
-            if not results:
-                return "Sem atividade técnica registrada nas últimas 24h."
-            
-            lines = ["Resumo de atividade técnica (24h):"]
-            for row in results:
-                lines.append(f"- {row[0]}: {row[1]} comandos, {row[2]} commits")
-            return "\n".join(lines)
-        except Exception as e:
-            logger.debug(f"Failed to fetch flow summary: {e}")
-            return "Estatísticas de atividade indisponíveis."
+        """Return a human-readable command/commit summary for the last 24 h."""
+        return self.events.get_flow_summary(hours=24)
 
     def generate_daybook_summary(self, target_date: str) -> DaybookSummary:
-        """
-        Generate a full summary for the daybook.
+        """Generate a full daybook summary for *target_date*.
 
-        Orchestrates:
-        1. Fetching logs
-        2. Sanitizing content
-        3. AI generation of narrative and focus
-        4. Fetching git metrics
+        Orchestrates log fetching, content sanitisation, AI generation,
+        and git metric collection.
 
         Args:
-            target_date: Date string YYYY-MM-DD
+            target_date: Date string ``YYYY-MM-DD``.
 
         Returns:
-            DaybookSummary object
+            ``DaybookSummary`` with focus areas and narrative.
         """
         logs = self.get_daily_logs(target_date)
         flow_stats = self.get_flow_summary_stats()
-        system_prompt = f"Aqui está o resumo da atividade técnica do usuário nas últimas 24h: {flow_stats}"
+        system_prompt = (
+            f"Here is the summary of the user's technical activity in the last 24h: {flow_stats}"
+        )
 
-        # Prepare content for AI
         if not logs:
             raw_content = "No activity logs recorded for this day."
         else:
             lines = []
             for log in logs:
-                # Format: [HH:MM] (Project) Message
-                ts_str = log["timestamp"].strftime("%H:%M")
-                proj_str = f"({log['project']}) " if log["project"] else ""
+                ts = log["timestamp"]
+                ts_str = ts.strftime("%H:%M") if hasattr(ts, "strftime") else str(ts)[:16]
+                proj_str = f"({log['project']}) " if log.get("project") else ""
                 lines.append(f"[{ts_str}] {proj_str}{log['message']}")
             raw_content = "\n".join(lines)
 
-        # Security: Sanitize before sending to AI
         sanitized = sanitize_context(raw_content)
 
-        # Default values
         focus = "- [ ] (No logs to infer focus)"
         narrative = "No logs recorded."
 
         if logs:
             try:
-                # Prompt for Focus
-                focus_prompt = f"""
-Based on these activity logs, identify the 2-3 main tasks or focus areas of the day.
-Format as a markdown list of checkboxes.
-
-Logs:
-{sanitized.content}
-
-Response:"""
-                focus_resp = self.provider.generate(
-                    focus_prompt, 
-                    system_prompt=system_prompt,
-                    temperature=0.3
+                focus_prompt = (
+                    f"Based on these activity logs, identify the 2-3 main tasks or focus areas of the day.\n"
+                    f"Format as a markdown list of checkboxes.\n\nLogs:\n{sanitized.content}\n\nResponse:"
                 )
-                focus = focus_resp.content.strip()
-
-                # Prompt for Narrative
-                narrative_prompt = f"""
-Transform these activity logs into a concise narrative summary of the day's work.
-Focus on what was accomplished and any challenges mentioned.
-Do not invent facts. Use only the provided logs.
-
-Logs:
-{sanitized.content}
-
-Narrative:"""
-                narrative_resp = self.provider.generate(
-                    narrative_prompt, 
+                focus = self.provider.complete(
+                    focus_prompt,
                     system_prompt=system_prompt,
-                    temperature=0.5
+                    temperature=0.3,
+                ).strip()
+
+                narrative_prompt = (
+                    f"Transform these activity logs into a concise narrative summary of the day's work.\n"
+                    f"Focus on what was accomplished. Do not invent facts.\n\n"
+                    f"Logs:\n{sanitized.content}\n\nNarrative:"
                 )
-                narrative = narrative_resp.content.strip()
+                narrative = self.provider.complete(
+                    narrative_prompt,
+                    system_prompt=system_prompt,
+                    temperature=0.5,
+                ).strip()
 
-            except Exception as e:
-                logger.warning(f"AI generation failed: {e}")
-                focus = "- [ ] (AI unavailable)"
-                narrative = raw_content  # Fallback to raw logs
-
-        # Git Metrics
-        metrics = self.get_git_metrics()
-
+            except Exception as exc:
+                logger.error("AI generation for daybook failed: %s", exc)
 
         return DaybookSummary(
             date=target_date,
             focus=focus,
             log_narrative=narrative,
-            metrics=metrics
+            metrics={"total_events": len(logs)},
         )
 
-    def get_git_metrics(self) -> dict[str, int]:
-        """
-        Fetch git metrics for the current day using shell commands.
-
-        Returns:
-            Dictionary with commits, prs, and issues counts
-        """
-        metrics = {"commits": 0, "prs": 0, "issues": 0}
-
-        try:
-            # Check if inside git repo
-            subprocess.run(
-                ["git", "rev-parse", "--is-inside-work-tree"],
-                check=True, capture_output=True
-            )
-
-            # Count commits since midnight
-            cmd = ["git", "rev-list", "--count", "--since=midnight", "HEAD"]
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode == 0:
-                metrics["commits"] = int(result.stdout.strip() or 0)
-
-            # PRs and Issues would require GH CLI or API, keeping simple for now
-            # per instructions ("podes usar comandos de shell simples (git)")
-
-        except subprocess.CalledProcessError:
-            pass  # Not a git repo
-        except Exception as e:
-            logger.warning(f"Git metrics failed: {e}")
-
-        return metrics
-
     def get_yesterday_pending(self) -> list[str]:
-        """
-        Parse 'Amanhã' section from yesterday's journal.
-
-        Returns:
-            List of pending tasks (strings)
-        """
+        """Parse the "Amanha" section from yesterday's journal file."""
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         file_path = self.journal_path / f"{yesterday}.md"
 
@@ -263,124 +165,103 @@ Narrative:"""
 
         try:
             content = file_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            logger.error("Error reading journal: %s", exc)
+            return [f"Error reading journal: {exc}"]
 
-            # Simple parsing: look for "## 🔜 Amanhã" and take subsequent lines
-            # until next header or end of file
-            pending = []
-            capture = False
-            for line in content.splitlines():
-                if "## 🔜 Amanhã" in line or "## Amanhã" in line:
-                    capture = True
-                    continue
-                if capture and line.startswith("##"):
-                    break
-                if capture and line.strip().startswith("- [ ]"):
-                    # Extract task text
-                    task = line.strip().replace("- [ ]", "").strip()
-                    if task:
-                        pending.append(task)
+        pending: list[str] = []
+        capture = False
+        for line in content.splitlines():
+            if "## 🔜 Amanhã" in line or "## Amanhã" in line:
+                capture = True
+                continue
+            if capture and line.startswith("##"):
+                break
+            if capture and line.strip().startswith("- [ ]"):
+                task = line.strip().replace("- [ ]", "").strip()
+                if task:
+                    pending.append(task)
 
-            return pending if pending else ["No pending tasks found in yesterday's journal."]
-
-        except Exception as e:
-            logger.error(f"Error reading journal: {e}")
-            return [f"Error reading journal: {e}"]
+        return pending if pending else ["No pending tasks found in yesterday's journal."]
 
     def _scan_categories(self) -> list[str]:
-        """
-        Scan workspace for available JD categories (Level 2).
-        
-        Returns:
-            List of paths relative to root (e.g., "10-19_KNOWLEDGE/10_docs")
-        """
-        categories = []
-        areas = list_areas()
-        
-        for area in areas:
+        """Scan workspace for available JD categories (level 1 and 2)."""
+        categories: list[str] = []
+
+        for area in list_areas():
             area_path = self.root_path / area.full
             if not area_path.exists():
-                categories.append(area.full)  # Fallback to area root
+                categories.append(area.full)
                 continue
-                
-            # Scan for numeric categories inside area (e.g., 10_docs)
+
             subdirs = [
-                d for d in area_path.iterdir() 
-                if d.is_dir() and d.name[0:2].isdigit() and "_" in d.name
+                item
+                for item in area_path.iterdir()
+                if item.is_dir() and item.name[0:2].isdigit() and "_" in item.name
             ]
-            
+
             if subdirs:
-                for d in subdirs:
-                    # Append relative path parts joined by /
-                    categories.append(f"{area.full}/{d.name}")
+                categories.extend(f"{area.full}/{item.name}" for item in subdirs)
             else:
                 categories.append(area.full)
-                
+
         return categories
 
     def classify_inbox_item(self, content: str) -> dict[str, str]:
-        """
-        Classify a text item using JD taxonomy.
-
-        Args:
-            content: Raw text content
-
-        Returns:
-            Dict with 'category', 'reasoning'
-        """
-        # Get valid categories (Areas + Subcategories) for deeper precision
+        """Classify an inbox text item using available JD categories."""
         categories = self._scan_categories()
-
-        # Sanitize
         sanitized = sanitize_context(content)
+        default_category = "00-09_SYSTEM"
+
+        if not categories:
+            return {"category": default_category, "confidence": "low"}
+
+        prompt = (
+            "Classify this text into exactly one category from the list below.\n"
+            "Respond with only the category value, nothing else.\n\n"
+            f"Categories: {', '.join(categories)}\n\n"
+            f"Text:\n{sanitized.content}\n"
+        )
 
         try:
-            category = self.provider.classify(sanitized.content, categories)
-            return {"category": category, "confidence": "high"}
-        except Exception as e:
-            logger.error(f"Classification failed: {e}")
-            return {"category": "00-09_SYSTEM", "confidence": "low", "error": str(e)}
+            result = self.provider.complete(prompt, temperature=0.0, max_tokens=80).strip()
+            selected = next((category for category in categories if category in result), None)
+            return {
+                "category": selected or default_category,
+                "confidence": "high" if selected else "low",
+            }
+        except Exception as exc:
+            logger.error("Classification failed: %s", exc)
+            return {
+                "category": default_category,
+                "confidence": "low",
+                "error": str(exc),
+            }
 
     def scan_inbox(self) -> list[Path]:
-        """List files in the Inbox."""
+        """List all non-hidden files in the inbox folder."""
         inbox_path = self.root_path / "00-09_SYSTEM" / "00_inbox"
         if not inbox_path.exists():
             return []
-
-        # Return all files, ignoring hidden ones
-        return [p for p in inbox_path.iterdir() if p.is_file() and not p.name.startswith(".")]
+        return [path for path in inbox_path.iterdir() if path.is_file() and not path.name.startswith(".")]
 
     def move_to_category(self, file_path: Path, category_full_name: str) -> Path | None:
-        """
-        Move a file to the suggested category.
-
-        Args:
-            file_path: Source file path
-            category_full_name: Destination category name (e.g., "20-29_CODE")
-
-        Returns:
-            New path if successful, None otherwise
-        """
+        """Move a file to a destination category, avoiding name collisions."""
         try:
-            dest_dir = self.root_path / category_full_name
-            if not dest_dir.exists():
-                # Try to find it in taxonomy if it's just an area
-                # But here we assume category_full_name matches a root folder
-                # If not, create it?
-                # The taxonomy defines root folders like "10-19_KNOWLEDGE"
-                # So we should expect these to exist or be creatable.
-                dest_dir.mkdir(parents=True, exist_ok=True)
+            destination_dir = self.root_path / category_full_name
+            destination_dir.mkdir(parents=True, exist_ok=True)
 
-            new_path = dest_dir / file_path.name
-
-            # Handle collision
-            if new_path.exists():
-                stem = new_path.stem
-                suffix = new_path.suffix
+            destination_path = destination_dir / file_path.name
+            if destination_path.exists():
                 timestamp = datetime.now().strftime("%H%M%S")
-                new_path = dest_dir / f"{stem}_{timestamp}{suffix}"
+                destination_path = destination_dir / f"{destination_path.stem}_{timestamp}{destination_path.suffix}"
 
-            file_path.rename(new_path)
-            return new_path
-        except Exception as e:
-            logger.error(f"Move failed: {e}")
+            file_path.rename(destination_path)
+            return destination_path
+        except OSError as exc:
+            logger.error("Move failed: %s", exc)
             return None
+
+
+def get_routine_agent(root: Path) -> RoutineAgent:
+    return RoutineAgent(root_path=root)

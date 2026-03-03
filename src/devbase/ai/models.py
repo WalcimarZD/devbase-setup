@@ -1,13 +1,35 @@
 """
 AI Response Models
 ===================
-Pydantic models for structured AI responses.
+Pydantic models and dataclasses for AI-generated content.
 
-These models ensure type safety and validation for AI-generated content.
+This is the SSOT for all response types — both the structured
+Pydantic responses returned to callers and the raw LLMResponse
+previously held in the legacy Groq adapter.
 """
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+
+@dataclass(frozen=True)
+class LLMResponse:
+    """Immutable result from a raw LLM provider call.
+
+    Attributes:
+        content: Generated text.
+        model: Model identifier used for the completion.
+        tokens_used: Total tokens consumed (prompt + completion).
+        latency_ms: Wall-clock latency in milliseconds.
+    """
+
+    content: str
+    model: str
+    tokens_used: int
+    latency_ms: float
 
 
 class OrganizationSuggestion(BaseModel):

@@ -4,56 +4,48 @@ AI Provider Factory
 Factory for instantiating LLM providers based on configuration.
 """
 from pathlib import Path
-from typing import Any, Dict, Optional
-import toml
 
-from devbase.ai.interface import LLMProvider, ConfigurationError
+from devbase.ai.exceptions import ConfigurationError
+from devbase.ai.interface import LLMProvider
 from devbase.ai.providers.mock import MockProvider
 from devbase.ai.providers.groq import GroqProvider
-from devbase.utils.paths import get_config_path
+from devbase.utils.config import Config
 
 
 class AIProviderFactory:
-    """Factory to create and configure LLM providers."""
-    
+    """Factory that creates LLM providers from workspace configuration."""
+
     @staticmethod
     def get_provider(root_path: Path) -> LLMProvider:
-        """Get the configured LLM provider.
-        
+        """Return the configured LLM provider for the given workspace root.
+
+        Reads ``[ai].provider`` from ``config.toml`` (defaults to ``groq``).
+        Passes *root_path* to the provider so it can resolve the API key.
+
         Args:
-            root_path: Project root path where config.toml is located.
-            
+            root_path: Workspace root directory.
+
         Returns:
-            An instance of LLMProvider.
-            
+            A ready-to-use ``LLMProvider`` instance.
+
         Raises:
-            ConfigurationError: If provider configuration is invalid or API key is missing.
+            ConfigurationError: If the provider cannot be initialised.
         """
-        config_path = get_config_path(root_path)
-        config: Dict[str, Any] = {}
-        
-        if config_path.exists():
-            try:
-                config = toml.load(config_path)
-            except Exception:
-                # If we can't load config, we'll use fallbacks
-                pass
-        
-        ai_config = config.get("ai", {})
-        provider_name = ai_config.get("provider", "groq").lower()
-        
+        config = Config(root=root_path)
+        provider_name = config.get("ai.provider", "groq").lower()
+
         if provider_name == "mock":
             return MockProvider()
-        
-        # Default to groq
+
         try:
             return GroqProvider(root=root_path)
-        except Exception as e:
-            # Catch InvalidAPIKeyError or others and wrap in ConfigurationError
-            error_msg = str(e)
+        except Exception as exc:
+            error_msg = str(exc)
             if "API key" in error_msg or "not found" in error_msg:
                 raise ConfigurationError(
-                    f"Erro de Configuração: Groq API Key não encontrada em {config_path}. "
-                    "Verifique a chave [ai].groq_api_key ou a variável de ambiente GROQ_API_KEY."
-                ) from e
-            raise ConfigurationError(f"Erro ao inicializar provedor {provider_name}: {e}") from e
+                    f"Groq API key not found. "
+                    "Set GROQ_API_KEY or run 'devbase ai config'."
+                ) from exc
+            raise ConfigurationError(
+                f"Failed to initialise provider '{provider_name}': {exc}"
+            ) from exc

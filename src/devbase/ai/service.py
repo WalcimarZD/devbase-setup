@@ -2,102 +2,46 @@
 AI Service Layer
 ==================
 High-level AI service orchestrator for DevBase.
+
+Responsibilities (one per class):
+- ``WorkspaceContextBuilder``: Build safe directory-tree strings.
+- ``AIService``: Orchestrate LLM calls for workspace intelligence.
 """
-import json
-import re
 import logging
 from pathlib import Path
 from typing import Optional, Any, Dict
 
-from devbase.ai.exceptions import ProviderError
 from devbase.ai.interface import LLMProvider
 from devbase.ai.models import Insight, OrganizationSuggestion, WorkspaceAnalysis
+from devbase.ai.prompts import (
+        DRAFT_SYSTEM_PROMPT,
+        INSIGHTS_SYSTEM_PROMPT,
+        ORGANIZATION_SYSTEM_PROMPT,
+)
 from devbase.services.security.sanitizer import sanitize_context
+from devbase.utils.json_helpers import safe_json_extract
 
 logger = logging.getLogger(__name__)
 
-# System prompts for AI interactions
-ORGANIZATION_SYSTEM_PROMPT = """You are a Principal Systems Architect. Your task is to analyze the NATURE and INTENT of a document to place it within a Johnny.Decimal hierarchy.
 
-LOGICAL CATEGORIZATION FRAMEWORK:
-1. SYSTEMIC (00-09): Documents that establish metadata, meta-processes, and "rules of the game." If the file defines HOW work is governed, audited, or structured across the entire workspace, it belongs here.
-2. EPISTEMIC (10-19): Documents that represent specialized technical knowledge, research, architectural blueprints, or high-level decisions. If the file is a source of truth for "the design" but not "the build," it belongs here.
-3. PRODUCTIVE (20-29): The active workshop. Source code, monorepos, and files that are directly part of a project's implementation.
-4. INSTRUMENTAL (30-39): Tools, scripts, and logs that support the infrastructure.
+class WorkspaceContextBuilder:
+    """Build a safe, depth-limited directory-tree string from a workspace root.
 
-DECISION HEURISTIC:
-- Analyze if the content is META (rules about work), ARCHITECTURAL (design of the system), or IMPLEMENTATION (the code itself).
-- Maintain the original language's nuance.
-- Use only the provided directory structure as a baseline, but suggest the most logical functional fit.
+    Separates the concern of filesystem traversal from the AI orchestrator.
+    """
 
-JSON Format:
-{
-  "destination": "XX-XX_AREA/XX_category",
-  "new_name": "semantic-descriptive-name.md",
-  "confidence": 0.98,
-  "reasoning": "A deep semantic analysis explaining WHY this specific functional area was chosen based on the document's intent.",
-  "metadata": {
-    "title": "Human Readable Title",
-    "description": "Executive summary",
-    "scope": "Who or what this affects",
-    "version": "1.0.0"
-  }
-}"""
+    def build(self, root: Path) -> str:
+        """Return a two-level directory listing as plain text.
 
-INSIGHTS_SYSTEM_PROMPT = """You are a Systems Auditor specializing in High-Performance Engineering Workspaces.
-Analyze the provided directory tree to detect structural entropy, knowledge silos, or naming inconsistencies.
+        Args:
+            root: Workspace root to inspect.
 
-FOCUS AREAS:
-1. ARCHITECTURE: Is the Johnny.Decimal structure being respected? Are areas being mixed?
-2. OPTIMIZATION: Are there redundant paths or cluttered deep hierarchies?
-3. ORGANIZATION: Is the naming convention (kebab-case) and area boundaries enforced?
-
-JSON Format:
-{
-  "score": 85,
-  "insights": [
-    {
-      "category": "architecture|optimization|organization",
-      "title": "Concise high-level finding",
-      "description": "Deep analysis of the impact and a specific recommendation to fix it.",
-      "severity": "info|suggestion|warning"
-    }
-  ]
-}"""
-
-DRAFT_SYSTEM_PROMPT = """You are a Technical Writer specializing in Engineering Journals.
-Analyze the Git commit message and generate a concise, professional technical note.
-Suggest a classification based on the nature of the change.
-
-CATEGORIES:
-- JOURNAL: Daily progress, small fixes, reflections.
-- COOKBOOK: Reusable patterns, complex configurations, "how-to" solutions.
-- ADR: Architectural decisions, significant trade-offs, new system components.
-
-JSON Format:
-{
-  "note": "Short technical summary of the change and its impact.",
-  "category": "JOURNAL|COOKBOOK|ADR",
-  "confidence": 0.95
-}"""
-
-class AIService:
-    """Central orchestrator for AI-powered workspace features."""
-    
-    def __init__(self, provider: LLMProvider) -> None:
-        self.provider = provider
-    
-    def _complete_sanitized(self, prompt: str, **kwargs: Any) -> str:
-        """Sanitizes prompt context before sending to provider."""
-        # Layer 1-4 Security Sanitization per TDD v1.2
-        sanitized = sanitize_context(prompt)
-        return self.provider.complete(sanitized.content, **kwargs)
-
-    def _get_workspace_tree(self, root: Path) -> str:
-        """Generates a text representation of the directory tree."""
-        tree = []
+        Returns:
+            Newline-joined list of visible directory names (depth ≤ 2).
+            Returns ``"Empty or inaccessible"`` on any I/O failure.
+        """
+        tree: list[str] = []
         try:
-            # Only list top 2 levels of directories to keep context window clean
             for item in sorted(root.glob("*")):
                 if item.is_dir() and not item.name.startswith("."):
                     tree.append(item.name)
@@ -108,17 +52,33 @@ class AIService:
             pass
         return "\n".join(tree) if tree else "Empty or inaccessible"
 
+
+class AIService:
+    """Central orchestrator for AI-powered workspace features."""
+
+    def __init__(
+        self,
+        provider: LLMProvider,
+        context_builder: Optional[WorkspaceContextBuilder] = None,
+    ) -> None:
+        self.provider = provider
+        self._context_builder = context_builder or WorkspaceContextBuilder()
+    
+    def _complete_sanitized(self, prompt: str, **kwargs: Any) -> str:
+        """Sanitise *prompt* through the 4-layer security pipeline before sending.
+
+        Separates security concerns from provider interaction (SoC).
+        """
+        sanitized = sanitize_context(prompt)
+        return self.provider.complete(sanitized.content, **kwargs)
+
+    def _get_workspace_tree(self, root: Path) -> str:
+        """Delegate to WorkspaceContextBuilder (kept for internal use)."""
+        return self._context_builder.build(root)
+
     def _safe_json_extract(self, text: str) -> Dict[str, Any]:
-        """Extracts and parses the first JSON object found in text."""
-        try:
-            start = text.find('{')
-            end = text.rfind('}') + 1
-            if start == -1 or end == 0:
-                raise ValueError("No JSON delimiters found")
-            return json.loads(text[start:end])
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.error(f"Failed to extract JSON from AI response: {e}")
-            return {}
+        """Delegate to the shared json_helpers utility (DRY)."""
+        return safe_json_extract(text)
 
     def suggest_draft(self, message: str) -> Dict[str, Any]:
         """Suggests a technical note and category based on a commit message."""

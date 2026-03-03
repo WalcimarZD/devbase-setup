@@ -15,19 +15,16 @@ Version: 5.1.0
 from __future__ import annotations
 
 import logging
-import re
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Generator
+from typing import List
 
-import numpy as np
 from fastembed import TextEmbedding
 
 from devbase.adapters.storage.duckdb_adapter import get_connection
-from devbase.config.taxonomy import get_jd_area_for_path
+from devbase.services.indexing_helpers import iter_files, resolve_tables_for_path, should_skip_file
 from devbase.services.security.sanitizer import sanitize_context
-from devbase.utils.filesystem import scan_directory
+from devbase.utils.markdown import MarkdownSplitter
 
 logger = logging.getLogger("devbase.search_engine")
 
@@ -39,53 +36,6 @@ class SearchResult:
     content: str
     score: float
     source: str  # 'vector' or 'fts'
-
-
-class MarkdownSplitter:
-    """
-    Splits Markdown content into chunks preserving header context.
-
-    Strategy:
-    1. Split by H1/H2 headers
-    2. Further split by paragraph if chunk is too large
-    """
-
-    def __init__(self, max_words: int = 500):
-        self.max_words = max_words
-
-    def split(self, text: str) -> List[str]:
-        """Split text into chunks."""
-        # Simple header-based splitting for now
-        # Regex matches headers like "# Title" or "## Subtitle"
-        # We capture the delimiter to keep it
-        parts = re.split(r'(^#{1,3} .*)', text, flags=re.MULTILINE)
-
-        chunks = []
-        current_chunk = ""
-
-        for part in parts:
-            if not part.strip():
-                continue
-
-            # If it's a header, start a new chunk if current is substantial
-            if re.match(r'^#{1,3} ', part):
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                current_chunk = part
-            else:
-                # Content part
-                # Check if adding this makes it too big
-                if len(current_chunk.split()) + len(part.split()) > self.max_words:
-                    if current_chunk:
-                        chunks.append(current_chunk.strip())
-                    current_chunk = part
-                else:
-                    current_chunk += "\n" + part
-
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-
-        return chunks
 
 
 class SearchEngine:
@@ -135,10 +85,7 @@ class SearchEngine:
         if not file_path.exists() or not file_path.is_file():
             return
 
-        # Determine if Hot or Cold
-        area = get_jd_area_for_path(file_path)
-        is_cold = area and area.area == "90-99"
-        table = "cold_embeddings" if is_cold else "hot_embeddings"
+        table, fts_table = resolve_tables_for_path(file_path)
 
         mtime = int(file_path.stat().st_mtime)
         rel_path = str(file_path)
@@ -151,7 +98,13 @@ class SearchEngine:
                 f"SELECT mtime_epoch FROM {table} WHERE file_path = ? LIMIT 1",
                 [rel_path]
             ).fetchone()
-            if existing and existing[0] == mtime:
+            existing_mtime = int(existing[0]) if existing and existing[0] is not None else None
+            skip, _ = should_skip_file(
+                file_path,
+                {rel_path: existing_mtime} if existing_mtime is not None else {},
+                force=False,
+            )
+            if skip:
                 return  # Up to date
 
         # Read and Sanitize
@@ -169,8 +122,6 @@ class SearchEngine:
         # Clear existing chunks for this file
         conn.execute(f"DELETE FROM {table} WHERE file_path = ?", [rel_path])
 
-        # Determine FTS table
-        fts_table = "cold_fts" if is_cold else "hot_fts"
         conn.execute(f"DELETE FROM {fts_table} WHERE file_path = ?", [rel_path])
 
         # Upsert into FTS (File level)
@@ -315,9 +266,7 @@ class SearchEngine:
             if not target.exists():
                 continue
 
-            # Optimization: Use os.walk with pruning via scan_directory
-            # This avoids scanning massive directories like node_modules
-            for path in scan_directory(target, extensions=extensions):
+            for path in iter_files(target, extensions=extensions):
                 self.index_file(path, force=True)
                 count += 1
 

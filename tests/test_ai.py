@@ -16,7 +16,7 @@ from devbase.ai.exceptions import (
     InvalidAPIKeyError,
     ProviderError,
 )
-from devbase.adapters.ai.groq_adapter import LLMResponse
+from devbase.ai.models import LLMResponse
 
 
 runner = CliRunner()
@@ -62,70 +62,73 @@ class TestLLMResponse:
 
 class TestGroqProvider:
     """Tests for GroqProvider with mocked API calls."""
-    
+
     def test_groq_provider_requires_api_key(self):
-        """Verify GroqProvider raises error without API key."""
+        """Verify GroqProvider raises InvalidAPIKeyError when no key is available."""
         with patch.dict("os.environ", {}, clear=True):
-            with patch("devbase.adapters.ai.groq_adapter.GroqProvider.__init__", side_effect=InvalidAPIKeyError("No key")):
+            with patch("devbase.ai.providers.groq.ConfigResolver.resolve_api_key", return_value=None):
                 with pytest.raises(InvalidAPIKeyError):
-                    from devbase.adapters.ai.groq_adapter import GroqProvider
+                    from devbase.ai.providers.groq import GroqProvider
                     GroqProvider(api_key=None)
-    
+
     def test_groq_provider_accepts_explicit_key(self):
-        """Verify GroqProvider accepts explicit API key."""
-        from devbase.adapters.ai.groq_adapter import GroqProvider
-        
+        """Verify GroqProvider accepts an explicit API key."""
+        from devbase.ai.providers.groq import GroqProvider
+
         provider = GroqProvider(api_key="test-key-12345")
         assert provider.api_key == "test-key-12345"
-    
-    @patch("devbase.adapters.ai.groq_adapter.GroqProvider.client", new_callable=MagicMock)
-    def test_generate_calls_api(self, mock_client):
-        """Verify generate() calls the Groq API correctly."""
-        from devbase.adapters.ai.groq_adapter import GroqProvider
-        
-        # Setup mock response
+
+    @patch("devbase.ai.providers.groq.groq")
+    def test_complete_calls_api(self, mock_groq_mod):
+        """Verify complete() calls the Groq API and returns a string."""
+        from devbase.ai.providers.groq import GroqProvider
+
+        mock_client = MagicMock()
+        mock_groq_mod.Groq.return_value = mock_client
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content="Mocked response"))]
-        mock_response.usage = MagicMock(total_tokens=25)
         mock_client.chat.completions.create.return_value = mock_response
-        
+
         provider = GroqProvider(api_key="test-key")
-        response = provider.generate("Hello, world!")
-        
-        assert response.content == "Mocked response"
-        assert response.tokens_used == 25
+        result = provider.complete("Hello, world!")
+
+        assert result == "Mocked response"
         mock_client.chat.completions.create.assert_called_once()
-    
-    @patch("devbase.adapters.ai.groq_adapter.GroqProvider.client", new_callable=MagicMock)
-    def test_classify_returns_valid_category(self, mock_client):
-        """Verify classify() returns a category from the provided list."""
-        from devbase.adapters.ai.groq_adapter import GroqProvider
-        
-        # Mock returns "bug" in response
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock(message=MagicMock(content="bug"))]
-        mock_response.usage = MagicMock(total_tokens=15)
-        mock_client.chat.completions.create.return_value = mock_response
-        
+
+    @patch("devbase.ai.providers.groq.groq")
+    def test_complete_raises_rate_limit(self, mock_groq_mod):
+        """Verify RateLimitError is raised when Groq throttles the request."""
+        import groq as groq_lib
+        from devbase.ai.exceptions import RateLimitError
+        from devbase.ai.providers.groq import GroqProvider
+
+        mock_client = MagicMock()
+        mock_groq_mod.Groq.return_value = mock_client
+        mock_groq_mod.RateLimitError = groq_lib.RateLimitError
+        mock_client.chat.completions.create.side_effect = groq_lib.RateLimitError(
+            message="rate limited", response=MagicMock(), body={}
+        )
+
         provider = GroqProvider(api_key="test-key")
-        result = provider.classify("Fix login button", ["feature", "bug", "docs"])
-        
-        assert result == "bug"
-    
-    @patch("devbase.adapters.ai.groq_adapter.GroqProvider.client", new_callable=MagicMock)
-    def test_summarize_returns_text(self, mock_client):
-        """Verify summarize() returns summarized text."""
-        from devbase.adapters.ai.groq_adapter import GroqProvider
-        
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock(message=MagicMock(content="This is a summary."))]
-        mock_response.usage = MagicMock(total_tokens=20)
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        provider = GroqProvider(api_key="test-key")
-        result = provider.summarize("Long text here..." * 100, max_length=50)
-        
-        assert result == "This is a summary."
+        with pytest.raises(RateLimitError):
+            provider.complete("ping")
+
+    @patch("devbase.ai.providers.groq.groq")
+    def test_complete_raises_invalid_api_key(self, mock_groq_mod):
+        """Verify InvalidAPIKeyError is raised on authentication failure."""
+        import groq as groq_lib
+        from devbase.ai.providers.groq import GroqProvider
+
+        mock_client = MagicMock()
+        mock_groq_mod.Groq.return_value = mock_client
+        mock_groq_mod.AuthenticationError = groq_lib.AuthenticationError
+        mock_client.chat.completions.create.side_effect = groq_lib.AuthenticationError(
+            message="invalid key", response=MagicMock(), body={}
+        )
+
+        provider = GroqProvider(api_key="bad-key")
+        with pytest.raises(InvalidAPIKeyError):
+            provider.complete("ping")
 
 
 # =============================================================================

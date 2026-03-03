@@ -4,16 +4,23 @@ Knowledge Database Service
 Handles indexing and searching of knowledge base notes.
 Indexes content into DuckDB 'hot_fts' (10-19) and 'cold_fts' (90-99).
 """
+from __future__ import annotations
+
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import frontmatter
-from rich.console import Console
 
 from devbase.adapters.storage import duckdb_adapter
-from devbase.utils.filesystem import scan_directory
+from devbase.services.indexing_helpers import (
+    get_existing_mtimes,
+    iter_files,
+    should_skip_file,
+    upsert_fts_batch,
+)
 
-console = Console()
+logger = logging.getLogger(__name__)
 
 class KnowledgeDB:
     def __init__(self, root: Path):
@@ -30,7 +37,8 @@ class KnowledgeDB:
                 "hot_notes": hot_count,
                 "cold_notes": cold_count
             }
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to fetch knowledge DB stats: %s", exc)
             return {"total_notes": 0, "hot_notes": 0, "cold_notes": 0}
 
     def index_workspace(self) -> Dict[str, int]:
@@ -49,24 +57,16 @@ class KnowledgeDB:
         # 1. Index Active Knowledge (Hot)
         hot_path = self.root / "10-19_KNOWLEDGE"
         if hot_path.exists():
-            existing_mtimes = self._get_existing_mtimes("hot_fts")
+            existing_mtimes = get_existing_mtimes(self.conn, "hot_fts")
             self._scan_directory(hot_path, "hot_fts", stats, existing_mtimes)
 
         # 2. Index Archived Knowledge (Cold)
         cold_path = self.root / "90-99_ARCHIVE_COLD"
         if cold_path.exists():
-            existing_mtimes = self._get_existing_mtimes("cold_fts")
+            existing_mtimes = get_existing_mtimes(self.conn, "cold_fts")
             self._scan_directory(cold_path, "cold_fts", stats, existing_mtimes)
 
         return stats
-
-    def _get_existing_mtimes(self, table: str) -> Dict[str, int]:
-        """Fetch existing mtime_epoch for all files in the table."""
-        try:
-            rows = self.conn.execute(f"SELECT file_path, mtime_epoch FROM {table}").fetchall()
-            return {row[0]: row[1] for row in rows}
-        except Exception:
-            return {}
 
     def _scan_directory(
         self,
@@ -77,36 +77,27 @@ class KnowledgeDB:
     ) -> None:
         """
         Recursive scan of a directory with batched inserts.
-
-        ⚡ Bolt: Optimized with:
-        1. Batch processing (improves insert performance by ~3-5x)
-        2. Incremental indexing (skips parsing/reading unchanged files)
-        3. Efficient directory scanning (prunes node_modules etc)
         """
-        batch_data = []
-        BATCH_SIZE = 500
+        batch_data: list[tuple[str, str, str, str, str, int]] = []
+        batch_size = 500
 
-        # Optimization: Use scan_directory for centralized pruning
-        for file_path in scan_directory(path, extensions={'.md'}):
+        for file_path in iter_files(path, extensions={".md"}):
             try:
-                # Optimization: Skip if file hasn't changed
-                current_mtime = int(file_path.stat().st_mtime)
-                file_path_str = str(file_path)
-
-                if file_path_str in existing_mtimes and current_mtime <= existing_mtimes[file_path_str]:
+                skip, current_mtime = should_skip_file(file_path, existing_mtimes)
+                if skip:
                     stats["skipped"] += 1
                     continue
 
                 data = self._process_file_data(file_path, current_mtime)
                 batch_data.append(data)
 
-                if len(batch_data) >= BATCH_SIZE:
+                if len(batch_data) >= batch_size:
                     self._flush_batch(table, batch_data)
                     stats["indexed"] += len(batch_data)
                     batch_data = []
 
-            except Exception:
-                # console.print(f"[red]Error indexing {file_path}: {e}[/red]")
+            except Exception as exc:
+                logger.warning("Error indexing %s: %s", file_path, exc)
                 stats["errors"] += 1
 
         # Flush remaining
@@ -114,7 +105,8 @@ class KnowledgeDB:
             try:
                 self._flush_batch(table, batch_data)
                 stats["indexed"] += len(batch_data)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Error flushing remaining batch into %s: %s", table, exc)
                 stats["errors"] += len(batch_data)
 
     def _process_file_data(self, path: Path, mtime: int) -> tuple:
@@ -133,21 +125,7 @@ class KnowledgeDB:
         """Execute batch insert using DuckDB executemany."""
         if not data:
             return
-
-        try:
-            self.conn.executemany(f"""
-                INSERT INTO {table} (file_path, title, content, tags, note_type, mtime_epoch)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT (file_path) DO UPDATE SET
-                    title = excluded.title,
-                    content = excluded.content,
-                    tags = excluded.tags,
-                    note_type = excluded.note_type,
-                    mtime_epoch = excluded.mtime_epoch
-            """, data)
-        except Exception as e:
-            # Fallback or log? For now raise to let caller handle
-            raise e
+        upsert_fts_batch(self.conn, table, data)
 
     def search(
         self,
@@ -208,12 +186,13 @@ class KnowledgeDB:
             params = params * 2  # Duplicate params for both parts of UNION
 
         full_query = " UNION ALL ".join(query_parts)
-        full_query += f" LIMIT {limit}"
+        full_query += " LIMIT ?"
+        params.append(limit)
 
         try:
             rows = self.conn.execute(full_query, params).fetchall()
         except Exception as e:
-            console.print(f"[red]Search error: {e}[/red]")
+            logger.error("Search error: %s", e)
             return []
 
         results = []

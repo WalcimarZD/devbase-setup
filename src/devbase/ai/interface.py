@@ -3,29 +3,22 @@ LLM Provider Interface
 =======================
 Abstract base class defining the contract for LLM providers.
 
-This follows the Ports & Adapters (Hexagonal) architecture pattern,
-enabling easy substitution of providers (Groq, Ollama, OpenAI, etc.)
-without changing the service layer.
+Follows the Ports & Adapters (Hexagonal) architecture pattern,
+enabling substitution of providers (Groq, Ollama, OpenAI …)
+without touching the service layer.
+
+Exception classes live in ``devbase.ai.exceptions`` — this module
+imports them for backwards-compatible re-export only.
 """
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-
-class ProviderError(Exception):
-    """Base exception for provider-related errors."""
-    def __init__(self, message: str, original_error: Optional[Exception] = None) -> None:
-        super().__init__(message)
-        self.original_error = original_error
-
-
-class RateLimitError(ProviderError):
-    """Raised when the provider's rate limit is exceeded."""
-    pass
-
-
-class ConfigurationError(ProviderError):
-    """Raised when there is a configuration issue (e.g., missing API key)."""
-    pass
+# Re-export so existing callers that import from this module keep working.
+from devbase.ai.exceptions import (  # noqa: F401
+    ConfigurationError,
+    ProviderError,
+    RateLimitError,
+)
 
 
 class LLMProvider(ABC):

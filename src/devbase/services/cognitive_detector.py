@@ -21,7 +21,6 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 
-from devbase.adapters.storage.duckdb_adapter import get_connection
 from devbase.services.notifications import get_notifier
 
 

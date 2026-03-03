@@ -172,3 +172,65 @@ def get_config() -> Config:
     if _config is None:
         _config = Config()
     return _config
+
+
+class ConfigResolver:
+    """Resolves configuration values with a well-defined precedence chain.
+
+    Precedence (highest to lowest):
+    1. Explicit argument passed to the method.
+    2. Environment variable.
+    3. ``config.toml`` entry.
+    4. ``None``.
+    """
+
+    _ENV_KEYS: dict[str, str] = {
+        "groq": "GROQ_API_KEY",
+    }
+    _CONFIG_KEYS: dict[str, str] = {
+        "groq": "ai.groq_api_key",
+    }
+
+    @classmethod
+    def resolve_api_key(
+        cls,
+        provider: str,
+        *,
+        explicit: Optional[str] = None,
+        root: Optional[Path] = None,
+    ) -> Optional[str]:
+        """Return the API key for *provider* using the precedence chain.
+
+        Args:
+            provider: Provider name (e.g. ``'groq'``).
+            explicit: Value passed directly by the caller (highest priority).
+            root: Workspace root for local ``config.toml`` resolution.
+
+        Returns:
+            Resolved API key string, or ``None`` if not configured.
+        """
+        import os
+
+        # 1. Explicit argument wins.
+        if explicit:
+            return explicit
+
+        # 2. Environment variable.
+        env_key = cls._ENV_KEYS.get(provider)
+        if env_key:
+            value = os.environ.get(env_key)
+            if value:
+                return value
+
+        # 3. config.toml.
+        config_key = cls._CONFIG_KEYS.get(provider)
+        if config_key:
+            try:
+                config = Config(root=root)
+                value = config.get(config_key)
+                if value:
+                    return value
+            except Exception:
+                pass
+
+        return None

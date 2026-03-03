@@ -5,14 +5,17 @@ Centralized event tracking for DevBase.
 Persists events to DuckDB for analytics and flow detection.
 """
 import json
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
 
 from devbase.utils.context import detect_context, infer_activity_type, infer_project_name
-from devbase.adapters.storage.duckdb_adapter import log_event
+from devbase.adapters.storage.event_repository import EventRepository
 from devbase.services.cognitive_detector import check_flow_state
+
+logger = logging.getLogger(__name__)
 
 class TelemetryService:
     def __init__(self, root: Path):
@@ -75,26 +78,29 @@ class TelemetryService:
             "metadata": full_metadata
         }
 
-        # 1. DuckDB Write
+        # 1. DuckDB Write via EventRepository
         try:
-            log_event(
+            EventRepository().log(
                 event_type=action,
                 message=message,
                 project=project_name,
                 metadata=json.dumps(full_metadata)
             )
         except Exception as e:
-            logger.debug(f"Telemetry DuckDB write failed: {e}")
+            logger.debug("Telemetry DuckDB write failed: %s", e)
 
-        # 2. JSONL Fallback (for analytics compatibility)
+        # 2. JSONL Fallback (opt-in via config: telemetry.jsonl_fallback = true)
         try:
-            log_dir = self.root / ".telemetry"
-            log_dir.mkdir(exist_ok=True)
-            log_file = log_dir / "events.jsonl"
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(event_data) + "\n")
+            from devbase.utils.config import Config
+            cfg = Config(root=self.root)
+            if cfg.get("telemetry.jsonl_fallback", False):
+                log_dir = self.root / ".telemetry"
+                log_dir.mkdir(exist_ok=True)
+                log_file = log_dir / "events.jsonl"
+                with open(log_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(event_data) + "\n")
         except Exception as e:
-            logger.debug(f"Telemetry JSONL write failed: {e}")
+            logger.debug("Telemetry JSONL write failed: %s", e)
 
         # Trigger Active Assistance (Flow Detection)
         # We do this after logging so the current event counts towards the flow

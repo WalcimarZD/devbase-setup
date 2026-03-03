@@ -23,8 +23,10 @@ from devbase.utils.workspace import detect_workspace_root
 
 logger = logging.getLogger(__name__)
 
-# Version Marker
-__version__ = "5.1.0-alpha.5"
+try:
+    __version__ = version("devbase")
+except PackageNotFoundError:
+    __version__ = "dev"
 
 # Unified Panel Mapping (Forced ASCII Ordering)
 PANEL_MAP: dict[str, tuple[str, str]] = {

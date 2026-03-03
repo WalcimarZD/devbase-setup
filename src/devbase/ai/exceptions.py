@@ -63,17 +63,26 @@ class RateLimitError(ProviderError):
         self.retry_after = retry_after
 
 
+class ConfigurationError(DevBaseAIError):
+    """Provider configuration is invalid or incomplete.
+
+    Raised when the API key is missing, the config file is malformed,
+    or the requested provider is unknown.
+    """
+    pass
+
+
 class PromptTooLongError(DevBaseAIError):
     """Prompt exceeds model's context window limit.
-    
+
     The input data is too large for the model to process.
     User should reduce input size or use a model with larger context.
-    
+
     Attributes:
         token_count: Estimated tokens in the prompt.
         max_tokens: Maximum allowed by the model.
     """
-    
+
     def __init__(
         self,
         message: str = "Prompt exceeds token limit",

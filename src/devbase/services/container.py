@@ -53,6 +53,18 @@ class ServiceContainer:
         """
         from devbase.ai.service import AIService
         from devbase.ai.factory import AIProviderFactory
-        
+
         provider = AIProviderFactory.get_provider(self.root)
         return AIService(provider)
+
+    @cached_property
+    def event_repository(self) -> "EventRepository":
+        """Centralised repository for all telemetry event queries."""
+        from devbase.adapters.storage.event_repository import EventRepository
+        return EventRepository()
+
+    @cached_property
+    def search_engine(self) -> "SearchEngine":
+        """Full-text + semantic search over workspace knowledge."""
+        from devbase.services.search_engine import SearchEngine
+        return SearchEngine()
