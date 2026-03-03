@@ -1,46 +1,28 @@
 """
 Development Commands Package
 ==============================
-Split from the monolithic development.py for maintainability.
-
-Sub-modules:
-    project  — new, import, open, info, list, archive, update, restore
-    scaffold — blueprint, adr-gen
-    audit    — audit (naming conventions)
-    worktree — worktree-add, worktree-list, worktree-remove
+Architecture: Command Merger Pattern.
+Flattens sub-module commands into a single 'dev' namespace.
 """
 import typer
 
-# Import command functions directly for standard registration
-from devbase.commands.dev.project import (
-    new, import_project, open_project, restore_packages, restore_project, info_project, list_projects, archive, update
-)
-from devbase.commands.dev.scaffold import blueprint, adr_gen
-from devbase.commands.dev.audit import audit
-from devbase.commands.dev.worktree import worktree_add, worktree_list, worktree_remove
+from devbase.commands.dev.project import app as project_app
+from devbase.commands.dev.scaffold import app as scaffold_app
+from devbase.commands.dev.audit import app as audit_app
+from devbase.commands.dev.worktree import app as worktree_app
 
-app = typer.Typer(help="Development commands")
+app = typer.Typer(help="Project Lifecycle & Worktrees")
 
-# Standard registration ensures correct argument parsing and context (ctx) propagation
-# Project commands
-app.command(name="new")(new)
-app.command(name="import")(import_project)
-app.command(name="open")(open_project)
-app.command(name="restore-packages")(restore_packages)
-app.command(name="restore")(restore_project)
-app.command(name="info")(info_project)
-app.command(name="list")(list_projects)
-app.command(name="archive")(archive)
-app.command(name="update")(update)
+# Safely merge commands from sub-apps to maintain a flat structure
+# Standardizing on .registered_commands ensures all metadata (ctx, types) is preserved.
+def _merge_commands():
+    for source_app in [project_app, scaffold_app, audit_app, worktree_app]:
+        # Merge individual commands
+        for command in source_app.registered_commands:
+            app.registered_commands.append(command)
+        
+        # Merge groups if any exist
+        for group in source_app.registered_groups:
+            app.registered_groups.append(group)
 
-# Scaffold commands
-app.command(name="blueprint")(blueprint)
-app.command(name="adr-gen")(adr_gen)
-
-# Audit commands
-app.command(name="audit")(audit)
-
-# Worktree commands
-app.command(name="worktree-add")(worktree_add)
-app.command(name="worktree-list")(worktree_list)
-app.command(name="worktree-remove")(worktree_remove)
+_merge_commands()
