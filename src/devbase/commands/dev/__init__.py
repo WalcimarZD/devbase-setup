@@ -11,16 +11,36 @@ Sub-modules:
 """
 import typer
 
-from devbase.commands.dev.project import app as project_app
-from devbase.commands.dev.scaffold import app as scaffold_app
-from devbase.commands.dev.audit import app as audit_app
-from devbase.commands.dev.worktree import app as worktree_app
+# Import command functions directly for standard registration
+from devbase.commands.dev.project import (
+    new, import_project, open_project, restore_packages, restore_project, info_project, list_projects, archive, update
+)
+from devbase.commands.dev.scaffold import blueprint, adr_gen
+from devbase.commands.dev.audit import audit
+from devbase.commands.dev.worktree import worktree_add, worktree_list, worktree_remove
 
 app = typer.Typer(help="Development commands")
 
-# Register all sub-module commands onto this single Typer app
-for source_app in [project_app, scaffold_app, audit_app, worktree_app]:
-    for command_info in source_app.registered_commands:
-        app.registered_commands.append(command_info)
-    for group_info in source_app.registered_groups:
-        app.registered_groups.append(group_info)
+# Standard registration ensures correct argument parsing and context (ctx) propagation
+# Project commands
+app.command(name="new")(new)
+app.command(name="import")(import_project)
+app.command(name="open")(open_project)
+app.command(name="restore-packages")(restore_packages)
+app.command(name="restore")(restore_project)
+app.command(name="info")(info_project)
+app.command(name="list")(list_projects)
+app.command(name="archive")(archive)
+app.command(name="update")(update)
+
+# Scaffold commands
+app.command(name="blueprint")(blueprint)
+app.command(name="adr-gen")(adr_gen)
+
+# Audit commands
+app.command(name="audit")(audit)
+
+# Worktree commands
+app.command(name="worktree-add")(worktree_add)
+app.command(name="worktree-list")(worktree_list)
+app.command(name="worktree-remove")(worktree_remove)

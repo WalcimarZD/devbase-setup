@@ -105,12 +105,11 @@ def add_worktree(
 
     # Simple approach: if --create, always create new branch from HEAD
     # Otherwise, try to checkout existing branch
-    # Note: Use "--" to prevent argument injection from branch names
     if create_branch:
-        cmd = ["git", "worktree", "add", "-b", branch, "--", str(worktree_path), "HEAD"]
+        cmd = ["git", "worktree", "add", "-b", branch, str(worktree_path), "HEAD"]
     else:
-        # Use -- delimiter to prevent branch name being interpreted as an option
-        cmd = ["git", "worktree", "add", str(worktree_path), "--", branch]
+        # Standard syntax: git worktree add <path> <branch>
+        cmd = ["git", "worktree", "add", str(worktree_path), branch]
 
     console.print(f"[cyan]→ git {' '.join(cmd[1:])}[/cyan]")
 
